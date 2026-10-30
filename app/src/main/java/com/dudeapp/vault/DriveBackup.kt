@@ -60,7 +60,7 @@ internal fun backupNamesToDelete(names: List<String>, keep: Int = KEEP_BACKUPS):
 
 /**
  * Writes one ordinary zip into a folder picked through Android's system file picker.
- * P Vault itself has no Internet permission; the Google Drive app handles the upload.
+ * The Google Drive app handles the upload; P Vault only writes through the picker.
  */
 class DriveBackupStore(context: Context) {
     private val app = context.applicationContext
