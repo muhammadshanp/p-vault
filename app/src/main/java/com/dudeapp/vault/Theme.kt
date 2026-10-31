@@ -23,7 +23,7 @@ val TextSoft: Color
     @ReadOnlyComposable
     get() = MaterialTheme.colorScheme.onSurfaceVariant
 
-/** White is the normal look; Dark keeps the same layout without the glass effects. */
+/** White and Dark use the same warm greys and coral accent as the website and logo. */
 enum class ThemePreset(
     val label: String,
     val dark: Boolean,
@@ -40,28 +40,28 @@ enum class ThemePreset(
     WHITE(
         label = "White",
         dark = false,
-        primary = Color(0xFF111827),
-        secondary = Color(0xFF2563EB),
-        background = Color(0xFFF6F7F9),
+        primary = Color(0xFFE8633A),
+        secondary = Color(0xFFB23E17),
+        background = Color(0xFFF3F4F2),
         surface = Color(0xFFFFFFFF),
-        surfaceVariant = Color(0xFFEFF1F4),
-        onBackground = Color(0xFF171A1F),
-        onSurfaceVariant = Color(0xFF6B7280),
-        outline = Color(0xFFE2E5EA),
-        error = Color(0xFFD93025),
+        surfaceVariant = Color(0xFFECEEEA),
+        onBackground = Color(0xFF16181D),
+        onSurfaceVariant = Color(0xFF595C62),
+        outline = Color(0xFFDCDEDA),
+        error = Color(0xFFB23E17),
     ),
     DARK(
         label = "Dark",
         dark = true,
-        primary = Color(0xFFAFC3FF),
-        secondary = Color(0xFF7EE0C8),
-        background = Color(0xFF0C0E12),
-        surface = Color(0xFF15181E),
-        surfaceVariant = Color(0xFF1E222B),
-        onBackground = Color(0xFFF2F4F7),
-        onSurfaceVariant = Color(0xFFA4ABBA),
-        outline = Color(0xFF2C323D),
-        error = Color(0xFFFF8A9B),
+        primary = Color(0xFFE8633A),
+        secondary = Color(0xFFF08A66),
+        background = Color(0xFF111317),
+        surface = Color(0xFF1A1D23),
+        surfaceVariant = Color(0xFF242830),
+        onBackground = Color(0xFFF3F4F2),
+        onSurfaceVariant = Color(0xFFA3A7AE),
+        outline = Color(0xFF2A2E36),
+        error = Color(0xFFF08A66),
     ),
 }
 
@@ -82,19 +82,21 @@ fun PVaultTheme(
     preset: ThemePreset = ThemePreset.WHITE,
     content: @Composable () -> Unit,
 ) {
-    val onAccent = if (preset.dark) preset.background else Color.White
+    val onPrimary = Color(0xFF16181D)
+    val onSecondary = if (preset.dark) Color(0xFF16181D) else Color.White
+    val onError = if (preset.dark) Color(0xFF16181D) else Color.White
     val base = if (preset.dark) darkColorScheme() else lightColorScheme()
     val colors = base.copy(
         primary = preset.primary,
-        onPrimary = onAccent,
+        onPrimary = onPrimary,
         primaryContainer = preset.surfaceVariant,
         onPrimaryContainer = preset.primary,
         secondary = preset.secondary,
-        onSecondary = onAccent,
+        onSecondary = onSecondary,
         secondaryContainer = preset.surfaceVariant,
         onSecondaryContainer = preset.secondary,
         tertiary = preset.secondary,
-        onTertiary = onAccent,
+        onTertiary = onSecondary,
         tertiaryContainer = preset.surfaceVariant,
         onTertiaryContainer = preset.secondary,
         background = preset.background,
@@ -104,20 +106,20 @@ fun PVaultTheme(
         surfaceVariant = preset.surfaceVariant,
         onSurfaceVariant = preset.onSurfaceVariant,
         surfaceTint = preset.primary,
-        inverseSurface = if (preset.dark) preset.onBackground else Color(0xFF1F2937),
+        inverseSurface = if (preset.dark) preset.onBackground else Color(0xFF16181D),
         inverseOnSurface = if (preset.dark) preset.background else Color.White,
         error = preset.error,
-        onError = onAccent,
-        errorContainer = if (preset.dark) Color(0xFF4A1D24) else Color(0xFFFCE8E6),
+        onError = onError,
+        errorContainer = if (preset.dark) Color(0xFF3A211B) else Color(0xFFF7E4DE),
         onErrorContainer = preset.error,
         outline = preset.outline,
         outlineVariant = preset.outline,
         scrim = Color.Black,
         surfaceBright = if (preset.dark) preset.surfaceVariant else Color.White,
-        surfaceDim = if (preset.dark) preset.background else Color(0xFFE9EBEF),
-        surfaceContainer = if (preset.dark) Color(0xFF191D24) else preset.background,
-        surfaceContainerHigh = if (preset.dark) Color(0xFF1E232C) else preset.surfaceVariant,
-        surfaceContainerHighest = if (preset.dark) Color(0xFF262C36) else Color(0xFFE7EAEF),
+        surfaceDim = if (preset.dark) preset.background else Color(0xFFE8EAE5),
+        surfaceContainer = if (preset.dark) Color(0xFF1E2128) else preset.background,
+        surfaceContainerHigh = preset.surfaceVariant,
+        surfaceContainerHighest = if (preset.dark) preset.outline else Color(0xFFE4E6E1),
         surfaceContainerLow = if (preset.dark) preset.surface else Color.White,
         surfaceContainerLowest = if (preset.dark) preset.background else Color.White,
     )
