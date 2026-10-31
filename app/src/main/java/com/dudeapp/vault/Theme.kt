@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -123,7 +124,15 @@ fun PVaultTheme(
         surfaceContainerLow = if (preset.dark) preset.surface else Color.White,
         surfaceContainerLowest = if (preset.dark) preset.background else Color.White,
     )
-    MaterialTheme(colorScheme = colors, typography = Typography(), content = content)
+    MaterialTheme(colorScheme = colors, typography = Typography()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = colors.background,
+            contentColor = colors.onBackground,
+        ) {
+            content()
+        }
+    }
 }
 
 /** A flat app background; colour comes from the active theme. */

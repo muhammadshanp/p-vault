@@ -4,29 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
-import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-/**
- * The stock OpenDocumentTree contract does not request write or persistable access.
- * Without these flags P Vault can create a file only for the current session, and
- * takePersistableUriPermission() fails, so the Drive folder would be forgotten on restart.
- */
-class PersistentOpenDocumentTree : ActivityResultContracts.OpenDocumentTree() {
-    override fun createIntent(context: Context, input: Uri?): Intent =
-        super.createIntent(context, input).apply {
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PREFIX_URI_PERMISSION,
-            )
-        }
-}
 
 data class DriveBackupState(
     val connected: Boolean,

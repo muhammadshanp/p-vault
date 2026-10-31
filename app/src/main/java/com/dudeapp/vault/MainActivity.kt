@@ -2,7 +2,6 @@ package com.dudeapp.vault
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.DisposableEffect
@@ -17,6 +16,7 @@ class MainActivity : FragmentActivity() {
 
     private var locked by mutableStateOf(true)
     private var needsSetup by mutableStateOf(false)
+    private var needsLockChoice by mutableStateOf(false)
     private var pendingShare by mutableStateOf<String?>(null)
     private var external = false // a system picker is open; don't lock on that trip
     private var backgroundAt = 0L
@@ -30,11 +30,12 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
 
         theme = themeStore.load()
-        needsSetup = !Auth.hasPin(this)
-        locked = !needsSetup
+        val settings = settingsStore.load()
+        needsLockChoice = !settings.lockChoiceMade && !Auth.hasPin(this)
+        needsSetup = !needsLockChoice && settings.appLock && !Auth.hasPin(this)
+        locked = !needsLockChoice && settings.appLock && !needsSetup
         autoPromptPending = locked
         pendingShare = extractShare(intent)
 
@@ -48,8 +49,29 @@ class MainActivity : FragmentActivity() {
             }
             PVaultTheme(theme) {
                 when {
+                    needsLockChoice -> LockChoiceScreen(
+                        onEnable = {
+                            settingsStore.save(
+                                settings.copy(lockChoiceMade = true, appLock = true),
+                            )
+                            needsLockChoice = false
+                            needsSetup = true
+                            locked = false
+                        },
+                        onSkip = {
+                            settingsStore.save(
+                                settings.copy(lockChoiceMade = true, appLock = false),
+                            )
+                            needsLockChoice = false
+                            needsSetup = false
+                            locked = false
+                        },
+                    )
+
                     needsSetup -> CreatePinScreen(
                         onDone = {
+                            val current = settingsStore.load()
+                            settingsStore.save(current.copy(lockChoiceMade = true, appLock = true))
                             needsSetup = false
                             locked = false
                         },
@@ -64,6 +86,10 @@ class MainActivity : FragmentActivity() {
                         sharedText = pendingShare,
                         onShareConsumed = { pendingShare = null },
                         onExternal = { external = true },
+                        onPinSetup = {
+                            needsSetup = true
+                            locked = false
+                        },
                         theme = theme,
                         onThemeChange = {
                             theme = it
@@ -90,8 +116,18 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         external = false
+        if (needsLockChoice || needsSetup) {
+            locked = false
+            return
+        }
+        val settings = settingsStore.load()
+        if (!settings.appLock) {
+            backgroundAt = 0L
+            locked = false
+            return
+        }
         if (!locked && backgroundAt > 0L) {
-            val delayMs = settingsStore.load().lockDelaySeconds * 1000L
+            val delayMs = settings.lockDelaySeconds * 1000L
             if (System.currentTimeMillis() - backgroundAt >= delayMs) {
                 biometricPromptKey = 0
                 autoPromptPending = true
@@ -107,8 +143,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!external && !needsSetup) {
-            if (settingsStore.load().lockDelaySeconds == 0) {
+        val settings = settingsStore.load()
+        if (!external && !needsSetup && !needsLockChoice && settings.appLock) {
+            if (settings.lockDelaySeconds == 0) {
                 if (!locked) {
                     biometricPromptKey = 0
                     autoPromptPending = true

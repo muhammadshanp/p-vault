@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -151,14 +153,25 @@ fun CategoryChips(
 }
 
 @Composable
-fun ReelCard(reel: Reel, onClick: () -> Unit, onMenu: () -> Unit) {
+fun ReelCard(
+    reel: Reel,
+    selected: Boolean,
+    selecting: Boolean,
+    onClick: () -> Unit,
+    onMenu: () -> Unit,
+) {
     val shape = RoundedCornerShape(22.dp)
+    val marked = selecting && selected
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(
+                width = if (marked) 2.dp else 1.dp,
+                color = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                shape = shape,
+            )
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -194,12 +207,42 @@ fun ReelCard(reel: Reel, onClick: () -> Unit, onMenu: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(onClick = onMenu) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "Reel options",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (selecting) {
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                    )
+                    .border(
+                        1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        } else {
+            IconButton(onClick = onMenu) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Reel options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -1,8 +1,11 @@
 package com.dudeapp.vault
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -10,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -39,7 +44,10 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SystemUpdateAlt
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -50,6 +58,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +71,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +79,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -83,6 +97,7 @@ fun VaultApp(
     sharedText: String?,
     onShareConsumed: () -> Unit,
     onExternal: () -> Unit,
+    onPinSetup: () -> Unit,
     theme: ThemePreset,
     onThemeChange: (ThemePreset) -> Unit,
 ) {
@@ -97,9 +112,21 @@ fun VaultApp(
         }.getOrNull().orEmpty()
     }
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) availableUpdate?.let { showUpdateNotification(context, it) }
+    }
+    var updateDialogOpen by remember { mutableStateOf(false) }
+    var notificationAsked by remember { mutableStateOf(false) }
+    var suppressNextStart by remember { mutableStateOf(false) }
+    var wasStopped by remember { mutableStateOf(false) }
 
     var tab by remember { mutableStateOf(Tab.FILES) }
     var query by remember { mutableStateOf("") }
+    var selecting by remember { mutableStateOf(false) }
+    var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var deleteSelectionOpen by remember { mutableStateOf(false) }
     var vaultItems by remember { mutableStateOf<List<VaultItem>>(emptyList()) }
     var reels by remember { mutableStateOf<List<Reel>>(emptyList()) }
     var categories by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -136,6 +163,33 @@ fun VaultApp(
     var settings by remember { mutableStateOf(settingsStore.load()) }
     var settingsOpen by remember { mutableStateOf(false) }
 
+    fun presentUpdate(latest: AppUpdate) {
+        if (!isNewerVersion(latest.version, currentVersion)) {
+            clearUpdateNotification(context)
+            return
+        }
+        availableUpdate = latest
+        updateDialogOpen = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            if (!notificationAsked) {
+                notificationAsked = true
+                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            showUpdateNotification(context, latest)
+        }
+    }
+
+    fun openUpdatePage(url: String) {
+        updateDialogOpen = false
+        suppressNextStart = true
+        clearUpdateNotification(context)
+        openUrl(context, url)
+    }
+
     LaunchedEffect(Unit) {
         if (sharedText != null) return@LaunchedEffect
         if (!drive.connected) return@LaunchedEffect
@@ -150,7 +204,31 @@ fun VaultApp(
 
     LaunchedEffect(Unit) {
         val latest = checkForUpdate() ?: return@LaunchedEffect
-        if (isNewerVersion(latest.version, currentVersion)) availableUpdate = latest
+        presentUpdate(latest)
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> wasStopped = true
+                Lifecycle.Event.ON_START -> if (wasStopped) {
+                    wasStopped = false
+                    if (suppressNextStart) {
+                        suppressNextStart = false
+                    } else {
+                        if (availableUpdate != null) updateDialogOpen = true
+                        scope.launch {
+                            val latest = checkForUpdate() ?: return@launch
+                            presentUpdate(latest)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(Unit) {
@@ -192,6 +270,44 @@ fun VaultApp(
         }
     }
 
+    fun toggleSelected(path: String) {
+        selectedPaths = if (path in selectedPaths) selectedPaths - path else selectedPaths + path
+    }
+
+    fun cancelSelection() {
+        selecting = false
+        selectedPaths = emptySet()
+    }
+
+    fun deleteSelected() {
+        val paths = selectedPaths
+        if (paths.isEmpty()) return
+        deleteSelectionOpen = false
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                when {
+                    tab == Tab.REELS -> reels
+                        .filter { it.file.absolutePath in paths }
+                        .forEach { store.deleteReel(it) }
+
+                    tab == Tab.NOTES && chatView -> chats
+                        .filter { it.dir.absolutePath in paths }
+                        .forEach { store.deleteChat(it) }
+
+                    else -> vaultItems
+                        .filter { it.file.absolutePath in paths }
+                        .forEach { store.delete(it) }
+                }
+            }
+            cancelSelection()
+            refresh()
+        }
+    }
+
+    LaunchedEffect(tab, chatView, query, reelFilter) {
+        if (selecting) cancelSelection()
+    }
+
     fun dismissRestorePrompt() {
         context.getSharedPreferences("dude_app", Context.MODE_PRIVATE)
             .edit()
@@ -212,11 +328,11 @@ fun VaultApp(
     }
 
     val pdfPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        if (uris.isNotEmpty()) {
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
             scope.launch {
-                withContext(Dispatchers.IO) { uris.forEach { store.addFile(it, "Document.pdf") } }
+                withContext(Dispatchers.IO) { store.addFile(uri, "Document.pdf") }
                 refresh()
             }
         }
@@ -259,7 +375,7 @@ fun VaultApp(
     }
 
     val driveFolderPicker = rememberLauncherForActivityResult(
-        PersistentOpenDocumentTree(),
+        ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
         if (uri != null) {
             val connected = driveStore.connect(uri)
@@ -474,19 +590,47 @@ fun VaultApp(
 
     val pendingName = categories.firstOrNull { it.equals("Pending", ignoreCase = true) }
 
+    val swipeTabs = Modifier.pointerInput(tab) {
+        var total = 0f
+        val threshold = 72.dp.toPx()
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragEnd = {
+                val next = when {
+                    total <= -threshold -> Tab.entries.getOrNull(tab.ordinal + 1)
+                    total >= threshold -> Tab.entries.getOrNull(tab.ordinal - 1)
+                    else -> null
+                }
+                if (next != null) tab = next
+            },
+            onHorizontalDrag = { change, dragAmount ->
+                total += dragAmount
+                change.consume()
+            },
+        )
+    }
+
     val detail = open
     val chatDetail = openChat
     if (settingsOpen) {
         SettingsScreen(
             theme = theme,
             settings = settings,
+            update = availableUpdate,
             onTheme = onThemeChange,
             onSettings = { next ->
                 val autoWasOff = !settings.autoBackup
                 settings = next
                 settingsStore.save(next)
+                if (next.appLock && !Auth.hasPin(context)) onPinSetup()
                 if (autoWasOff && next.autoBackup && driveStore.hasPending()) {
                     autoBackupTick += 1
+                }
+            },
+            onUpdate = {
+                availableUpdate?.let {
+                    settingsOpen = false
+                    openUpdatePage(it.url)
                 }
             },
             onExport = { exportVault() },
@@ -568,6 +712,14 @@ fun VaultApp(
                             Tab.NOTES -> if (chatView) "chat" else "note"
                         },
                         onAdd = { sectionAdd() },
+                        onSelect = {
+                            if (selecting) {
+                                cancelSelection()
+                            } else {
+                                selecting = true
+                                selectedPaths = emptySet()
+                            }
+                        },
                         onManage = when {
                             tab == Tab.REELS -> { { categoriesOpen = true } }
                             tab == Tab.NOTES && chatView -> { { chatsOpen = true } }
@@ -575,6 +727,40 @@ fun VaultApp(
                         },
                         manageDescription = if (tab == Tab.REELS) "Edit categories" else "Manage chats",
                     )
+
+                    if (selecting) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${selectedPaths.size} selected",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { cancelSelection() }) {
+                                Text("Cancel")
+                            }
+                            TextButton(
+                                onClick = {
+                                    if (selectedPaths.isNotEmpty()) deleteSelectionOpen = true
+                                },
+                                enabled = selectedPaths.isNotEmpty(),
+                            ) {
+                                Text(
+                                    "Delete",
+                                    color = if (selectedPaths.isEmpty()) {
+                                        TextSoft
+                                    } else {
+                                        MaterialTheme.colorScheme.error
+                                    },
+                                )
+                            }
+                        }
+                    }
 
                     if (tab == Tab.NOTES) {
                         TextModeChips(chatView = chatView, onChange = { chatView = it })
@@ -595,22 +781,31 @@ fun VaultApp(
                                 searching = query.isNotBlank(),
                                 pendingView = pendingName != null && reelFilter == pendingName,
                                 onAdd = { sectionAdd() },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).then(swipeTabs),
                             )
                         } else {
                             LazyColumn(
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 120.dp),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .fillMaxWidth(),
+                                    .fillMaxWidth()
+                                    .then(swipeTabs),
                             ) {
                                 visibleReels.forEach { reel ->
                                     item(key = reel.file.absolutePath) {
                                         ReelCard(
                                             reel = reel,
-                                            onClick = { openUrl(context, reel.url) },
-                                            onMenu = { reelMenu = reel },
+                                            selected = reel.file.absolutePath in selectedPaths,
+                                            selecting = selecting,
+                                            onClick = {
+                                                if (selecting) {
+                                                    toggleSelected(reel.file.absolutePath)
+                                                } else {
+                                                    openUrl(context, reel.url)
+                                                }
+                                            },
+                                            onMenu = { if (!selecting) reelMenu = reel },
                                         )
                                     }
                                 }
@@ -623,19 +818,31 @@ fun VaultApp(
                                 searching = query.isNotBlank(),
                                 chatView = true,
                                 onAdd = { sectionAdd() },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).then(swipeTabs),
                             )
                         } else {
                             LazyColumn(
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 120.dp),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .fillMaxWidth(),
+                                    .fillMaxWidth()
+                                    .then(swipeTabs),
                             ) {
                                 visibleChats.forEach { chat ->
                                     item(key = chat.dir.absolutePath) {
-                                        ChatRow(chat = chat, onClick = { openChat = chat })
+                                        ChatRow(
+                                            chat = chat,
+                                            selected = chat.dir.absolutePath in selectedPaths,
+                                            selecting = selecting,
+                                            onClick = {
+                                                if (selecting) {
+                                                    toggleSelected(chat.dir.absolutePath)
+                                                } else {
+                                                    openChat = chat
+                                                }
+                                            },
+                                        )
                                     }
                                 }
                             }
@@ -645,20 +852,32 @@ fun VaultApp(
                             tab = tab,
                             searching = query.isNotBlank(),
                             onAdd = { sectionAdd() },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).then(swipeTabs),
                         )
                     } else {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
-                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 120.dp),
+                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .then(swipeTabs),
                         ) {
                             items(visibleFiles, key = { it.file.absolutePath }) { item ->
-                                VaultCard(item = item, onClick = { open = item })
+                                VaultCard(
+                                    item = item,
+                                    selected = item.file.absolutePath in selectedPaths,
+                                    selecting = selecting,
+                                    onClick = {
+                                        if (selecting) {
+                                            toggleSelected(item.file.absolutePath)
+                                        } else {
+                                            open = item
+                                        }
+                                    },
+                                )
                             }
                         }
                     }
@@ -688,6 +907,30 @@ fun VaultApp(
                     onReel = {
                         addOpen = false
                         openReelDialog()
+                    },
+                )
+            }
+
+            if (deleteSelectionOpen) {
+                val count = selectedPaths.size
+                AlertDialog(
+                    onDismissRequest = { deleteSelectionOpen = false },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    title = {
+                        Text(if (count == 1) "Delete 1 item?" else "Delete $count items?")
+                    },
+                    text = {
+                        Text("This removes the selected items from your vault. It can't be undone.")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { deleteSelected() }) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deleteSelectionOpen = false }) {
+                            Text("Cancel")
+                        }
                     },
                 )
             }
@@ -981,28 +1224,56 @@ fun VaultApp(
     }
 
     val update = availableUpdate
-    if (update != null) {
+    if (update != null && updateDialogOpen) {
         AlertDialog(
-            onDismissRequest = { availableUpdate = null },
-            title = { Text("Update available") },
+            onDismissRequest = { updateDialogOpen = false },
+            icon = {
+                Box(
+                    Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.SystemUpdateAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            },
+            title = { Text("Update available", textAlign = TextAlign.Center) },
             text = {
-                Text("P Vault ${update.version} is available. You have $currentVersion.")
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "P Vault ${update.version}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "A newer version is ready. You have $currentVersion. Get it from the official P Vault website.",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        availableUpdate = null
-                        openUrl(context, update.url)
-                    },
+                Button(
+                    onClick = { openUpdatePage(update.url) },
+                    shape = RoundedCornerShape(50),
                 ) {
-                    Text("Update")
+                    Text("Update now")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { availableUpdate = null }) {
-                    Text("Later")
+                TextButton(onClick = { updateDialogOpen = false }) {
+                    Text("Not now")
                 }
             },
+            shape = RoundedCornerShape(28.dp),
         )
     }
 }
@@ -1097,6 +1368,7 @@ private fun SectionHeader(
     count: Int,
     unit: String,
     onAdd: () -> Unit,
+    onSelect: () -> Unit,
     onManage: (() -> Unit)?,
     manageDescription: String,
 ) {
@@ -1121,11 +1393,18 @@ private fun SectionHeader(
         if (onManage != null) {
             IconButton(onClick = onManage) {
                 Icon(
-                    imageVector = Icons.Default.Edit,
+                    imageVector = Icons.Outlined.Tune,
                     contentDescription = manageDescription,
                     modifier = Modifier.size(20.dp),
                 )
             }
+        }
+        IconButton(onClick = onSelect) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Select $title",
+                modifier = Modifier.size(20.dp),
+            )
         }
         FilledIconButton(onClick = onAdd) {
             Icon(Icons.Default.Add, contentDescription = "Add to $title")
@@ -1134,14 +1413,24 @@ private fun SectionHeader(
 }
 
 @Composable
-private fun VaultCard(item: VaultItem, onClick: () -> Unit) {
+private fun VaultCard(
+    item: VaultItem,
+    selected: Boolean,
+    selecting: Boolean,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(24.dp)
+    val marked = selecting && selected
     Box(
         Modifier
             .aspectRatio(0.82f)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(
+                width = if (marked) 2.dp else 1.dp,
+                color = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                shape = shape,
+            )
             .clickable(onClick = onClick),
     ) {
         when (item.type) {
@@ -1204,6 +1493,45 @@ private fun VaultCard(item: VaultItem, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                 )
+            }
+        }
+
+        if (selecting) {
+            if (selected) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                )
+            }
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        },
+                    )
+                    .border(
+                        1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }

@@ -102,15 +102,25 @@ fun TextModeChips(chatView: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
-fun ChatRow(chat: ChatThread, onClick: () -> Unit) {
+fun ChatRow(
+    chat: ChatThread,
+    selected: Boolean,
+    selecting: Boolean,
+    onClick: () -> Unit,
+) {
     val context = LocalContext.current
     val shape = RoundedCornerShape(22.dp)
+    val marked = selecting && selected
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(
+                width = if (marked) 2.dp else 1.dp,
+                color = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                shape = shape,
+            )
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -133,7 +143,36 @@ fun ChatRow(chat: ChatThread, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (chat.lastStamp > 0L) {
+        if (selecting) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                    )
+                    .border(
+                        1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        } else if (chat.lastStamp > 0L) {
             Spacer(Modifier.width(8.dp))
             Text(listTimeOf(context, chat.lastStamp), color = TextSoft, fontSize = 11.sp)
         }

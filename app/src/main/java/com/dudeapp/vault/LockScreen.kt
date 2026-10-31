@@ -135,6 +135,36 @@ fun CreatePinScreen(onDone: () -> Unit) {
 }
 
 @Composable
+fun LockChoiceScreen(onEnable: () -> Unit, onSkip: () -> Unit) {
+    PinShell {
+        Icon(Icons.Outlined.Lock, null, Modifier.size(46.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "Protect P Vault?",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Add a PIN so only you can open your vault. You can turn it off later in Settings.",
+            color = TextSoft,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(30.dp))
+        Button(
+            onClick = onEnable,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(18.dp),
+        ) {
+            Text("Set a PIN", fontWeight = FontWeight.SemiBold)
+        }
+        TextButton(onClick = onSkip) {
+            Text("Skip for now")
+        }
+    }
+}
+
+@Composable
 fun LockScreen(autoPromptKey: Int, onUnlocked: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity

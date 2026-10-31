@@ -14,15 +14,17 @@ A private vault for photos, PDFs, text notes and Instagram Reels. Android only. 
 - Save Instagram Reels as links, organised into categories (Pending, Tech, AI, Anime, Others, plus your own). Links are validated before saving.
 - Share a reel from Instagram straight into P Vault; it opens the save dialog with Pending selected.
 - Browse in five tabs: Files, Reels, Images, PDFs, Notes. Search by title, filter reels by category.
+- Swipe left or right on the content to move between tabs.
 - The Notes tab opens Chats by default; switch the Chats/Notes chips to see plain notes.
 - A contextual + in every section: add a file, reel, photo, PDF or note.
 - Rename and delete items. Reels can be moved between categories; categories can be renamed (Pending is reserved).
+- Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together.
 - Search hints and item counts follow the current section.
-- Locked behind a PIN (salted SHA-256 hash) and optional fingerprint. The fingerprint prompt opens automatically when you return to the app; PIN is the fallback. Five wrong PIN attempts lock the app for 30 seconds. Auto-lock can run immediately, after 30 seconds, after 1 minute, or after 5 minutes.
-- A full Settings screen: theme, change PIN, fingerprint unlock, auto-lock delay, auto-backup on/off, backup reminder interval, backups kept, export/import, clear vault data, and About/version.
-- Screenshots, screen recording and the recent-apps preview are blocked.
+- Optionally locked behind a PIN (salted SHA-256 hash) and optional fingerprint. On first launch, P Vault asks whether you want a PIN; choose Skip to use it without a lock. The fingerprint prompt opens automatically when you return to the app; PIN is the fallback. Five wrong PIN attempts lock the app for 30 seconds. Auto-lock can run immediately, after 30 seconds, after 1 minute, or after 5 minutes. The launch PIN can be turned off in Settings.
+- A full Settings screen: theme, app lock on/off, change PIN, fingerprint unlock, auto-lock delay, auto-backup on/off, backup reminder interval, backups kept, export/import, clear vault data, and About/version.
+- Screenshots, screen recording and the recent-apps preview are allowed.
 - Optional Google Drive backup through Android's system folder picker. Install the free Google Drive app, sign in there, and pick a Drive folder once. No Google Cloud project or paid plan is needed. Local storage stays primary. A dedicated Google account just for backups is a good idea. Backups are not encrypted.
-- On launch, checks the public GitHub Releases page for a newer version and shows an **Update available** dialog. The Update button opens the release page; it never installs anything by itself.
+- On launch, checks the public GitHub Releases page for a newer version and shows an **Update available** dialog. The Update button opens the official P Vault website; it never installs anything by itself.
 - Everything lives in the app's private storage. The only network request is the GitHub version check; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
 
 ## Stack
@@ -100,7 +102,7 @@ P Vault writes to the folder through Android's storage provider, and the Google 
 Open Settings from the gear beside your name. It includes:
 
 - Theme: White or Dark.
-- Change PIN, fingerprint unlock, and auto-lock delay.
+- App lock on/off, change PIN, fingerprint unlock, and auto-lock delay.
 - Auto-backup on/off and the backup reminder interval.
 - How many backups to keep in the Google Drive folder.
 - Export the vault to any zip file, import a P Vault backup, or clear all local vault data.
@@ -120,14 +122,14 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Limits
 
-- PIN + fingerprint is an app lock, not encryption. Screenshots and recents are blocked, but a rooted/forensic device can still read app-private files. Drive backups are plain zips.
+- PIN + fingerprint is an app lock, not encryption. The app lock is optional, and screenshots/recents are allowed, so anything visible on screen can be captured. A rooted/forensic device can still read app-private files. Drive backups are plain zips.
 - Chats are local notes in a WhatsApp-style view. There is no messaging or sync. Drive backup is optional and one-way.
 - Uninstalling the app deletes the local vault. Drive backups remain in Google Drive if you made them.
 - Deleting a chat deletes its messages. Deleting all chats does not recreate the default chats.
-- Forgetting the PIN means no way in.
+- Forgetting the PIN while app lock is on means no way in.
 - Drive backup is one-way and auto-backup runs only while P Vault is open. A backup can be interrupted if Android kills the app. Restore replaces the local vault. The connected folder keeps the number of P_Vault zips you choose in Settings; use a dedicated folder per phone.
 - Drive backup requires the Google Drive app and a folder you grant access to. If the app is uninstalled or the folder is removed, connect again.
 
 ## Package
 
-`com.dudeapp.vault` — version 0.3.1 (versionCode 15).
+`com.dudeapp.vault` — version 0.3.5 (versionCode 19).

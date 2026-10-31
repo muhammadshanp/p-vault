@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -55,8 +56,10 @@ import androidx.compose.ui.unit.sp
 fun SettingsScreen(
     theme: ThemePreset,
     settings: AppSettings,
+    update: AppUpdate?,
     onTheme: (ThemePreset) -> Unit,
     onSettings: (AppSettings) -> Unit,
+    onUpdate: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onClearData: () -> Unit,
@@ -142,6 +145,30 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
 
                 SettingsSection("Security") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("App lock", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text(
+                                "Ask for your PIN when P Vault opens.",
+                                color = TextSoft,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        Switch(
+                            checked = settings.appLock,
+                            onCheckedChange = {
+                                onSettings(settings.copy(appLock = it))
+                            },
+                        )
+                    }
+                    if (!settings.appLock) {
+                        Text(
+                            "App lock is off. Anyone with this phone can open the vault.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -273,6 +300,49 @@ fun SettingsScreen(
                 }
 
                 Spacer(Modifier.height(12.dp))
+
+                if (update != null) {
+                    SettingsSection("Notifications") {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable(onClick = onUpdate)
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Notifications,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "P Vault ${update.version} is available",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    "Tap to download and install the new version.",
+                                    color = TextSoft,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                            TextButton(onClick = onUpdate) { Text("Install") }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
 
                 SettingsSection("About") {
                     Text("P Vault $version", fontSize = 13.sp, fontWeight = FontWeight.Medium)
