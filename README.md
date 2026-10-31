@@ -130,4 +130,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.3 (versionCode 14).
+`com.dudeapp.vault` — version 0.3.1 (versionCode 15).

@@ -10,6 +10,8 @@ class UpdateCheckerTest {
         assertTrue(isNewerVersion("1.9", "1.8"))
         assertTrue(isNewerVersion("1.10", "1.9"))
         assertTrue(isNewerVersion("2.0.1", "1.99.9"))
+        assertTrue(isNewerVersion("0.3.1", "0.3"))
+        assertFalse(isNewerVersion("0.3", "0.3.1"))
         assertFalse(isNewerVersion("1.8", "1.8"))
         assertFalse(isNewerVersion("1.8", "1.9"))
     }

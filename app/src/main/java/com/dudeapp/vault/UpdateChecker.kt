@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 private const val UPDATE_REPO = "muhammadshanp/p-vault"
+private const val UPDATE_PAGE = "https://muhammadshanp.github.io/p-vault-website/"
 
 data class AppUpdate(val version: String, val url: String)
 
@@ -26,9 +27,7 @@ suspend fun checkForUpdate(): AppUpdate? = withContext(Dispatchers.IO) {
                 .find(json.optString("tag_name"))
                 ?.value
                 ?: return@runCatching null
-            val url = json.optString("html_url")
-                .ifBlank { "https://github.com/$UPDATE_REPO/releases/latest" }
-            AppUpdate(version, url)
+            AppUpdate(version, UPDATE_PAGE)
         } finally {
             connection.disconnect()
         }
