@@ -1,6 +1,6 @@
 # P Vault
 
-Website: **https://muhammadshanp.github.io/p-vault/**
+Website: **https://muhammadshanp.github.io/p-vault-website/** (source: [p-vault-website](https://github.com/muhammadshanp/p-vault-website))
 
 A private vault for photos, PDFs, text notes and Instagram Reels. Android only. Local by default, with optional Google Drive backup.
 
