@@ -62,6 +62,7 @@ The tag must contain the version number (`v1.10` or `1.10` both work). No update
 - **Android Auto Backup is enabled.** When Google backup is on and the vault fits Android's backup quota (about 25 MB), Android can restore the app-private files after a reinstall. This is not guaranteed and depends on the phone and backup timing.
 - **If Auto Backup does not restore**, the first launch with no local data shows **Restore your vault?**. Choose **Restore from Drive**, pick the latest `P_Vault_*.zip`, and the app restores it.
 - **Reconnect Drive once after a reinstall.** Android revokes the folder permission even when Auto Backup restores the saved folder name. Tap **Connect** and pick the same folder again; the existing backups stay there.
+- **An empty vault is not auto-backed up.** A fresh install cannot add an empty zip and push out a good backup. Normal **Backups kept** pruning still applies when a real backup is made.
 
 Auto Backup stores app data in the user's Google account, including vault files and settings. The Drive folder backup remains the reliable full copy.
 
@@ -127,4 +128,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 1.10 (versionCode 11).
+`com.dudeapp.vault` — version 1.11 (versionCode 12).

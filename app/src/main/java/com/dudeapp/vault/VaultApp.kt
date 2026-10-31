@@ -399,10 +399,18 @@ fun VaultApp(
         if (!drive.connected) return@LaunchedEffect
         if (!settings.autoBackup) return@LaunchedEffect
         if (!driveStore.hasPending()) return@LaunchedEffect
+        val hasContent = withContext(Dispatchers.IO) {
+            store.hasUserContent() || profile.name.isNotBlank() || profile.avatar != null
+        }
+        if (!hasContent) return@LaunchedEffect
         delay(AUTO_BACKUP_DELAY_MS)
         if (!drive.connected) return@LaunchedEffect
         if (!settings.autoBackup) return@LaunchedEffect
         if (!driveStore.hasPending()) return@LaunchedEffect
+        val stillHasContent = withContext(Dispatchers.IO) {
+            store.hasUserContent() || profile.name.isNotBlank() || profile.avatar != null
+        }
+        if (!stillHasContent) return@LaunchedEffect
         while (drive.busy) delay(2_000)
         if (!driveStore.hasPending()) return@LaunchedEffect
         backupNow(showToast = false)
