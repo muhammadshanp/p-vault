@@ -131,6 +131,7 @@ fun VaultApp(
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupReminder by remember { mutableStateOf(false) }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
+    var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
     var settings by remember { mutableStateOf(settingsStore.load()) }
     var settingsOpen by remember { mutableStateOf(false) }
@@ -150,6 +151,20 @@ fun VaultApp(
     LaunchedEffect(Unit) {
         val latest = checkForUpdate() ?: return@LaunchedEffect
         if (isNewerVersion(latest.version, currentVersion)) availableUpdate = latest
+    }
+
+    LaunchedEffect(Unit) {
+        val appPrefs = context.getSharedPreferences("dude_app", Context.MODE_PRIVATE)
+        if (appPrefs.getBoolean("restore_prompted", false)) return@LaunchedEffect
+        val empty = withContext(Dispatchers.IO) {
+            val existingProfile = profileStore.load()
+            !store.hasUserContent() && existingProfile.name.isBlank() && existingProfile.avatar == null
+        }
+        if (empty) {
+            restorePrompt = true
+        } else {
+            appPrefs.edit().putBoolean("restore_prompted", true).apply()
+        }
     }
 
     LaunchedEffect(version) {
@@ -175,6 +190,14 @@ fun VaultApp(
             autoBackupTick += 1
             driveStore.markPending()
         }
+    }
+
+    fun dismissRestorePrompt() {
+        context.getSharedPreferences("dude_app", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("restore_prompted", true)
+            .apply()
+        restorePrompt = false
     }
 
     val imagePicker = rememberLauncherForActivityResult(
@@ -910,6 +933,40 @@ fun VaultApp(
                     enabled = !drive.busy,
                 ) {
                     Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (restorePrompt) {
+        AlertDialog(
+            onDismissRequest = { dismissRestorePrompt() },
+            title = { Text("Restore your vault?") },
+            text = {
+                Text(
+                    "No vault data was found on this phone. If you backed up to Google Drive, restore the latest P_Vault zip now. Otherwise start fresh.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        dismissRestorePrompt()
+                        onExternal()
+                        restorePicker.launch(
+                            arrayOf(
+                                "application/zip",
+                                "application/x-zip-compressed",
+                                "application/octet-stream",
+                            ),
+                        )
+                    },
+                ) {
+                    Text("Restore from Drive")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { dismissRestorePrompt() }) {
+                    Text("Start fresh")
                 }
             },
         )

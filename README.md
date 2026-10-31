@@ -55,6 +55,16 @@ To publish an update:
 
 The tag must contain the version number (`v1.10` or `1.10` both work). No update file needs to be uploaded separately. Offline launches skip the check silently.
 
+## Data and reinstall
+
+- **Updating the app keeps everything.** Installing a new APK over the old one does not touch the vault, settings, profile or Drive connection.
+- **Uninstalling deletes the local vault.** Android removes app-private files. Your Google Drive backups are not deleted.
+- **Android Auto Backup is enabled.** When Google backup is on and the vault fits Android's backup quota (about 25 MB), Android can restore the app-private files after a reinstall. This is not guaranteed and depends on the phone and backup timing.
+- **If Auto Backup does not restore**, the first launch with no local data shows **Restore your vault?**. Choose **Restore from Drive**, pick the latest `P_Vault_*.zip`, and the app restores it.
+- **Reconnect Drive once after a reinstall.** Android revokes the folder permission even when Auto Backup restores the saved folder name. Tap **Connect** and pick the same folder again; the existing backups stay there.
+
+Auto Backup stores app data in the user's Google account, including vault files and settings. The Drive folder backup remains the reliable full copy.
+
 ## Sharing reels
 
 In Instagram, open a reel, tap Share, and choose P Vault. The app opens on the Reels tab with the link filled in and Pending selected. Save it there, then move it to Tech, AI, Anime, Others or your own category from its ⋮ menu whenever you are ready. You can also paste a link manually with +. Only valid `http`/`https` links can be saved.
@@ -117,4 +127,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 1.9 (versionCode 10).
+`com.dudeapp.vault` — version 1.10 (versionCode 11).

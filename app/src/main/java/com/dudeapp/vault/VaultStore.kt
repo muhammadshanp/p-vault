@@ -58,6 +58,12 @@ class VaultStore(private val context: Context) {
         ensureDefaultChats()
     }
 
+    /** True when the user has added or written anything, ignoring the empty default folders. */
+    fun hasUserContent(): Boolean =
+        dir.listFiles()?.any { it.isFile } == true ||
+            reelsRoot.walkTopDown().any { it.isFile } ||
+            chatsRoot.walkTopDown().any { it.isFile }
+
     fun list(): List<VaultItem> =
         dir.listFiles()
             ?.mapNotNull { file ->
