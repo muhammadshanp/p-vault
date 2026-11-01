@@ -3,7 +3,6 @@ package com.dudeapp.vault
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,14 +25,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -108,256 +108,186 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 32.dp),
             ) {
-                Text(
-                    text = "Make P Vault work the way you want. Everything stays on this phone unless you export it.",
-                    color = TextSoft,
-                    fontSize = 13.sp,
-                )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
 
-                SettingsSection("Appearance") {
-                    Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemePreset.entries.forEach { preset ->
-                            item(key = preset.name) {
-                                FilterChip(
-                                    selected = preset == theme,
-                                    onClick = { onTheme(preset) },
-                                    label = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                Modifier
-                                                    .size(10.dp)
-                                                    .clip(CircleShape)
-                                                    .background(preset.primary),
-                                            )
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(preset.label)
-                                        }
-                                    },
-                                )
+                SettingsGroup("Appearance") {
+                    SettingsItem(
+                        title = "Theme",
+                        subtitle = "Choose how the app looks.",
+                    ) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ThemePreset.entries.forEach { preset ->
+                                item(key = preset.name) {
+                                    FilterChip(
+                                        selected = preset == theme,
+                                        onClick = { onTheme(preset) },
+                                        label = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    Modifier
+                                                        .size(10.dp)
+                                                        .clip(CircleShape)
+                                                        .background(preset.primary),
+                                                )
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(preset.label)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
-
-                SettingsSection("Security") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("App lock", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                SettingsGroup("Security") {
+                    SettingsItem(
+                        title = "App lock",
+                        subtitle = "Ask for your PIN when P Vault opens.",
+                        trailing = {
+                            Switch(
+                                checked = settings.appLock,
+                                onCheckedChange = { onSettings(settings.copy(appLock = it)) },
+                            )
+                        },
+                    ) {
+                        if (!settings.appLock) {
                             Text(
-                                "Ask for your PIN when P Vault opens.",
-                                color = TextSoft,
+                                "App lock is off. Anyone with this phone can open the vault.",
+                                color = MaterialTheme.colorScheme.error,
                                 fontSize = 12.sp,
                             )
                         }
-                        Switch(
-                            checked = settings.appLock,
-                            onCheckedChange = {
-                                onSettings(settings.copy(appLock = it))
-                            },
+                    }
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Change PIN",
+                        subtitle = "Use 4 to 6 digits.",
+                        trailing = {
+                            TextButton(onClick = { changePinOpen = true }) { Text("Change") }
+                        },
+                    )
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Fingerprint unlock",
+                        subtitle = if (biometricsAvailable) {
+                            "Unlock with your fingerprint."
+                        } else {
+                            "No fingerprint is set up on this device."
+                        },
+                        trailing = {
+                            Switch(
+                                checked = settings.biometricUnlock && biometricsAvailable,
+                                onCheckedChange = { onSettings(settings.copy(biometricUnlock = it)) },
+                                enabled = biometricsAvailable,
+                            )
+                        },
+                    )
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Auto-lock after",
+                        subtitle = "Lock the app after you leave it. Shorter is safer.",
+                    ) {
+                        ChoiceChips(
+                            options = LOCK_DELAY_OPTIONS,
+                            selected = settings.lockDelaySeconds,
+                            label = ::lockDelayLabel,
+                            onSelect = { onSettings(settings.copy(lockDelaySeconds = it)) },
                         )
                     }
-                    if (!settings.appLock) {
+                }
+
+                SettingsGroup("Backup") {
+                    SettingsItem(
+                        title = "Auto-backup",
+                        subtitle = "Back up shortly after a change while P Vault is open.",
+                        trailing = {
+                            Switch(
+                                checked = settings.autoBackup,
+                                onCheckedChange = { onSettings(settings.copy(autoBackup = it)) },
+                            )
+                        },
+                    )
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Backup reminder",
+                        subtitle = "Ask me when my newest backup is older than this.",
+                    ) {
+                        ChoiceChips(
+                            options = REMINDER_DAY_OPTIONS,
+                            selected = settings.reminderDays,
+                            label = ::reminderLabel,
+                            onSelect = { onSettings(settings.copy(reminderDays = it)) },
+                        )
+                    }
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Backups kept",
+                        subtitle = "Delete older P Vault zips from the connected Drive folder.",
+                    ) {
+                        ChoiceChips(
+                            options = KEEP_BACKUP_OPTIONS,
+                            selected = settings.keepBackups,
+                            label = { it.toString() },
+                            onSelect = { onSettings(settings.copy(keepBackups = it)) },
+                        )
+                    }
+                }
+
+                SettingsGroup("Data") {
+                    SettingsItem(
+                        title = "Export vault",
+                        subtitle = "Save a copy of your vault as a zip file.",
+                        trailing = { TextButton(onClick = onExport) { Text("Export") } },
+                    )
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Import backup",
+                        subtitle = "Restore from a P Vault zip file.",
+                        trailing = { TextButton(onClick = onImport) { Text("Import") } },
+                    )
+                    SettingsDivider()
+                    SettingsItem(
+                        title = "Clear vault data",
+                        subtitle = "Delete local photos, PDFs, notes, reels, chats and your profile. Drive backups stay.",
+                        trailing = {
+                            TextButton(
+                                onClick = { clearOpen = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error,
+                                ),
+                            ) { Text("Clear") }
+                        },
+                    )
+                }
+
+                if (update != null) {
+                    SettingsGroup("Update") {
+                        SettingsItem(
+                            title = "P Vault ${update.version} is available",
+                            subtitle = "Download and install the newest version.",
+                            trailing = { TextButton(onClick = onUpdate) { Text("Install") } },
+                        )
+                    }
+                }
+
+                SettingsGroup("About") {
+                    SettingsItem(
+                        title = "P Vault $version",
+                        subtitle = "Local-first. Your vault stays on this device.",
+                    ) {
                         Text(
-                            "App lock is off. Anyone with this phone can open the vault.",
+                            "Backups are plain zip files, not encrypted.",
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp,
                         )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { changePinOpen = true }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Change PIN", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            Text("Use 4-6 digits", color = TextSoft, fontSize = 12.sp)
-                        }
-                        TextButton(onClick = { changePinOpen = true }) { Text("Change") }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Fingerprint unlock", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            Text(
-                                if (biometricsAvailable) {
-                                    "Use your fingerprint on the lock screen."
-                                } else {
-                                    "No fingerprint is set up on this device."
-                                },
-                                color = TextSoft,
-                                fontSize = 12.sp,
-                            )
-                        }
-                        Switch(
-                            checked = settings.biometricUnlock && biometricsAvailable,
-                            onCheckedChange = {
-                                onSettings(settings.copy(biometricUnlock = it))
-                            },
-                            enabled = biometricsAvailable,
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Update checks use the official P Vault website.",
+                            color = TextSoft,
+                            fontSize = 12.sp,
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Auto-lock after", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        "Applies when you leave P Vault. Shorter is safer.",
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    ChoiceChips(
-                        options = LOCK_DELAY_OPTIONS,
-                        selected = settings.lockDelaySeconds,
-                        label = ::lockDelayLabel,
-                        onSelect = { onSettings(settings.copy(lockDelaySeconds = it)) },
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                SettingsSection("Backup") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Auto-backup", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            Text(
-                                "Back up about 20 seconds after a change while P Vault is open.",
-                                color = TextSoft,
-                                fontSize = 12.sp,
-                            )
-                        }
-                        Switch(
-                            checked = settings.autoBackup,
-                            onCheckedChange = {
-                                onSettings(settings.copy(autoBackup = it))
-                            },
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Backup reminder", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        "Ask for a backup when the newest one is older than this.",
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    ChoiceChips(
-                        options = REMINDER_DAY_OPTIONS,
-                        selected = settings.reminderDays,
-                        label = ::reminderLabel,
-                        onSelect = { onSettings(settings.copy(reminderDays = it)) },
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text("Backups kept", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        "Older P_Vault zips in the connected Drive folder are deleted. Other files are left alone.",
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    ChoiceChips(
-                        options = KEEP_BACKUP_OPTIONS,
-                        selected = settings.keepBackups,
-                        label = { it.toString() },
-                        onSelect = { onSettings(settings.copy(keepBackups = it)) },
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                SettingsSection("Data") {
-                    TextButton(
-                        onClick = onExport,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Export vault to a zip")
-                    }
-                    TextButton(
-                        onClick = onImport,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Import a backup")
-                    }
-                    TextButton(
-                        onClick = { clearOpen = true },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Clear vault data")
-                    }
-                    Text(
-                        "Export and import work with a normal zip file. Drive backups are not deleted when you clear local data.",
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                if (update != null) {
-                    SettingsSection("Notifications") {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable(onClick = onUpdate)
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Notifications,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "P Vault ${update.version} is available",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                Text(
-                                    "Tap to download and install the new version.",
-                                    color = TextSoft,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                            TextButton(onClick = onUpdate) { Text("Install") }
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                SettingsSection("About") {
-                    Text("P Vault $version", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Local-first. The only network request is a GitHub update check; Drive uploads are handled by the Google Drive app.",
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Backups are plain zip files, not encrypted.",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp,
-                    )
                 }
             }
         }
@@ -372,47 +302,79 @@ fun SettingsScreen(
             onDismissRequest = { clearOpen = false },
             title = { Text("Clear vault data?") },
             text = {
-                Text(
-                    "This removes all local photos, PDFs, notes, reels, chats and your profile. Google Drive backups are not deleted. This cannot be undone.",
-                )
+                Text("This removes all local photos, PDFs, notes, reels, chats and your profile. Google Drive backups are not deleted. This cannot be undone.")
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        clearOpen = false
-                        onClearData()
-                    },
-                ) {
-                    Text("Clear", color = MaterialTheme.colorScheme.error)
-                }
+                TextButton(onClick = { clearOpen = false; onClearData() }) { Text("Clear", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = {
-                TextButton(onClick = { clearOpen = false }) { Text("Cancel") }
-            },
+            dismissButton = { TextButton(onClick = { clearOpen = false }) { Text("Cancel") } },
         )
     }
 }
 
 @Composable
-private fun SettingsSection(
+private fun SettingsGroup(
     title: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-            .padding(14.dp),
+            .padding(bottom = 18.dp),
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
-        Spacer(Modifier.height(8.dp))
-        content()
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            Column(Modifier.fillMaxWidth(), content = content)
+        }
     }
+}
+
+@Composable
+private fun SettingsItem(
+    title: String,
+    subtitle: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    content: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                if (subtitle != null) {
+                    Text(subtitle, color = TextSoft, fontSize = 12.sp, lineHeight = 16.sp)
+                }
+            }
+            if (trailing != null) {
+                Spacer(Modifier.width(12.dp))
+                trailing()
+            }
+        }
+        if (content != null) {
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+    )
 }
 
 @Composable

@@ -146,10 +146,10 @@ class MainActivity : FragmentActivity() {
         val settings = settingsStore.load()
         if (!external && !needsSetup && !needsLockChoice && settings.appLock) {
             if (settings.lockDelaySeconds == 0) {
-                if (!locked) {
-                    biometricPromptKey = 0
-                    autoPromptPending = true
-                }
+                // Always arm the auto-prompt, even if the lock screen was already showing
+                // when the user backgrounded the app (e.g. while a biometric prompt was up).
+                if (!locked) biometricPromptKey = 0
+                autoPromptPending = true
                 locked = true
             } else if (!locked) {
                 backgroundAt = System.currentTimeMillis()

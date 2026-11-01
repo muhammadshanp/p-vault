@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -63,14 +64,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -78,15 +76,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
-
-private val avatarColors = listOf(
-    Color(0xFF7C3AED) to Color(0xFFE1306C),
-    Color(0xFF0EA5E9) to Color(0xFF22D3EE),
-    Color(0xFFF59E0B) to Color(0xFFEF4444),
-    Color(0xFF10B981) to Color(0xFF84CC16),
-    Color(0xFFEC4899) to Color(0xFF8B5CF6),
-    Color(0xFF14B8A6) to Color(0xFF3B82F6),
-)
 
 @Composable
 fun TextModeChips(chatView: Boolean, onChange: (Boolean) -> Unit) {
@@ -125,7 +114,7 @@ fun ChatRow(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChatAvatar(chat, 52.dp, 20.sp)
+        ChatAvatar(chat, 52.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -305,7 +294,7 @@ fun ChatManagerSheet(
                         .padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ChatAvatar(chat, 42.dp, 16.sp)
+                    ChatAvatar(chat, 42.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(chat.name, style = MaterialTheme.typography.bodyLarge)
@@ -500,7 +489,7 @@ fun ChatScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
-                ChatAvatar(chat, 38.dp, 15.sp)
+                ChatAvatar(chat, 38.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -783,20 +772,13 @@ private fun MessageBubble(
 }
 
 @Composable
-private fun ChatAvatar(chat: ChatThread, size: Dp, fontSize: TextUnit) {
-    val colors = avatarColors[(chat.name.hashCode() and Int.MAX_VALUE) % avatarColors.size]
+private fun ChatAvatar(chat: ChatThread, size: Dp) {
     val avatar = chat.avatar
     Box(
         Modifier
             .size(size)
             .clip(CircleShape)
-            .then(
-                if (avatar == null) {
-                    Modifier.background(Brush.linearGradient(listOf(colors.first, colors.second)))
-                } else {
-                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
-                },
-            )
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
@@ -808,11 +790,11 @@ private fun ChatAvatar(chat: ChatThread, size: Dp, fontSize: TextUnit) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Text(
-                text = chat.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "#",
-                color = Color.White,
-                fontSize = fontSize,
-                fontWeight = FontWeight.SemiBold,
+            Icon(
+                imageVector = Icons.Outlined.Person,
+                contentDescription = "${chat.name} picture",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(size * 0.55f),
             )
         }
     }

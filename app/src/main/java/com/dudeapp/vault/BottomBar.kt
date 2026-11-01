@@ -1,9 +1,9 @@
 package com.dudeapp.vault
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +26,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
-import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class Tab(val label: String, val icon: ImageVector) {
-    FILES("Files", Icons.Outlined.GridView),
+    HOME("Home", Icons.Outlined.Home),
     REELS("Reels", Icons.Outlined.PlayCircle),
     IMAGES("Images", Icons.Outlined.Image),
     PDFS("PDFs", Icons.Outlined.PictureAsPdf),
@@ -62,8 +62,8 @@ fun BottomBar(
     val indicator by animateFloatAsState(
         targetValue = selected.ordinal.toFloat(),
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+            dampingRatio = 0.88f,
+            stiffness = 560f,
         ),
         label = "tabIndicator",
     )
@@ -111,13 +111,14 @@ fun BottomBar(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
+                        animationSpec = tween(durationMillis = 160),
                         label = "tabTint",
                     )
                     val scale by animateFloatAsState(
-                        targetValue = if (isSelected) 1f else 0.92f,
+                        targetValue = if (isSelected) 1.08f else 0.9f,
                         animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium,
+                            dampingRatio = 0.6f,
+                            stiffness = 700f,
                         ),
                         label = "tabScale",
                     )

@@ -13,7 +13,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +31,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,7 +44,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Tune
@@ -71,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -122,7 +127,8 @@ fun VaultApp(
     var suppressNextStart by remember { mutableStateOf(false) }
     var wasStopped by remember { mutableStateOf(false) }
 
-    var tab by remember { mutableStateOf(Tab.FILES) }
+    var tab by remember { mutableStateOf(Tab.HOME) }
+    val pagerState = rememberPagerState(initialPage = tab.ordinal, pageCount = { Tab.entries.size })
     var query by remember { mutableStateOf("") }
     var selecting by remember { mutableStateOf(false) }
     var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -406,12 +412,11 @@ fun VaultApp(
     LaunchedEffect(sharedText) {
         val text = sharedText?.trim().orEmpty()
         if (text.isEmpty()) return@LaunchedEffect
-        val url = Regex("""https?://\S+""").find(text)?.value ?: text
+        val url = extractUrl(text) ?: text
         val title = text.replace(url, "").replace("\n", " ").trim().take(60)
         reelDraftUrl = url
         reelDraftTitle = title.ifBlank { "Instagram Reel" }
         reelDraftCategory = store.pendingCategoryName()
-        tab = Tab.REELS
         open = null
         openChat = null
         reelDialogOpen = true
@@ -557,7 +562,7 @@ fun VaultApp(
 
     fun sectionAdd() {
         when (tab) {
-            Tab.FILES -> addOpen = true
+            Tab.HOME -> addOpen = true
             Tab.REELS -> openReelDialog()
             Tab.IMAGES -> launchPhotos()
             Tab.PDFS -> launchPdfs()
@@ -565,49 +570,16 @@ fun VaultApp(
         }
     }
 
-    val visibleFiles = vaultItems.filter { item ->
-        val inTab = when (tab) {
-            Tab.FILES -> true
-            Tab.REELS -> false
-            Tab.IMAGES -> item.type == ItemType.IMAGE
-            Tab.PDFS -> item.type == ItemType.PDF
-            Tab.NOTES -> !chatView && item.type == ItemType.TEXT
-        }
-        inTab && (query.isBlank() || item.title.contains(query.trim(), ignoreCase = true))
-    }
-
-    val visibleReels = reels.filter { reel ->
-        tab == Tab.REELS &&
-            (reelFilter == null || reel.category == reelFilter) &&
-            (query.isBlank() || reel.title.contains(query.trim(), ignoreCase = true))
-    }
-
-    val visibleChats = chats.filter { chat ->
-        query.isBlank() ||
-            chat.name.contains(query.trim(), ignoreCase = true) ||
-            chat.lastMessage.contains(query.trim(), ignoreCase = true)
-    }
-
     val pendingName = categories.firstOrNull { it.equals("Pending", ignoreCase = true) }
 
-    val swipeTabs = Modifier.pointerInput(tab) {
-        var total = 0f
-        val threshold = 72.dp.toPx()
-        detectHorizontalDragGestures(
-            onDragStart = { total = 0f },
-            onDragEnd = {
-                val next = when {
-                    total <= -threshold -> Tab.entries.getOrNull(tab.ordinal + 1)
-                    total >= threshold -> Tab.entries.getOrNull(tab.ordinal - 1)
-                    else -> null
-                }
-                if (next != null) tab = next
-            },
-            onHorizontalDrag = { change, dragAmount ->
-                total += dragAmount
-                change.consume()
-            },
-        )
+    LaunchedEffect(pagerState.currentPage) {
+        tab = Tab.entries[pagerState.currentPage]
+        selecting = false
+        selectedPaths = emptySet()
+        query = ""
+        reelFilter = null
+        // Preserve the user's chat/notes mode across tab switches; the toggle only
+        // appears on the Notes tab, so resetting it here would discard their choice.
     }
 
     val detail = open
@@ -682,210 +654,263 @@ fun VaultApp(
                     .fillMaxSize()
                     .statusBarsPadding(),
             ) {
-                    ProfileHeader(
-                        profile = profile,
-                        onProfile = { profileOpen = true },
-                        onSettings = { settingsOpen = true },
-                        query = query,
-                        onQuery = { query = it },
-                        placeholder = when (tab) {
-                            Tab.FILES -> "Search files"
-                            Tab.REELS -> "Search reels"
-                            Tab.IMAGES -> "Search images"
-                            Tab.PDFS -> "Search PDFs"
-                            Tab.NOTES -> if (chatView) "Search chats" else "Search notes"
-                        },
-                    )
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.weight(1f),
+                ) { page ->
+                    val currentTab = Tab.entries[page]
+                    val isHome = currentTab == Tab.HOME
+                    val isReels = currentTab == Tab.REELS
+                    val isNotesChat = currentTab == Tab.NOTES && chatView
+                    val currentVisibleFiles = vaultItems.filter { item ->
+                        val inTab = when (currentTab) {
+                            Tab.HOME -> false
+                            Tab.REELS -> false
+                            Tab.IMAGES -> item.type == ItemType.IMAGE
+                            Tab.PDFS -> item.type == ItemType.PDF
+                            Tab.NOTES -> !chatView && item.type == ItemType.TEXT
+                        }
+                        inTab && (query.isBlank() || item.title.contains(query.trim(), ignoreCase = true))
+                    }
+                    val currentVisibleReels = if (isReels) {
+                        reels.filter { reel ->
+                            (reelFilter == null || reel.category == reelFilter) &&
+                                (query.isBlank() || reel.title.contains(query.trim(), ignoreCase = true))
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    val currentVisibleChats = if (isNotesChat) {
+                        chats.filter { chat ->
+                            query.isBlank() ||
+                                chat.name.contains(query.trim(), ignoreCase = true) ||
+                                chat.lastMessage.contains(query.trim(), ignoreCase = true)
+                        }
+                    } else {
+                        emptyList()
+                    }
 
-                    SectionHeader(
-                        title = if (tab == Tab.NOTES && chatView) "Chats" else tab.label,
-                        count = when {
-                            tab == Tab.REELS -> visibleReels.size
-                            tab == Tab.NOTES && chatView -> visibleChats.size
-                            else -> visibleFiles.size
-                        },
-                        unit = when (tab) {
-                            Tab.FILES -> "item"
-                            Tab.REELS -> "reel"
-                            Tab.IMAGES -> "image"
-                            Tab.PDFS -> "PDF"
-                            Tab.NOTES -> if (chatView) "chat" else "note"
-                        },
-                        onAdd = { sectionAdd() },
-                        onSelect = {
-                            if (selecting) {
-                                cancelSelection()
-                            } else {
-                                selecting = true
-                                selectedPaths = emptySet()
-                            }
-                        },
-                        onManage = when {
-                            tab == Tab.REELS -> { { categoriesOpen = true } }
-                            tab == Tab.NOTES && chatView -> { { chatsOpen = true } }
-                            else -> null
-                        },
-                        manageDescription = if (tab == Tab.REELS) "Edit categories" else "Manage chats",
-                    )
+                    Column(Modifier.fillMaxSize()) {
+                        ProfileHeader(
+                            profile = profile,
+                            onProfile = { profileOpen = true },
+                            onSettings = { settingsOpen = true },
+                            query = query,
+                            onQuery = { query = it },
+                            showSearch = !isHome,
+                            welcome = isHome,
+                            placeholder = when (currentTab) {
+                                Tab.HOME -> "Search"
+                                Tab.REELS -> "Search reels"
+                                Tab.IMAGES -> "Search images"
+                                Tab.PDFS -> "Search PDFs"
+                                Tab.NOTES -> if (chatView) "Search chats" else "Search notes"
+                            },
+                        )
 
-                    if (selecting) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                "${selectedPaths.size} selected",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { cancelSelection() }) {
-                                Text("Cancel")
-                            }
-                            TextButton(
-                                onClick = {
-                                    if (selectedPaths.isNotEmpty()) deleteSelectionOpen = true
+                        if (isHome) {
+                            HomeContent(
+                                items = vaultItems,
+                                reels = reels,
+                                chats = chats,
+                                onOpenItem = { open = it },
+                                onOpenChat = { openChat = it },
+                                onOpenTab = { target ->
+                                    scope.launch { pagerState.animateScrollToPage(target.ordinal) }
                                 },
-                                enabled = selectedPaths.isNotEmpty(),
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+
+                        SectionHeader(
+                            title = if (isNotesChat) "Chats" else currentTab.label,
+                            count = when {
+                                isReels -> currentVisibleReels.size
+                                isNotesChat -> currentVisibleChats.size
+                                else -> currentVisibleFiles.size
+                            },
+                            unit = when (currentTab) {
+                                Tab.HOME -> "item"
+                                Tab.REELS -> "reel"
+                                Tab.IMAGES -> "image"
+                                Tab.PDFS -> "PDF"
+                                Tab.NOTES -> if (chatView) "chat" else "note"
+                            },
+                            onAdd = { sectionAdd() },
+                            onSelect = {
+                                if (selecting) {
+                                    cancelSelection()
+                                } else {
+                                    selecting = true
+                                    selectedPaths = emptySet()
+                                }
+                            },
+                            onManage = when {
+                                isReels -> { { categoriesOpen = true } }
+                                isNotesChat -> { { chatsOpen = true } }
+                                else -> null
+                            },
+                            manageDescription = if (isReels) "Edit categories" else "Manage chats",
+                        )
+
+                        if (selecting) {
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    "Delete",
-                                    color = if (selectedPaths.isEmpty()) {
-                                        TextSoft
-                                    } else {
-                                        MaterialTheme.colorScheme.error
-                                    },
+                                    "${selectedPaths.size} selected",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
                                 )
-                            }
-                        }
-                    }
-
-                    if (tab == Tab.NOTES) {
-                        TextModeChips(chatView = chatView, onChange = { chatView = it })
-                        Spacer(Modifier.height(6.dp))
-                    }
-
-                    if (tab == Tab.REELS) {
-                        CategoryChips(
-                            categories = categories,
-                            selected = reelFilter,
-                            onSelect = { reelFilter = it },
-                        )
-                        Spacer(Modifier.height(6.dp))
-
-                        if (visibleReels.isEmpty()) {
-                            EmptyState(
-                                tab = tab,
-                                searching = query.isNotBlank(),
-                                pendingView = pendingName != null && reelFilter == pendingName,
-                                onAdd = { sectionAdd() },
-                                modifier = Modifier.weight(1f).then(swipeTabs),
-                            )
-                        } else {
-                            LazyColumn(
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .then(swipeTabs),
-                            ) {
-                                visibleReels.forEach { reel ->
-                                    item(key = reel.file.absolutePath) {
-                                        ReelCard(
-                                            reel = reel,
-                                            selected = reel.file.absolutePath in selectedPaths,
-                                            selecting = selecting,
-                                            onClick = {
-                                                if (selecting) {
-                                                    toggleSelected(reel.file.absolutePath)
-                                                } else {
-                                                    openUrl(context, reel.url)
-                                                }
-                                            },
-                                            onMenu = { if (!selecting) reelMenu = reel },
-                                        )
-                                    }
+                                Spacer(Modifier.weight(1f))
+                                TextButton(onClick = { cancelSelection() }) {
+                                    Text("Cancel")
                                 }
-                            }
-                        }
-                    } else if (tab == Tab.NOTES && chatView) {
-                        if (visibleChats.isEmpty()) {
-                            EmptyState(
-                                tab = tab,
-                                searching = query.isNotBlank(),
-                                chatView = true,
-                                onAdd = { sectionAdd() },
-                                modifier = Modifier.weight(1f).then(swipeTabs),
-                            )
-                        } else {
-                            LazyColumn(
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .then(swipeTabs),
-                            ) {
-                                visibleChats.forEach { chat ->
-                                    item(key = chat.dir.absolutePath) {
-                                        ChatRow(
-                                            chat = chat,
-                                            selected = chat.dir.absolutePath in selectedPaths,
-                                            selecting = selecting,
-                                            onClick = {
-                                                if (selecting) {
-                                                    toggleSelected(chat.dir.absolutePath)
-                                                } else {
-                                                    openChat = chat
-                                                }
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else if (visibleFiles.isEmpty()) {
-                        EmptyState(
-                            tab = tab,
-                            searching = query.isNotBlank(),
-                            onAdd = { sectionAdd() },
-                            modifier = Modifier.weight(1f).then(swipeTabs),
-                        )
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .then(swipeTabs),
-                        ) {
-                            items(visibleFiles, key = { it.file.absolutePath }) { item ->
-                                VaultCard(
-                                    item = item,
-                                    selected = item.file.absolutePath in selectedPaths,
-                                    selecting = selecting,
+                                TextButton(
                                     onClick = {
-                                        if (selecting) {
-                                            toggleSelected(item.file.absolutePath)
-                                        } else {
-                                            open = item
-                                        }
+                                        if (selectedPaths.isNotEmpty()) deleteSelectionOpen = true
                                     },
-                                )
+                                    enabled = selectedPaths.isNotEmpty(),
+                                ) {
+                                    Text(
+                                        "Delete",
+                                        color = if (selectedPaths.isEmpty()) {
+                                            TextSoft
+                                        } else {
+                                            MaterialTheme.colorScheme.error
+                                        },
+                                    )
+                                }
                             }
                         }
+
+                        if (currentTab == Tab.NOTES) {
+                            TextModeChips(chatView = chatView, onChange = { chatView = it })
+                            Spacer(Modifier.height(6.dp))
+                        }
+
+                        if (isReels) {
+                            CategoryChips(
+                                categories = categories,
+                                selected = reelFilter,
+                                onSelect = { reelFilter = it },
+                            )
+                            Spacer(Modifier.height(6.dp))
+
+                            if (currentVisibleReels.isEmpty()) {
+                                EmptyState(
+                                    tab = currentTab,
+                                    searching = query.isNotBlank(),
+                                    pendingView = pendingName != null && reelFilter == pendingName,
+                                    onAdd = { sectionAdd() },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            } else {
+                                LazyColumn(
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth(),
+                                ) {
+                                    currentVisibleReels.forEach { reel ->
+                                        item(key = reel.file.absolutePath) {
+                                            ReelCard(
+                                                reel = reel,
+                                                selected = reel.file.absolutePath in selectedPaths,
+                                                selecting = selecting,
+                                                onClick = {
+                                                    if (selecting) {
+                                                        toggleSelected(reel.file.absolutePath)
+                                                    } else {
+                                                        openUrl(context, reel.url)
+                                                    }
+                                                },
+                                                onMenu = { if (!selecting) reelMenu = reel },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (isNotesChat) {
+                            if (currentVisibleChats.isEmpty()) {
+                                EmptyState(
+                                    tab = currentTab,
+                                    searching = query.isNotBlank(),
+                                    chatView = true,
+                                    onAdd = { sectionAdd() },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            } else {
+                                LazyColumn(
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth(),
+                                ) {
+                                    currentVisibleChats.forEach { chat ->
+                                        item(key = chat.dir.absolutePath) {
+                                            ChatRow(
+                                                chat = chat,
+                                                selected = chat.dir.absolutePath in selectedPaths,
+                                                selecting = selecting,
+                                                onClick = {
+                                                    if (selecting) {
+                                                        toggleSelected(chat.dir.absolutePath)
+                                                    } else {
+                                                        openChat = chat
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (currentVisibleFiles.isEmpty()) {
+                            EmptyState(
+                                tab = currentTab,
+                                searching = query.isNotBlank(),
+                                onAdd = { sectionAdd() },
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                            ) {
+                                items(currentVisibleFiles, key = { it.file.absolutePath }) { item ->
+                                    VaultCard(
+                                        item = item,
+                                        selected = item.file.absolutePath in selectedPaths,
+                                        selecting = selecting,
+                                        onClick = {
+                                            if (selecting) {
+                                                toggleSelected(item.file.absolutePath)
+                                            } else {
+                                                open = item
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        }
                     }
+                }
             }
 
             BottomBar(
                 selected = tab,
-                onSelect = { tab = it },
+                onSelect = { scope.launch { pagerState.animateScrollToPage(it.ordinal) } },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
 
@@ -1053,7 +1078,7 @@ fun VaultApp(
                         reelDialogOpen = false
                         scope.launch {
                             withContext(Dispatchers.IO) { store.addReel(url, title, category) }
-                            tab = Tab.REELS
+                            pagerState.animateScrollToPage(Tab.REELS.ordinal)
                             reelFilter = category
                             query = ""
                             refresh()
@@ -1279,6 +1304,220 @@ fun VaultApp(
 }
 
 @Composable
+private fun HomeContent(
+    items: List<VaultItem>,
+    reels: List<Reel>,
+    chats: List<ChatThread>,
+    onOpenItem: (VaultItem) -> Unit,
+    onOpenChat: (ChatThread) -> Unit,
+    onOpenTab: (Tab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val images = items.count { it.type == ItemType.IMAGE }
+    val pdfs = items.count { it.type == ItemType.PDF }
+    val notes = items.count { it.type == ItemType.TEXT }
+    val recent = items.take(4)
+
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Text(
+                text = "Your space",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeShortcut(
+                    icon = Icons.Outlined.Image,
+                    title = "Photos",
+                    detail = countLabel(images, "photo"),
+                    onClick = { onOpenTab(Tab.IMAGES) },
+                )
+                HomeShortcut(
+                    icon = Icons.Outlined.PictureAsPdf,
+                    title = "PDFs",
+                    detail = countLabel(pdfs, "PDF"),
+                    onClick = { onOpenTab(Tab.PDFS) },
+                )
+                HomeShortcut(
+                    icon = Icons.Outlined.ChatBubbleOutline,
+                    title = "Notes & chats",
+                    detail = "${countLabel(notes, "note")} · ${countLabel(chats.size, "chat")}",
+                    onClick = { onOpenTab(Tab.NOTES) },
+                )
+                HomeShortcut(
+                    icon = Icons.Outlined.PlayCircle,
+                    title = "Reels",
+                    detail = countLabel(reels.size, "reel"),
+                    onClick = { onOpenTab(Tab.REELS) },
+                )
+            }
+        }
+
+        if (recent.isNotEmpty()) {
+            item { HomeSectionTitle("Recent") }
+            recent.forEach { item ->
+                item(key = item.file.absolutePath) {
+                    HomeRecentRow(item = item, onClick = { onOpenItem(item) })
+                }
+            }
+        }
+
+        if (chats.isNotEmpty()) {
+            item { HomeSectionTitle("Recent chats") }
+            chats.take(3).forEach { chat ->
+                item(key = chat.dir.absolutePath) {
+                    ChatRow(
+                        chat = chat,
+                        selected = false,
+                        selecting = false,
+                        onClick = { onOpenChat(chat) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeShortcut(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(detail, color = TextSoft, fontSize = 12.sp)
+        }
+        Text(
+            text = "View",
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (item.type) {
+                ItemType.IMAGE -> AsyncImage(
+                    model = item.file,
+                    contentDescription = item.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                ItemType.PDF -> Icon(
+                    imageVector = Icons.Outlined.PictureAsPdf,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+
+                ItemType.TEXT -> Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.StickyNote2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = when (item.type) {
+                    ItemType.IMAGE -> "Photo"
+                    ItemType.PDF -> "PDF"
+                    ItemType.TEXT -> "Note"
+                },
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+        }
+        Text(
+            text = "Open",
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun HomeSectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+private fun countLabel(count: Int, unit: String): String =
+    if (count == 1) "1 $unit" else "$count ${unit}s"
+
+/** Pulls the first well-formed http(s) URL out of a shared message, stripping trailing
+ *  punctuation that often trails a pasted link (e.g. "Check this out! https://..."). */
+private fun extractUrl(text: String): String? {
+    val match = Regex("""https?://[^\s]+""").find(text) ?: return null
+    var url = match.value
+    while (url.isNotEmpty() && url.last() in ".,;:!?)]}'\"") {
+        url = url.dropLast(1)
+    }
+    return url.ifBlank { null }
+}
+
+@Composable
 private fun ProfileHeader(
     profile: UserProfile,
     onProfile: () -> Unit,
@@ -1286,7 +1525,10 @@ private fun ProfileHeader(
     query: String,
     onQuery: (String) -> Unit,
     placeholder: String,
+    showSearch: Boolean = true,
+    welcome: Boolean = false,
 ) {
+    val firstName = profile.name.trim().substringBefore(' ')
     Column(Modifier.padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1323,14 +1565,22 @@ private fun ProfileHeader(
                     .clickable(onClick = onProfile),
             ) {
                 Text(
-                    text = profile.name.ifBlank { "Set up your profile" },
+                    text = when {
+                        welcome && firstName.isBlank() -> "Welcome"
+                        welcome -> "Welcome, $firstName"
+                        else -> profile.name.trim().ifBlank { "Set up your profile" }
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Private vault · on this device",
+                    text = if (welcome && firstName.isBlank()) {
+                        "Set up your profile"
+                    } else {
+                        "Private vault · on this device"
+                    },
                     color = TextSoft,
                     fontSize = 12.sp,
                 )
@@ -1344,21 +1594,23 @@ private fun ProfileHeader(
             }
         }
         Spacer(Modifier.height(14.dp))
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQuery,
-            placeholder = { Text(placeholder) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(6.dp))
+        if (showSearch) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQuery,
+                placeholder = { Text(placeholder) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+        }
     }
 }
 
@@ -1588,7 +1840,7 @@ private fun EmptyState(
                         }
                         Tab.IMAGES -> "Tap + to import photos from your gallery."
                         Tab.PDFS -> "Tap + to import a PDF document."
-                        Tab.FILES -> "Tap + to add a photo, PDF, note or reel."
+                        Tab.HOME -> "Tap + to add a photo, PDF, note or reel."
                     }
                 },
                 color = TextSoft,
