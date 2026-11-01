@@ -35,7 +35,7 @@ internal fun backupReminderDue(
 
 /** Names of old P Vault zips to remove; unrelated files and old Dude_ backups are ignored. */
 internal fun backupNamesToDelete(names: List<String>, keep: Int = KEEP_BACKUPS): Set<String> =
-    names.filter { it.startsWith("P_Vault_") && it.endsWith(".zip") }
+    names.filter { (it == "P_Vault.zip" || it.startsWith("P_Vault_")) && it.endsWith(".zip") }
         .sortedDescending()
         .drop(keep)
         .toSet()
@@ -144,7 +144,7 @@ class DriveBackupStore(context: Context) {
         return BackupResult(true, "Backed up to Google Drive")
     }
 
-    fun suggestedName(): String = "P_Vault_${stamp()}.zip"
+    fun suggestedName(): String = "P_Vault.zip"
 
     fun exportTo(target: Uri): BackupResult {
         val zip = runCatching { createZip() }.getOrElse {
@@ -247,7 +247,7 @@ class DriveBackupStore(context: Context) {
                 resolver,
                 parent,
                 "application/zip",
-                "P_Vault_${stamp()}.zip",
+                "P_Vault.zip",
             ) ?: return "Drive did not allow creating a file"
             val output = resolver.openOutputStream(created)
                 ?: throw IOException("Could not open the Drive folder")
@@ -279,7 +279,8 @@ class DriveBackupStore(context: Context) {
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(1) ?: continue
-                    if (!name.startsWith("P_Vault_") || !name.endsWith(".zip")) continue
+                    if (!name.endsWith(".zip")) continue
+                    if (name == "P_Vault.zip" || (name.startsWith("P_Vault_") && name.endsWith(".zip"))) {
                     val id = cursor.getString(0) ?: continue
                     backups += name to DocumentsContract.buildDocumentUriUsingTree(tree, id)
                 }
