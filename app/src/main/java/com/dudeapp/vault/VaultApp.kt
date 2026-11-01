@@ -654,6 +654,23 @@ fun VaultApp(
                     .fillMaxSize()
                     .statusBarsPadding(),
             ) {
+                ProfileHeader(
+                    profile = profile,
+                    onProfile = { profileOpen = true },
+                    onSettings = { settingsOpen = true },
+                    query = query,
+                    onQuery = { query = it },
+                    showSearch = tab != Tab.HOME,
+                    welcome = tab == Tab.HOME,
+                    placeholder = when (tab) {
+                        Tab.HOME -> "Search"
+                        Tab.REELS -> "Search reels"
+                        Tab.IMAGES -> "Search images"
+                        Tab.PDFS -> "Search PDFs"
+                        Tab.NOTES -> if (chatView) "Search chats" else "Search notes"
+                    },
+                )
+
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
@@ -691,23 +708,6 @@ fun VaultApp(
                     }
 
                     Column(Modifier.fillMaxSize()) {
-                        ProfileHeader(
-                            profile = profile,
-                            onProfile = { profileOpen = true },
-                            onSettings = { settingsOpen = true },
-                            query = query,
-                            onQuery = { query = it },
-                            showSearch = !isHome,
-                            welcome = isHome,
-                            placeholder = when (currentTab) {
-                                Tab.HOME -> "Search"
-                                Tab.REELS -> "Search reels"
-                                Tab.IMAGES -> "Search images"
-                                Tab.PDFS -> "Search PDFs"
-                                Tab.NOTES -> if (chatView) "Search chats" else "Search notes"
-                            },
-                        )
-
                         if (isHome) {
                             HomeContent(
                                 items = vaultItems,
