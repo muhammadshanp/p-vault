@@ -49,7 +49,7 @@ The debug APK is written to `app\build\outputs\apk\debug\app-debug.apk`.
 
 ## Updates
 
-P Vault reads the latest release from `https://api.github.com/repos/muhammadshanp/p-vault/releases/latest` when it opens. If the release tag is newer than the installed version, it shows **Update available** with a button that opens the release page.
+P Vault reads the latest release from `https://api.github.com/repos/muhammadshanp/p-vault/releases/latest` when it opens. If the release tag is newer than the installed version, it shows **Update available** with a button that opens the [updates page](https://muhammadshanp.github.io/p-vault-website/update.html).
 
 To publish an update:
 
