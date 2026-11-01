@@ -7,7 +7,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 private const val UPDATE_REPO = "muhammadshanp/p-vault"
-private const val UPDATE_PAGE = "https://muhammadshanp.github.io/p-vault-website/"
+private const val UPDATE_PAGE = "https://muhammadshanp.github.io/p-vault-website/update.html"
 
 data class AppUpdate(val version: String, val url: String)
 
