@@ -2,6 +2,7 @@ package com.dudeapp.vault
 
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -12,7 +13,7 @@ private const val UPDATE_PAGE = "https://muhammadshanp.github.io/p-vault-website
 data class AppUpdate(val version: String, val url: String)
 
 /** Reads the latest public GitHub release. Returns null when offline or no release exists. */
-suspend fun checkForUpdate(): AppUpdate? = withContext(Dispatchers.IO) {
+suspend fun checkForUpdate(currentVersion: String): AppUpdate? = withContext(Dispatchers.IO) {
     runCatching {
         val connection = URL("https://api.github.com/repos/$UPDATE_REPO/releases/latest")
             .openConnection() as HttpURLConnection
@@ -27,12 +28,15 @@ suspend fun checkForUpdate(): AppUpdate? = withContext(Dispatchers.IO) {
                 .find(json.optString("tag_name"))
                 ?.value
                 ?: return@runCatching null
-            AppUpdate(version, UPDATE_PAGE)
+            AppUpdate(version, updatePageUrl(currentVersion))
         } finally {
             connection.disconnect()
         }
     }.getOrNull()
 }
+
+internal fun updatePageUrl(currentVersion: String): String =
+    "$UPDATE_PAGE?v=${URLEncoder.encode(currentVersion, "UTF-8")}"
 
 /** True when the release version is newer than the installed version. */
 internal fun isNewerVersion(latest: String, current: String): Boolean {

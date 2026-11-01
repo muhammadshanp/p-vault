@@ -1,10 +1,19 @@
 package com.dudeapp.vault
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdateCheckerTest {
+    @Test
+    fun passesInstalledVersionToTheUpdatePage() {
+        assertEquals(
+            "https://muhammadshanp.github.io/p-vault-website/update.html?v=0.4.2",
+            updatePageUrl("0.4.2"),
+        )
+    }
+
     @Test
     fun comparesVersionParts() {
         assertTrue(isNewerVersion("1.9", "1.8"))

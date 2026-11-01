@@ -209,7 +209,7 @@ fun VaultApp(
     }
 
     LaunchedEffect(Unit) {
-        val latest = checkForUpdate() ?: return@LaunchedEffect
+        val latest = checkForUpdate(currentVersion) ?: return@LaunchedEffect
         presentUpdate(latest)
     }
 
@@ -225,7 +225,7 @@ fun VaultApp(
                     } else {
                         if (availableUpdate != null) updateDialogOpen = true
                         scope.launch {
-                            val latest = checkForUpdate() ?: return@launch
+                            val latest = checkForUpdate(currentVersion) ?: return@launch
                             presentUpdate(latest)
                         }
                     }
