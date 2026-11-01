@@ -46,6 +46,7 @@ data class ChatMessage(
  * No database: `<stamp>_<title>.<ext>` is the whole schema.
  */
 class VaultStore(private val context: Context) {
+    var onChange: (() -> Unit)? = null
 
     private val dir = File(context.filesDir, "vault").apply { mkdirs() }
     private val reelsRoot = File(context.filesDir, "reels").apply { mkdirs() }
@@ -98,7 +99,9 @@ class VaultStore(private val context: Context) {
             target.delete()
             return null
         }
-        return VaultItem(target, titleOf(target.name), type, stampOf(target.name))
+        val item = VaultItem(target, titleOf(target.name), type, stampOf(target.name))
+        onChange?.invoke()
+        return item
     }
 
     fun addText(title: String, body: String): VaultItem {
@@ -107,12 +110,17 @@ class VaultStore(private val context: Context) {
         }
         val target = newFile(cleanTitle, "txt")
         target.writeText(body)
-        return VaultItem(target, titleOf(target.name), ItemType.TEXT, stampOf(target.name))
+        val item = VaultItem(target, titleOf(target.name), ItemType.TEXT, stampOf(target.name))
+        onChange?.invoke()
+        return item
     }
 
     fun readText(item: VaultItem): String = item.file.readText()
 
-    fun saveText(item: VaultItem, text: String) = item.file.writeText(text)
+    fun saveText(item: VaultItem, text: String) {
+        item.file.writeText(text)
+        onChange?.invoke()
+    }
 
     fun rename(item: VaultItem, newTitle: String): VaultItem? {
         val target = File(dir, "${stampOf(item.file.name)}_${sanitize(newTitle)}.${item.file.extension}")

@@ -107,7 +107,7 @@ fun VaultApp(
     onThemeChange: (ThemePreset) -> Unit,
 ) {
     val context = LocalContext.current
-    val store = remember { VaultStore(context) }
+    val store = remember { VaultStore(context).apply { onChange = { autoBackupTick += 1 } } }
     val profileStore = remember { ProfileStore(context) }
     val driveStore = remember { DriveBackupStore(context) }
     val scope = rememberCoroutineScope()
