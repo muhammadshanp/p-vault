@@ -333,13 +333,7 @@ private fun ImageViewer(file: File) {
     Box(
         Modifier
             .fillMaxSize()
-            .clipToBounds()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 6f)
-                    offset = if (scale <= 1.01f) Offset.Zero else offset + pan
-                }
-            },
+            .clipToBounds(),
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
@@ -353,6 +347,18 @@ private fun ImageViewer(file: File) {
                     scaleY = scale
                     translationX = offset.x
                     translationY = offset.y
+                },
+        )
+        // Leave the edges to Android so the system back gesture is not eaten by pan/zoom.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 6f)
+                        offset = if (scale <= 1.01f) Offset.Zero else offset + pan
+                    }
                 },
         )
     }
