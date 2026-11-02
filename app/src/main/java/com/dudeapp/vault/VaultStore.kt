@@ -56,10 +56,10 @@ class VaultStore(private val context: Context) {
     init {
         ensureDefaultCategories()
         ensurePendingCategory()
-        ensureDefaultChats()
+        removeUnusedDefaultChats()
     }
 
-    /** True when the user has added or written anything, ignoring the empty default folders. */
+    /** True when the user has added or written anything, ignoring empty folders. */
     fun hasUserContent(): Boolean =
         dir.listFiles()?.any { it.isFile } == true ||
             reelsRoot.walkTopDown().any { it.isFile } ||
@@ -142,10 +142,8 @@ class VaultStore(private val context: Context) {
         dir.mkdirs()
         reelsRoot.mkdirs()
         chatsRoot.mkdirs()
-        chatPrefs.edit().remove("seeded").apply()
         ensureDefaultCategories()
         ensurePendingCategory()
-        ensureDefaultChats()
     }.isSuccess
 
     // ---- Reels ----------------------------------------------------------
@@ -385,14 +383,15 @@ class VaultStore(private val context: Context) {
     fun deleteMessage(message: ChatMessage): Boolean =
         runCatching { message.file.delete() }.getOrDefault(false)
 
-    private fun ensureDefaultChats() {
-        if (chatPrefs.getBoolean("seeded", false)) return
-        if (chatsRoot.listFiles()?.any { it.isDirectory } != true) {
-            listOf("Anime", "Tech", "AI", "Movies", "College").forEachIndexed { index, name ->
-                File(chatsRoot, numberedFolder(index + 1, name)).mkdirs()
-            }
-        }
-        chatPrefs.edit().putBoolean("seeded", true).apply()
+    /** Removes the old empty starter chats once; chats with messages are kept. */
+    private fun removeUnusedDefaultChats() {
+        if (chatPrefs.getBoolean("default_chats_cleaned", false)) return
+        val defaults = setOf("anime", "tech", "ai", "movies", "college")
+        chatsRoot.listFiles()
+            ?.filter { it.isDirectory && it.name.substringAfter('_').lowercase() in defaults }
+            ?.filter { it.listFiles().orEmpty().isEmpty() }
+            ?.forEach { it.deleteRecursively() }
+        chatPrefs.edit().putBoolean("default_chats_cleaned", true).apply()
     }
 
     private fun chatDir(name: String): File? =
