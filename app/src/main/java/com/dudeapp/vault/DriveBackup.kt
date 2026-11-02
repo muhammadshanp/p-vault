@@ -280,9 +280,10 @@ class DriveBackupStore(context: Context) {
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(1) ?: continue
                     if (!name.endsWith(".zip")) continue
-                    if (name == "P_Vault.zip" || (name.startsWith("P_Vault_") && name.endsWith(".zip"))) {
-                    val id = cursor.getString(0) ?: continue
-                    backups += name to DocumentsContract.buildDocumentUriUsingTree(tree, id)
+                    if (name == "P_Vault.zip" || name.startsWith("P_Vault_")) {
+                        val id = cursor.getString(0) ?: continue
+                        backups += name to DocumentsContract.buildDocumentUriUsingTree(tree, id)
+                    }
                 }
             }
             val old = backupNamesToDelete(backups.map { it.first }, keep)

@@ -7,9 +7,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,6 +73,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,7 +111,6 @@ fun VaultApp(
     onThemeChange: (ThemePreset) -> Unit,
 ) {
     val context = LocalContext.current
-    val store = remember { VaultStore(context).apply { onChange = { autoBackupTick += 1 } } }
     val profileStore = remember { ProfileStore(context) }
     val driveStore = remember { DriveBackupStore(context) }
     val scope = rememberCoroutineScope()
@@ -129,6 +132,15 @@ fun VaultApp(
 
     var tab by remember { mutableStateOf(Tab.HOME) }
     val pagerState = rememberPagerState(initialPage = tab.ordinal, pageCount = { Tab.entries.size })
+    fun switchTab(target: Tab) {
+        tab = target
+        scope.launch {
+            pagerState.animateScrollToPage(
+                page = target.ordinal,
+                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+            )
+        }
+    }
     var query by remember { mutableStateOf("") }
     var selecting by remember { mutableStateOf(false) }
     var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -143,6 +155,7 @@ fun VaultApp(
     var version by remember { mutableIntStateOf(0) }
     var autoBackupTick by remember { mutableIntStateOf(0) }
     var autoBackupSkip by remember { mutableIntStateOf(0) }
+    val store = remember { VaultStore(context).apply { onChange = { scope.launch { autoBackupTick += 1 } } } }
 
     var chatView by remember { mutableStateOf(true) }
     var openChat by remember { mutableStateOf<ChatThread?>(null) }
@@ -572,18 +585,35 @@ fun VaultApp(
 
     val pendingName = categories.firstOrNull { it.equals("Pending", ignoreCase = true) }
 
-    LaunchedEffect(pagerState.currentPage) {
-        tab = Tab.entries[pagerState.currentPage]
-        selecting = false
-        selectedPaths = emptySet()
-        query = ""
-        reelFilter = null
-        // Preserve the user's chat/notes mode across tab switches; the toggle only
-        // appears on the Notes tab, so resetting it here would discard their choice.
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            val settled = page.coerceIn(0, Tab.entries.lastIndex)
+            tab = Tab.entries[settled]
+            selecting = false
+            selectedPaths = emptySet()
+            query = ""
+            reelFilter = null
+            // Preserve the user's chat/notes mode across tab switches; the toggle only
+            // appears on the Notes tab, so resetting it here would discard their choice.
+        }
     }
 
     val detail = open
     val chatDetail = openChat
+    BackHandler(
+        enabled = detail == null && chatDetail == null && !settingsOpen &&
+            (query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
+    ) {
+        when {
+            query.isNotBlank() -> query = ""
+            selecting -> {
+                selecting = false
+                selectedPaths = emptySet()
+            }
+            reelFilter != null -> reelFilter = null
+            tab != Tab.HOME -> switchTab(Tab.HOME)
+        }
+    }
     if (settingsOpen) {
         SettingsScreen(
             theme = theme,
@@ -673,6 +703,7 @@ fun VaultApp(
 
                 HorizontalPager(
                     state = pagerState,
+                    beyondViewportPageCount = 1,
                     modifier = Modifier.weight(1f),
                 ) { page ->
                     val currentTab = Tab.entries[page]
@@ -715,9 +746,7 @@ fun VaultApp(
                                 chats = chats,
                                 onOpenItem = { open = it },
                                 onOpenChat = { openChat = it },
-                                onOpenTab = { target ->
-                                    scope.launch { pagerState.animateScrollToPage(target.ordinal) }
-                                },
+                                onOpenTab = { target -> switchTab(target) },
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
@@ -910,7 +939,7 @@ fun VaultApp(
 
             BottomBar(
                 selected = tab,
-                onSelect = { scope.launch { pagerState.animateScrollToPage(it.ordinal) } },
+                onSelect = { target -> switchTab(target) },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
 
@@ -1078,7 +1107,7 @@ fun VaultApp(
                         reelDialogOpen = false
                         scope.launch {
                             withContext(Dispatchers.IO) { store.addReel(url, title, category) }
-                            pagerState.animateScrollToPage(Tab.REELS.ordinal)
+                            switchTab(Tab.REELS)
                             reelFilter = category
                             query = ""
                             refresh()
