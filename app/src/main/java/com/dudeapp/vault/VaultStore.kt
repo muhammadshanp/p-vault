@@ -35,10 +35,15 @@ data class ChatThread(
     val avatar: File? = null,
 )
 
+enum class ChatMessageType { TEXT, PHOTO, VOICE }
+
 data class ChatMessage(
     val file: File,
     val text: String,
     val stamp: Long,
+    val type: ChatMessageType = ChatMessageType.TEXT,
+    val attachment: File? = null,
+    val durationMs: Long = 0L,
 )
 
 /**
@@ -242,9 +247,7 @@ class VaultStore(private val context: Context) {
                 ChatThread(
                     dir = folder,
                     name = folder.name.substringAfter('_'),
-                    lastMessage = last?.let { file ->
-                        runCatching { file.readText().replace(Regex("\\s+"), " ").trim() }.getOrDefault("")
-                    }.orEmpty(),
+                    lastMessage = last?.let { chatPreview(it) }.orEmpty(),
                     lastStamp = last?.let { chatStampOf(it.name) } ?: 0L,
                     messageCount = messages.size,
                     avatar = chatAvatarOf(folder),
@@ -341,11 +344,7 @@ class VaultStore(private val context: Context) {
         val folder = chatDir(chat) ?: return emptyList()
         return folder.listFiles()
             ?.filter { it.isFile && it.extension.lowercase() == "txt" }
-            ?.mapNotNull { file ->
-                val text = runCatching { file.readText().trim() }.getOrNull()
-                if (text.isNullOrBlank()) return@mapNotNull null
-                ChatMessage(file, text, chatStampOf(file.name))
-            }
+            ?.mapNotNull { parseChatMessage(folder, it) }
             ?.sortedBy { it.stamp }
             .orEmpty()
     }
@@ -354,21 +353,53 @@ class VaultStore(private val context: Context) {
         val body = text.trim()
         if (body.isEmpty()) return null
         val folder = chatDir(chat) ?: return null
-        var stamp = System.currentTimeMillis()
-        var file = File(folder, "$stamp.txt")
-        while (file.exists()) {
-            stamp += 1
-            file = File(folder, "$stamp.txt")
+        return writeChatMessage(folder, nextStamp(folder), body)
+    }
+
+    /** Copies a picked image into the chat and adds a photo message. */
+    fun addPhotoMessage(chat: String, uri: Uri): ChatMessage? {
+        val folder = chatDir(chat) ?: return null
+        val stamp = nextStamp(folder)
+        val attachment = File(folder, "${stamp}_photo.${photoExtension(uri)}")
+        val copied = runCatching {
+            val input = context.contentResolver.openInputStream(uri) ?: return@runCatching false
+            input.use { source -> attachment.outputStream().use { sink -> source.copyTo(sink) } }
+            true
+        }.getOrDefault(false)
+        if (!copied || attachment.length() == 0L) {
+            attachment.delete()
+            return null
         }
-        return runCatching {
-            file.writeText(body)
-            ChatMessage(file, body, stamp)
-        }.onFailure { file.delete() }.getOrNull()
+        return writeChatMessage(folder, stamp, CHAT_PHOTO + attachment.name)
+    }
+
+    /** Moves a finished recording into the chat and adds a voice message. */
+    fun addVoiceMessage(chat: String, source: File, durationMs: Long): ChatMessage? {
+        val folder = chatDir(chat) ?: return null
+        val stamp = nextStamp(folder)
+        val attachment = File(folder, "${stamp}_voice.m4a")
+        val moved = runCatching {
+            if (!source.renameTo(attachment)) {
+                source.copyTo(attachment, overwrite = true)
+                source.delete()
+            }
+            true
+        }.getOrDefault(false)
+        if (!moved || attachment.length() == 0L) {
+            attachment.delete()
+            source.delete()
+            return null
+        }
+        return writeChatMessage(
+            folder,
+            stamp,
+            CHAT_VOICE + attachment.name + "|" + durationMs.coerceAtLeast(0L),
+        )
     }
 
     fun editMessage(message: ChatMessage, text: String): ChatMessage? {
         val body = text.trim()
-        if (body.isEmpty() || !message.file.exists()) return null
+        if (body.isEmpty() || message.type != ChatMessageType.TEXT || !message.file.exists()) return null
         val temp = File(message.file.parentFile, "${message.file.name}.tmp")
         return runCatching {
             temp.writeText(body)
@@ -381,7 +412,69 @@ class VaultStore(private val context: Context) {
     }
 
     fun deleteMessage(message: ChatMessage): Boolean =
-        runCatching { message.file.delete() }.getOrDefault(false)
+        runCatching {
+            message.attachment?.delete()
+            message.file.delete()
+        }.getOrDefault(false)
+
+    private fun chatPreview(file: File): String {
+        val body = runCatching { file.readText().trim() }.getOrDefault("")
+        return when {
+            body.startsWith(CHAT_PHOTO) -> "Photo"
+            body.startsWith(CHAT_VOICE) -> "Voice message"
+            else -> body.replace(Regex("\\s+"), " ").trim()
+        }
+    }
+
+    private fun parseChatMessage(folder: File, file: File): ChatMessage? {
+        val body = runCatching { file.readText().trim() }.getOrNull() ?: return null
+        if (body.isBlank()) return null
+        val stamp = chatStampOf(file.name)
+        if (body.startsWith(CHAT_PHOTO)) {
+            val attachment = chatAttachment(folder, body.removePrefix(CHAT_PHOTO).trim()) ?: return null
+            return ChatMessage(file, "", stamp, ChatMessageType.PHOTO, attachment)
+        }
+        if (body.startsWith(CHAT_VOICE)) {
+            val payload = body.removePrefix(CHAT_VOICE).trim()
+            val separator = payload.indexOf('|')
+            val name = if (separator >= 0) payload.substring(0, separator) else payload
+            val duration = if (separator >= 0) payload.substring(separator + 1).toLongOrNull() ?: 0L else 0L
+            val attachment = chatAttachment(folder, name) ?: return null
+            return ChatMessage(file, "", stamp, ChatMessageType.VOICE, attachment, duration)
+        }
+        return ChatMessage(file, body, stamp)
+    }
+
+    private fun chatAttachment(folder: File, name: String): File? = runCatching {
+        if (name.isBlank()) return@runCatching null
+        val file = File(folder, name)
+        if (!file.canonicalPath.startsWith(folder.canonicalPath + File.separator)) return@runCatching null
+        file.takeIf { it.isFile && it.length() > 0 }
+    }.getOrNull()
+
+    private fun writeChatMessage(folder: File, stamp: Long, body: String): ChatMessage? {
+        val file = File(folder, "$stamp.txt")
+        return runCatching {
+            file.writeText(body)
+            parseChatMessage(folder, file)
+        }.onFailure { file.delete() }.getOrNull()
+    }
+
+    private fun nextStamp(folder: File): Long {
+        var stamp = System.currentTimeMillis()
+        while (folder.listFiles()?.any { it.name.startsWith("$stamp") } == true) stamp += 1
+        return stamp
+    }
+
+    private fun photoExtension(uri: Uri): String =
+        when (context.contentResolver.getType(uri).orEmpty().lowercase()) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            "image/gif" -> "gif"
+            "image/heic" -> "heic"
+            "image/heif" -> "heif"
+            else -> "jpg"
+        }
 
     /** Removes the old empty starter chats once; chats with messages are kept. */
     private fun removeUnusedDefaultChats() {
@@ -468,6 +561,8 @@ class VaultStore(private val context: Context) {
     companion object {
         private const val PENDING_NAME = "Pending"
         private const val PENDING_FOLDER = "00_Pending"
+        private const val CHAT_PHOTO = "\u0001photo:"
+        private const val CHAT_VOICE = "\u0001voice:"
         private val IMAGE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif")
     }
 }

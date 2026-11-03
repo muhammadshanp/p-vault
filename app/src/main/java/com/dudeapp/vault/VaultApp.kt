@@ -665,6 +665,7 @@ fun VaultApp(
         ChatScreen(
             chat = chatDetail,
             store = store,
+            onExternal = onExternal,
             onPickPicture = { pickChatAvatar(chatDetail) },
             onRemovePicture = { removeChatAvatar(chatDetail) },
             onChanged = { refresh() },
