@@ -140,7 +140,7 @@ fun VaultApp(
         scope.launch {
             pagerState.animateScrollToPage(
                 page = target.ordinal,
-                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
             )
         }
     }

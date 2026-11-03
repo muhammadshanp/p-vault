@@ -62,8 +62,8 @@ fun BottomBar(
     val indicator by animateFloatAsState(
         targetValue = selected.ordinal.toFloat(),
         animationSpec = spring(
-            dampingRatio = 0.88f,
-            stiffness = 560f,
+            dampingRatio = 0.9f,
+            stiffness = 800f,
         ),
         label = "tabIndicator",
     )
@@ -117,8 +117,8 @@ fun BottomBar(
                     val scale by animateFloatAsState(
                         targetValue = if (isSelected) 1.08f else 0.9f,
                         animationSpec = spring(
-                            dampingRatio = 0.6f,
-                            stiffness = 700f,
+                            dampingRatio = 0.75f,
+                            stiffness = 900f,
                         ),
                         label = "tabScale",
                     )
