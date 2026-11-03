@@ -51,17 +51,18 @@ internal object BackupZip {
             ZipInputStream(BufferedInputStream(input)).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
-                    val name = (entry.name ?: continue).replace('\\', '/')
-                    if (name == MANIFEST) {
+                    val cleanName = (entry.name ?: continue).replace('\\', '/')
+                    val strippedName = cleanName.trimStart('/')
+                    if (strippedName.equals(MANIFEST, ignoreCase = true)) {
                         hasManifest = true
                         profileName = readManifest(zip)
                         zip.closeEntry()
                         continue
                     }
-                    if (!allowed(name)) {
+                    if (!allowed(strippedName)) {
                         return BackupZipResult(false, "That file is not a P Vault backup")
                     }
-                    val target = File(staging, name)
+                    val target = File(staging, strippedName)
                     if (!target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
                         return BackupZipResult(false, "That backup contains an unsafe path")
                     }

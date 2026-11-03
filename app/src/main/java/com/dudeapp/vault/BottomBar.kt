@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -123,7 +124,7 @@ fun BottomBar(
                         label = "tabScale",
                     )
 
-                    Column(
+                    Box(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
@@ -134,8 +135,7 @@ fun BottomBar(
                                 role = Role.Tab,
                             )
                             .padding(vertical = 4.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = tab.icon,
@@ -153,7 +153,7 @@ fun BottomBar(
                             text = tab.label,
                             color = tint,
                             fontSize = 10.sp,
-                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
                         )
                     }
                 }
