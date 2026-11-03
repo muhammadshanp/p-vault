@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -77,6 +78,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -142,6 +145,8 @@ fun VaultApp(
         }
     }
     var query by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchAutoFocus by remember { mutableStateOf(false) }
     var selecting by remember { mutableStateOf(false) }
     var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     var deleteSelectionOpen by remember { mutableStateOf(false) }
@@ -591,6 +596,8 @@ fun VaultApp(
             tab = Tab.entries[settled]
             selecting = false
             selectedPaths = emptySet()
+            searchOpen = false
+            searchAutoFocus = false
             query = ""
             reelFilter = null
             // Preserve the user's chat/notes mode across tab switches; the toggle only
@@ -602,9 +609,14 @@ fun VaultApp(
     val chatDetail = openChat
     BackHandler(
         enabled = detail == null && chatDetail == null && !settingsOpen &&
-            (query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
+            (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
+            searchOpen -> {
+                searchOpen = false
+                searchAutoFocus = false
+                query = ""
+            }
             query.isNotBlank() -> query = ""
             selecting -> {
                 selecting = false
@@ -691,6 +703,18 @@ fun VaultApp(
                     query = query,
                     onQuery = { query = it },
                     showSearch = tab != Tab.HOME,
+                    searchOpen = searchOpen,
+                    autoFocus = searchAutoFocus,
+                    onSearchOpen = {
+                        searchOpen = true
+                        searchAutoFocus = true
+                    },
+                    onSearchClose = {
+                        searchOpen = false
+                        searchAutoFocus = false
+                        query = ""
+                    },
+                    onAutoFocused = { searchAutoFocus = false },
                     welcome = tab == Tab.HOME,
                     placeholder = when (tab) {
                         Tab.HOME -> "Search"
@@ -1555,9 +1579,21 @@ private fun ProfileHeader(
     onQuery: (String) -> Unit,
     placeholder: String,
     showSearch: Boolean = true,
+    searchOpen: Boolean = false,
+    autoFocus: Boolean = false,
+    onSearchOpen: () -> Unit = {},
+    onSearchClose: () -> Unit = {},
+    onAutoFocused: () -> Unit = {},
     welcome: Boolean = false,
 ) {
     val firstName = profile.name.trim().substringBefore(' ')
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(autoFocus) {
+        if (autoFocus && showSearch && searchOpen) {
+            focusRequester.requestFocus()
+            onAutoFocused()
+        }
+    }
     Column(Modifier.padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1614,6 +1650,15 @@ private fun ProfileHeader(
                     fontSize = 12.sp,
                 )
             }
+            if (showSearch && !searchOpen) {
+                IconButton(onClick = onSearchOpen) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
             IconButton(onClick = onSettings) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
@@ -1623,12 +1668,17 @@ private fun ProfileHeader(
             }
         }
         Spacer(Modifier.height(14.dp))
-        if (showSearch) {
+        if (showSearch && searchOpen) {
             OutlinedTextField(
                 value = query,
                 onValueChange = onQuery,
                 placeholder = { Text(placeholder) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = onSearchClose) {
+                        Icon(Icons.Default.Close, contentDescription = "Close search")
+                    }
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -1636,7 +1686,9 @@ private fun ProfileHeader(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 ),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
             )
             Spacer(Modifier.height(6.dp))
         }

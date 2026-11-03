@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 private const val UPDATE_REPO = "muhammadshanp/p-vault"
-private const val UPDATE_PAGE = "https://muhammadshanp.github.io/p-vault-website/update.html"
+private const val APK_URL = "https://github.com/muhammadshanp/p-vault/releases/latest/download/P-Vault.apk"
 
 data class AppUpdate(val version: String, val url: String)
 
@@ -28,7 +28,7 @@ suspend fun checkForUpdate(currentVersion: String): AppUpdate? = withContext(Dis
                 .find(json.optString("tag_name"))
                 ?.value
                 ?: return@runCatching null
-            AppUpdate(version, updatePageUrl(currentVersion))
+            AppUpdate(version, apkDownloadUrl(json))
         } finally {
             connection.disconnect()
         }
@@ -36,7 +36,19 @@ suspend fun checkForUpdate(currentVersion: String): AppUpdate? = withContext(Dis
 }
 
 internal fun updatePageUrl(currentVersion: String): String =
-    "$UPDATE_PAGE?v=${URLEncoder.encode(currentVersion, "UTF-8")}"
+    "https://muhammadshanp.github.io/p-vault-website/update.html?v=${URLEncoder.encode(currentVersion, "UTF-8")}"
+
+/** Direct APK download from the release; falls back to the /latest/download link. */
+internal fun apkDownloadUrl(json: JSONObject): String {
+    val assets = json.optJSONArray("assets") ?: return APK_URL
+    for (i in 0 until assets.length()) {
+        val asset = assets.optJSONObject(i) ?: continue
+        if (asset.optString("name").endsWith(".apk", ignoreCase = true)) {
+            return asset.optString("browser_download_url").takeIf { it.isNotEmpty() } ?: APK_URL
+        }
+    }
+    return APK_URL
+}
 
 /** True when the release version is newer than the installed version. */
 internal fun isNewerVersion(latest: String, current: String): Boolean {

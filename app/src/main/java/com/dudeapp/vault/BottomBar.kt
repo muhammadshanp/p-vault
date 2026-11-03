@@ -93,7 +93,7 @@ fun BottomBar(
                     .width(tabWidth)
                     .fillMaxHeight()
                     .padding(horizontal = 2.dp, vertical = 5.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(30.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
             )
 
