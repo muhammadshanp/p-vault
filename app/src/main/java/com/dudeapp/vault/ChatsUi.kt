@@ -60,7 +60,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -109,11 +108,36 @@ fun TextModeChips(chatView: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(4.dp),
     ) {
-        FilterChip(selected = chatView, onClick = { onChange(true) }, label = { Text("Chats") })
-        FilterChip(selected = !chatView, onClick = { onChange(false) }, label = { Text("Notes") })
+        listOf(true to "Chats", false to "Notes").forEach { (mode, label) ->
+            val active = chatView == mode
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(CircleShape)
+                    .background(
+                        if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
+                    )
+                    .clickable { onChange(mode) }
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 14.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (active) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -125,69 +149,36 @@ fun ChatRow(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(22.dp)
-    val marked = selecting && selected
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = if (marked) 2.dp else 1.dp,
-                color = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                shape = shape,
-            )
+            .vaultCard(RoundedCornerShape(20.dp), selecting && selected)
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChatAvatar(chat, 52.dp)
+        ChatAvatar(chat, 50.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = chat.name,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = chat.lastMessage.ifBlank { "No messages yet" },
                 color = TextSoft,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         if (selecting) {
             Spacer(Modifier.width(8.dp))
-            Box(
-                Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        },
-                    )
-                    .border(
-                        1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
+            SelectionDot(selected = selected)
         } else if (chat.lastStamp > 0L) {
             Spacer(Modifier.width(8.dp))
             Text(listTimeOf(context, chat.lastStamp), color = TextSoft, fontSize = 11.sp)
@@ -1121,8 +1112,7 @@ private fun ChatAvatar(chat: ChatThread, size: Dp) {
         Modifier
             .size(size)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+            .background(Accent.Chat.copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center,
     ) {
         if (avatar != null) {
@@ -1136,7 +1126,7 @@ private fun ChatAvatar(chat: ChatThread, size: Dp) {
             Icon(
                 imageVector = Icons.Outlined.Person,
                 contentDescription = "${chat.name} picture",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = Accent.Chat,
                 modifier = Modifier.size(size * 0.55f),
             )
         }

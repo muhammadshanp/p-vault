@@ -16,7 +16,7 @@ A private vault for photos, PDFs, text notes and Instagram Reels. Android only. 
 - Browse in five tabs: Files, Reels, Images, PDFs, Notes. Search by title, filter reels by category.
 - Swipe left or right on the content to move between tabs.
 - The Notes tab opens Chats by default; switch the Chats/Notes chips to see plain notes.
-- A contextual + in every section: add a file, reel, photo, PDF or note.
+- A floating + button on every tab, including Home: add a file, reel, photo, PDF, note or chat.
 - Rename and delete items. Reels can be moved between categories; categories can be renamed (Pending is reserved).
 - Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together.
 - Search hints and item counts follow the current section.
@@ -101,7 +101,7 @@ P Vault writes to the folder through Android's storage provider, and the Google 
 
 Open Settings from the gear beside your name. It includes:
 
-- Theme: White or Dark.
+- Theme: Light or Dark.
 - App lock on/off, change PIN, fingerprint unlock, and auto-lock delay.
 - Auto-backup on/off and the backup reminder interval.
 - How many backups to keep in the Google Drive folder.
@@ -132,4 +132,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.3.5 (versionCode 19).
+`com.dudeapp.vault` — version 0.5.0 (versionCode 30).

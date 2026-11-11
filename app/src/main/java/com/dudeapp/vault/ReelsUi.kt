@@ -3,7 +3,6 @@ package com.dudeapp.vault
 import android.net.Uri
 import android.util.Patterns
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -142,11 +140,11 @@ fun CategoryChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "filter:all") {
-            FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("All") })
+            PillChip(label = "All", selected = selected == null, onClick = { onSelect(null) })
         }
         categories.forEach { name ->
             item(key = name) {
-                FilterChip(selected = selected == name, onClick = { onSelect(name) }, label = { Text(name) })
+                PillChip(label = name, selected = selected == name, onClick = { onSelect(name) })
             }
         }
     }
@@ -160,25 +158,17 @@ fun ReelCard(
     onClick: () -> Unit,
     onMenu: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(22.dp)
-    val marked = selecting && selected
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = if (marked) 2.dp else 1.dp,
-                color = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                shape = shape,
-            )
+            .vaultCard(RoundedCornerShape(20.dp), selecting && selected)
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = if (selecting) 14.dp else 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(58.dp)
+                .size(54.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFFE1306C)))),
             contentAlignment = Alignment.Center,
@@ -187,7 +177,7 @@ fun ReelCard(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(30.dp),
+                modifier = Modifier.size(28.dp),
             )
         }
         Spacer(Modifier.width(12.dp))
@@ -196,45 +186,36 @@ fun ReelCard(
                 text = reel.title,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "${reel.category} · ${hostOf(reel.url)}",
-                color = TextSoft,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = reel.category,
+                    color = Accent.Reel,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Accent.Reel.copy(alpha = 0.14f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = hostOf(reel.url),
+                    color = TextSoft,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
         if (selecting) {
-            Box(
-                Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        },
-                    )
-                    .border(
-                        1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
+            Spacer(Modifier.width(8.dp))
+            SelectionDot(selected = selected)
         } else {
             IconButton(onClick = onMenu) {
                 Icon(

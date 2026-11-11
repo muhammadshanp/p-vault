@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -106,37 +107,35 @@ fun AddSheet(
             Spacer(Modifier.height(6.dp))
             Text("Everything stays on this device.", color = TextSoft, fontSize = 13.sp)
             Spacer(Modifier.height(18.dp))
-            AddRow(Icons.Outlined.Image, "Photos", "Import images from your gallery", onPickPhotos)
-            AddRow(Icons.Outlined.PictureAsPdf, "PDF document", "Import a PDF file", onPickPdf)
-            AddRow(Icons.AutoMirrored.Outlined.StickyNote2, "Text note", "Write something down", onTextNote)
-            AddRow(Icons.Outlined.PlayCircle, "Reel link", "Save an Instagram Reel", onReel)
+            AddRow(Icons.Outlined.Image, Accent.Photo, "Photos", "Import images from your gallery", onPickPhotos)
+            AddRow(Icons.Outlined.PictureAsPdf, Accent.Pdf, "PDF document", "Import a PDF file", onPickPdf)
+            AddRow(Icons.AutoMirrored.Outlined.StickyNote2, Accent.Note, "Text note", "Write something down", onTextNote)
+            AddRow(Icons.Outlined.PlayCircle, Accent.Reel, "Reel link", "Save an Instagram Reel", onReel)
         }
     }
 }
 
 @Composable
-private fun AddRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun AddRow(
+    icon: ImageVector,
+    tint: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 13.dp),
+            .padding(horizontal = 10.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(46.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-        }
+        IconBadge(icon = icon, tint = tint, size = 48.dp, iconSize = 24.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = TextSoft, fontSize = 12.sp)
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = TextSoft, fontSize = 13.sp)
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = TextSoft)
     }
