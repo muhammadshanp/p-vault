@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -40,6 +41,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -49,6 +51,7 @@ import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
@@ -56,8 +59,7 @@ import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -790,7 +792,6 @@ fun VaultApp(
                                 Tab.PDFS -> "PDF"
                                 Tab.NOTES -> if (chatView) "chat" else "note"
                             },
-                            onAdd = { sectionAdd() },
                             onSelect = {
                                 if (selecting) {
                                     cancelSelection()
@@ -811,13 +812,17 @@ fun VaultApp(
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 2.dp),
+                                    .padding(horizontal = 20.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .padding(start = 16.dp, end = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
                                     "${selectedPaths.size} selected",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                                 Spacer(Modifier.weight(1f))
                                 TextButton(onClick = { cancelSelection() }) {
@@ -839,6 +844,7 @@ fun VaultApp(
                                     )
                                 }
                             }
+                            Spacer(Modifier.height(4.dp))
                         }
 
                         if (currentTab == Tab.NOTES) {
@@ -864,7 +870,7 @@ fun VaultApp(
                                 )
                             } else {
                                 LazyColumn(
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -900,7 +906,7 @@ fun VaultApp(
                                 )
                             } else {
                                 LazyColumn(
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -934,7 +940,7 @@ fun VaultApp(
                         } else {
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(2),
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier
@@ -967,6 +973,21 @@ fun VaultApp(
                 onSelect = { target -> switchTab(target) },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+
+            if (!selecting) {
+                FloatingActionButton(
+                    onClick = { sectionAdd() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = 20.dp, bottom = BottomBarHeight + 17.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
+                }
+            }
 
             if (addOpen) {
                 AddSheet(
@@ -1370,52 +1391,75 @@ private fun HomeContent(
     val images = items.count { it.type == ItemType.IMAGE }
     val pdfs = items.count { it.type == ItemType.PDF }
     val notes = items.count { it.type == ItemType.TEXT }
+    val total = items.size + reels.size + chats.size
     val recent = items.take(4)
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 136.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Text(
-                text = "Your space",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        item { HomeHero(total = total) }
+
+        item { HomeSectionTitle("Library") }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeShortcut(
-                    icon = Icons.Outlined.Image,
-                    title = "Photos",
-                    detail = countLabel(images, "photo"),
-                    onClick = { onOpenTab(Tab.IMAGES) },
-                )
-                HomeShortcut(
-                    icon = Icons.Outlined.PictureAsPdf,
-                    title = "PDFs",
-                    detail = countLabel(pdfs, "PDF"),
-                    onClick = { onOpenTab(Tab.PDFS) },
-                )
-                HomeShortcut(
-                    icon = Icons.Outlined.ChatBubbleOutline,
-                    title = "Notes & chats",
-                    detail = "${countLabel(notes, "note")} · ${countLabel(chats.size, "chat")}",
-                    onClick = { onOpenTab(Tab.NOTES) },
-                )
-                HomeShortcut(
-                    icon = Icons.Outlined.PlayCircle,
-                    title = "Reels",
-                    detail = countLabel(reels.size, "reel"),
-                    onClick = { onOpenTab(Tab.REELS) },
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HomeTile(
+                        icon = Icons.Outlined.Image,
+                        tint = Accent.Photo,
+                        title = "Photos",
+                        detail = countLabel(images, "photo"),
+                        onClick = { onOpenTab(Tab.IMAGES) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    HomeTile(
+                        icon = Icons.Outlined.PictureAsPdf,
+                        tint = Accent.Pdf,
+                        title = "PDFs",
+                        detail = countLabel(pdfs, "PDF"),
+                        onClick = { onOpenTab(Tab.PDFS) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HomeTile(
+                        icon = Icons.Outlined.ChatBubbleOutline,
+                        tint = Accent.Chat,
+                        title = "Notes & chats",
+                        detail = "${countLabel(notes, "note")} · ${countLabel(chats.size, "chat")}",
+                        onClick = { onOpenTab(Tab.NOTES) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    HomeTile(
+                        icon = Icons.Outlined.PlayCircle,
+                        tint = Accent.Reel,
+                        title = "Reels",
+                        detail = countLabel(reels.size, "reel"),
+                        onClick = { onOpenTab(Tab.REELS) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
+        if (total == 0) {
+            item {
+                Text(
+                    text = "Your vault is empty. Tap + to add a photo, PDF, note or reel.",
+                    color = TextSoft,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
                 )
             }
         }
 
         if (recent.isNotEmpty()) {
-            item { HomeSectionTitle("Recent") }
+            item { HomeSectionTitle("Recently added") }
             recent.forEach { item ->
                 item(key = item.file.absolutePath) {
                     HomeRecentRow(item = item, onClick = { onOpenItem(item) })
@@ -1440,85 +1484,120 @@ private fun HomeContent(
 }
 
 @Composable
-private fun HomeShortcut(
+private fun HomeHero(total: Int) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                Brush.linearGradient(listOf(Color(0xFFF0703F), Color(0xFFB9391A))),
+            )
+            .padding(horizontal = 22.dp, vertical = 20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Outlined.Lock,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "PRIVATE VAULT",
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.2.sp,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = total.toString(),
+            color = Color.White,
+            fontSize = 44.sp,
+            lineHeight = 48.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = if (total == 1) {
+                "item kept safe on this device"
+            } else {
+                "items kept safe on this device"
+            },
+            color = Color.White.copy(alpha = 0.92f),
+            fontSize = 14.sp,
+        )
+    }
+}
+
+@Composable
+private fun HomeTile(
     icon: ImageVector,
+    tint: Color,
     title: String,
     detail: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+    Column(
+        modifier
+            .vaultCard(RoundedCornerShape(22.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(16.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(detail, color = TextSoft, fontSize = 12.sp)
-        }
+        IconBadge(icon = icon, tint = tint)
+        Spacer(Modifier.height(14.dp))
         Text(
-            text = "View",
-            color = MaterialTheme.colorScheme.primary,
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = detail,
+            color = TextSoft,
             fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
 private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .vaultCard(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (item.type) {
-                ItemType.IMAGE -> AsyncImage(
-                    model = item.file,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        when (item.type) {
+            ItemType.IMAGE -> AsyncImage(
+                model = item.file,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            )
 
-                ItemType.PDF -> Icon(
-                    imageVector = Icons.Outlined.PictureAsPdf,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
+            ItemType.PDF -> IconBadge(
+                icon = Icons.Outlined.PictureAsPdf,
+                tint = Accent.Pdf,
+                size = 48.dp,
+                iconSize = 24.dp,
+            )
 
-                ItemType.TEXT -> Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.StickyNote2,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
+            ItemType.TEXT -> IconBadge(
+                icon = Icons.AutoMirrored.Outlined.StickyNote2,
+                tint = Accent.Note,
+                size = 48.dp,
+                iconSize = 24.dp,
+            )
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -1539,11 +1618,10 @@ private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
                 fontSize = 12.sp,
             )
         }
-        Text(
-            text = "Open",
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextSoft,
         )
     }
 }
@@ -1553,7 +1631,7 @@ private fun HomeSectionTitle(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 8.dp),
     )
 }
 
@@ -1572,6 +1650,30 @@ private fun extractUrl(text: String): String? {
 }
 
 @Composable
+private fun HeaderButton(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+@Composable
 private fun ProfileHeader(
     profile: UserProfile,
     onProfile: () -> Unit,
@@ -1587,7 +1689,8 @@ private fun ProfileHeader(
     onAutoFocused: () -> Unit = {},
     welcome: Boolean = false,
 ) {
-    val firstName = profile.name.trim().substringBefore(' ')
+    val name = profile.name.trim()
+    val firstName = name.substringBefore(' ')
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(autoFocus) {
         if (autoFocus && showSearch && searchOpen) {
@@ -1596,77 +1699,70 @@ private fun ProfileHeader(
         }
     }
     Column(Modifier.padding(horizontal = 20.dp)) {
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                    .clickable(onClick = onProfile),
-                contentAlignment = Alignment.Center,
-            ) {
-                val avatar = profile.avatar
-                if (avatar != null) {
-                    AsyncImage(
-                        model = avatar,
-                        contentDescription = "Profile",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.Person,
-                        contentDescription = "Profile",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(
+            Row(
                 Modifier
                     .weight(1f)
+                    .clip(RoundedCornerShape(24.dp))
                     .clickable(onClick = onProfile),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = when {
-                        welcome && firstName.isBlank() -> "Welcome"
-                        welcome -> "Welcome, $firstName"
-                        else -> profile.name.trim().ifBlank { "Set up your profile" }
-                    },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (welcome && firstName.isBlank()) {
-                        "Set up your profile"
+                Box(
+                    Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val avatar = profile.avatar
+                    if (avatar != null) {
+                        AsyncImage(
+                            model = avatar,
+                            contentDescription = "Profile",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     } else {
-                        "Private vault · on this device"
-                    },
-                    color = TextSoft,
-                    fontSize = 12.sp,
-                )
-            }
-            if (showSearch && !searchOpen) {
-                IconButton(onClick = onSearchOpen) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        modifier = Modifier.size(22.dp),
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = "Profile",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = when {
+                            name.isBlank() -> "Tap to set up your profile"
+                            welcome -> "Welcome back"
+                            else -> "P Vault"
+                        },
+                        color = TextSoft,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = when {
+                            name.isBlank() -> "Welcome"
+                            welcome -> firstName
+                            else -> name
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            IconButton(onClick = onSettings) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Settings",
-                    modifier = Modifier.size(22.dp),
-                )
+            Spacer(Modifier.width(8.dp))
+            if (showSearch && !searchOpen) {
+                HeaderButton(Icons.Default.Search, "Search", onSearchOpen)
+                Spacer(Modifier.width(8.dp))
             }
+            HeaderButton(Icons.Outlined.Settings, "Settings", onSettings)
         }
         Spacer(Modifier.height(14.dp))
         if (showSearch && searchOpen) {
@@ -1681,7 +1777,7 @@ private fun ProfileHeader(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(16.dp),
+                shape = CircleShape,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -1691,7 +1787,7 @@ private fun ProfileHeader(
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -1701,7 +1797,6 @@ private fun SectionHeader(
     title: String,
     count: Int,
     unit: String,
-    onAdd: () -> Unit,
     onSelect: () -> Unit,
     onManage: (() -> Unit)?,
     manageDescription: String,
@@ -1712,37 +1807,33 @@ private fun SectionHeader(
             .padding(horizontal = 20.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
+        Row(
+            Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
             )
+            Spacer(Modifier.width(10.dp))
             Text(
-                text = if (count == 1) "1 $unit" else "$count ${unit}s",
+                text = countLabel(count, unit),
                 color = TextSoft,
                 fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
         if (onManage != null) {
-            IconButton(onClick = onManage) {
-                Icon(
-                    imageVector = Icons.Outlined.Tune,
-                    contentDescription = manageDescription,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            HeaderButton(Icons.Outlined.Tune, manageDescription, onManage)
+            Spacer(Modifier.width(8.dp))
         }
-        IconButton(onClick = onSelect) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Select $title",
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        FilledIconButton(onClick = onAdd) {
-            Icon(Icons.Default.Add, contentDescription = "Add to $title")
-        }
+        HeaderButton(Icons.Default.Edit, "Select $title", onSelect)
     }
 }
 
@@ -1753,18 +1844,11 @@ private fun VaultCard(
     selecting: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(24.dp)
     val marked = selecting && selected
     Box(
         Modifier
-            .aspectRatio(0.82f)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = if (marked) 2.dp else 1.dp,
-                color = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                shape = shape,
-            )
+            .aspectRatio(0.86f)
+            .vaultCard(RoundedCornerShape(22.dp), marked)
             .clickable(onClick = onClick),
     ) {
         when (item.type) {
@@ -1781,10 +1865,10 @@ private fun VaultCard(
                         .fillMaxWidth()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
                             ),
                         )
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(start = 12.dp, end = 12.dp, top = 26.dp, bottom = 10.dp),
                 ) {
                     Text(
                         text = item.title,
@@ -1801,31 +1885,30 @@ private fun VaultCard(
                 Modifier
                     .fillMaxSize()
                     .padding(14.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = if (item.type == ItemType.PDF) {
-                            Icons.Outlined.PictureAsPdf
-                        } else {
-                            Icons.AutoMirrored.Outlined.StickyNote2
-                        },
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                        modifier = Modifier.size(40.dp),
-                    )
-                }
+                IconBadge(
+                    icon = if (item.type == ItemType.PDF) {
+                        Icons.Outlined.PictureAsPdf
+                    } else {
+                        Icons.AutoMirrored.Outlined.StickyNote2
+                    },
+                    tint = accentOf(item.type),
+                    size = 48.dp,
+                    iconSize = 24.dp,
+                )
+                Spacer(Modifier.weight(1f))
                 Text(
                     text = item.title,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (item.type == ItemType.PDF) "PDF" else "Note",
+                    color = TextSoft,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -1838,35 +1921,12 @@ private fun VaultCard(
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                 )
             }
-            Box(
-                Modifier
+            SelectionDot(
+                selected = selected,
+                modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(10.dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                        },
-                    )
-                    .border(
-                        1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
+                    .padding(10.dp),
+            )
         }
     }
 }
@@ -1883,17 +1943,21 @@ private fun EmptyState(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(bottom = 110.dp),
+            .padding(start = 36.dp, end = 36.dp, bottom = 120.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = if (chatView) Icons.Outlined.ChatBubbleOutline else tab.icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(46.dp),
+            IconBadge(
+                icon = when {
+                    searching -> Icons.Default.Search
+                    chatView -> Icons.Outlined.ChatBubbleOutline
+                    else -> tab.icon
+                },
+                tint = MaterialTheme.colorScheme.primary,
+                size = 76.dp,
+                iconSize = 34.dp,
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(18.dp))
             Text(
                 text = if (searching) {
                     "No matches"
@@ -1902,7 +1966,7 @@ private fun EmptyState(
                 } else {
                     "Nothing here yet"
                 },
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -1926,12 +1990,13 @@ private fun EmptyState(
                     }
                 },
                 color = TextSoft,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
                 textAlign = TextAlign.Center,
             )
             if (!searching) {
-                Spacer(Modifier.height(16.dp))
-                FilledTonalButton(onClick = onAdd) {
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onAdd) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Add")

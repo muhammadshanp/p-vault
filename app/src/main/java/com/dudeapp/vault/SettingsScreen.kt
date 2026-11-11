@@ -2,6 +2,7 @@ package com.dudeapp.vault
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -95,8 +96,7 @@ fun SettingsScreen(
                 }
                 Text(
                     text = "Settings",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.headlineSmall,
                 )
             }
 
@@ -323,15 +323,17 @@ private fun SettingsGroup(
             .padding(bottom = 18.dp),
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            text = title.uppercase(),
+            color = TextSoft,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp),
         )
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
         ) {
             Column(Modifier.fillMaxWidth(), content = content)
         }
