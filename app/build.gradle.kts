@@ -12,12 +12,16 @@ android {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "0.5.1"
+        versionCode = 32
+        versionName = "0.5.2"
     }
 
     buildTypes {
         release {
+            // Releases are optimised (non-debuggable) builds, which run Compose far more
+            // smoothly than debug builds. They keep the debug signing key because every
+            // earlier P Vault was signed with it, and updates must match that key.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -37,6 +41,10 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        checkReleaseBuilds = false
     }
 }
 

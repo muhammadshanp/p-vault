@@ -303,7 +303,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Update checks use the official P Vault website.",
+                            "Updates are checked and downloaded from P Vault's GitHub releases.",
                             color = TextSoft,
                             fontSize = 12.sp,
                         )

@@ -2,6 +2,7 @@ package com.dudeapp.vault
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -21,6 +22,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +36,23 @@ enum class Tab(val label: String, val icon: ImageVector, val selectedIcon: Image
     IMAGES("Images", Icons.Outlined.Image, Icons.Filled.Image),
     PDFS("PDFs", Icons.Outlined.PictureAsPdf, Icons.Filled.PictureAsPdf),
     NOTES("Notes", Icons.AutoMirrored.Outlined.StickyNote2, Icons.AutoMirrored.Filled.StickyNote2),
+}
+
+/**
+ * The bar for the tab pager. The highlight follows the pager itself (taps and swipes),
+ * so it can never disagree with the page on screen. Reading the pager position in here,
+ * rather than in the screen that owns the pager, means a swipe only redraws this bar.
+ */
+@Composable
+fun PagerBottomBar(
+    pagerState: PagerState,
+    onSelect: (Tab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selected by remember(pagerState) {
+        derivedStateOf { Tab.entries[pagerState.targetPage.coerceIn(0, Tab.entries.lastIndex)] }
+    }
+    BottomBar(selected = selected, onSelect = onSelect, modifier = modifier)
 }
 
 /**
