@@ -37,14 +37,16 @@ fun showUpdateNotification(context: Context, update: AppUpdate) {
     val open = PendingIntent.getActivity(
         context,
         0,
-        Intent(Intent.ACTION_VIEW, Uri.parse(update.url)),
+        // Open P Vault itself; its update dialog downloads and installs the release.
+        context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: Intent(Intent.ACTION_VIEW, Uri.parse(update.url)),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
     val notification = Notification.Builder(context, UPDATE_CHANNEL)
         .setSmallIcon(R.drawable.ic_update_notification)
         .setColor(0xFFE8633A.toInt())
         .setContentTitle("P Vault ${update.version} is available")
-        .setContentText("Tap to download the new version from the official website.")
+        .setContentText("Tap to open P Vault and update.")
         .setContentIntent(open)
         .setAutoCancel(true)
         .setOnlyAlertOnce(true)

@@ -16,8 +16,8 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: chmod +x gradlew
-      - run: ./gradlew --no-daemon assembleDebug testDebugUnitTest
+      - run: ./gradlew --no-daemon assembleRelease testReleaseUnitTest
       - uses: actions/upload-artifact@v4
         with:
           name: test-apk-not-for-release
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk

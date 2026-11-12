@@ -1,4 +1,4 @@
-# Builds the debug APK and copies it to P-Vault.apk next to this script.
+# Builds the release APK (signed with the debug key, like every earlier version) and copies it to P-Vault.apk next to this script.
 $ErrorActionPreference = "Stop"
 
 $env:JAVA_HOME = "$env:LOCALAPPDATA\DudeTools\jdk\jdk-21.0.12.1+1"
@@ -7,9 +7,9 @@ $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 
 Push-Location $PSScriptRoot
 try {
-    & .\gradlew.bat assembleDebug
+    & .\gradlew.bat assembleRelease
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed" }
-    Copy-Item "app\build\outputs\apk\debug\app-debug.apk" "P-Vault.apk" -Force
+    Copy-Item "app\build\outputs\apk\release\app-release.apk" "P-Vault.apk" -Force
     Write-Host "APK ready: $PSScriptRoot\P-Vault.apk"
 } finally {
     Pop-Location

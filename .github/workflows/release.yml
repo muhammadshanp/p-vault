@@ -65,8 +65,8 @@ jobs:
         if: steps.version.outputs.state != 'false'
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug testDebugUnitTest
-          cp app/build/outputs/apk/debug/app-debug.apk P-Vault.apk
+          ./gradlew --no-daemon assembleRelease testReleaseUnitTest
+          cp app/build/outputs/apk/release/app-release.apk P-Vault.apk
 
       - name: Check the APK is signed with the original key
         if: steps.version.outputs.state != 'false'
@@ -75,7 +75,7 @@ jobs:
           actual=$("$apksigner" verify --print-certs P-Vault.apk | grep -oP 'certificate SHA-256 digest: \K[0-9a-f]+' | head -1)
           echo "APK certificate: $actual"
           if [ "$actual" != "$EXPECTED_CERT" ]; then
-            echo "::error::This APK is not signed with the original P Vault key, so it could not update existing installs. Check that DEBUG_KEYSTORE_BASE64 holds the keystore from the PC that built earlier releases."
+            echo "::error::Key fingerprint is $actual but must be $EXPECTED_CERT. This APK is not signed with the original P Vault key, so it could not update existing installs. Check that DEBUG_KEYSTORE_BASE64 holds the keystore from the PC that built earlier releases."
             exit 1
           fi
 

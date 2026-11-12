@@ -61,6 +61,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -205,6 +206,41 @@ fun VaultApp(
             }
         } else {
             showUpdateNotification(context, latest)
+        }
+    }
+
+    // null = idle, -1 = downloading with unknown size, 0..100 = download progress.
+    var updateProgress by remember { mutableStateOf<Int?>(null) }
+    var updateError by remember { mutableStateOf<String?>(null) }
+
+    /** Downloads the release inside the app, checks it, then opens Android's installer. */
+    fun installUpdate(update: AppUpdate) {
+        if (updateProgress != null) return
+        updateError = null
+        updateProgress = -1
+        updateDialogOpen = true
+        scope.launch {
+            val file = downloadUpdate(context, update) { updateProgress = it }
+            if (file == null) {
+                updateProgress = null
+                updateError = "Could not download the update. Check your connection and try again."
+                return@launch
+            }
+            val problem = withContext(Dispatchers.IO) { updateProblem(context, file) }
+            updateProgress = null
+            if (problem != null) {
+                updateError = problem
+                return@launch
+            }
+            clearUpdateNotification(context)
+            suppressNextStart = true
+            onExternal()
+            if (launchInstaller(context, file)) {
+                updateDialogOpen = false
+            } else {
+                suppressNextStart = false
+                updateError = "Could not open the installer."
+            }
         }
     }
 
@@ -645,7 +681,7 @@ fun VaultApp(
             onUpdate = {
                 availableUpdate?.let {
                     settingsOpen = false
-                    openUpdatePage(it.url)
+                    installUpdate(it)
                 }
             },
             onExport = { exportVault() },
@@ -736,7 +772,9 @@ fun VaultApp(
                 ) {
                 HorizontalPager(
                     state = pagerState,
-                    beyondViewportPageCount = 1,
+                    // Keep every tab composed. Swiping then only moves pages that already
+                    // exist, instead of building the next one in the middle of the gesture.
+                    beyondViewportPageCount = Tab.entries.size,
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val currentTab = Tab.entries[page]
@@ -988,10 +1026,8 @@ fun VaultApp(
                 }
                 }
 
-                // Highlight follows the pager itself (taps and swipes), so the bar can
-                // never disagree with the page that is on screen.
-                BottomBar(
-                    selected = Tab.entries[pagerState.targetPage.coerceIn(0, Tab.entries.lastIndex)],
+                PagerBottomBar(
+                    pagerState = pagerState,
                     onSelect = { target -> switchTab(target) },
                 )
             }
@@ -1361,23 +1397,65 @@ fun VaultApp(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "A newer version is ready. You have $currentVersion. Get it from the official P Vault website.",
+                        text = "A newer version is ready. You have $currentVersion. It downloads and installs here, inside P Vault.",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    val progress = updateProgress
+                    if (progress != null) {
+                        Spacer(Modifier.height(16.dp))
+                        if (progress in 0..100) {
+                            LinearProgressIndicator(
+                                progress = { progress / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = if (progress in 0..100) "Downloading… $progress%" else "Downloading…",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    val failure = updateError
+                    if (failure != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = failure,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 13.sp,
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
-                    onClick = { openUpdatePage(update.url) },
+                    onClick = { installUpdate(update) },
+                    enabled = updateProgress == null,
                     shape = RoundedCornerShape(50),
                 ) {
-                    Text("Update now")
+                    Text(
+                        when {
+                            updateProgress != null -> "Downloading…"
+                            updateError != null -> "Try again"
+                            else -> "Update now"
+                        },
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { updateDialogOpen = false }) {
-                    Text("Not now")
+                if (updateError != null && updateProgress == null) {
+                    // Fallback when the in-app download or check fails.
+                    TextButton(onClick = { openUpdatePage(update.url) }) {
+                        Text("Use browser")
+                    }
+                } else {
+                    TextButton(onClick = { updateDialogOpen = false }) {
+                        Text(if (updateProgress != null) "Hide" else "Not now")
+                    }
                 }
             },
             shape = RoundedCornerShape(28.dp),

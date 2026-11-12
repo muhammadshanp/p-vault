@@ -24,8 +24,8 @@ A private vault for photos, PDFs, text notes and Instagram Reels. Android only. 
 - A full Settings screen: theme, app lock on/off, change PIN, fingerprint unlock, auto-lock delay, auto-backup on/off, backup reminder interval, backups kept, export/import, clear vault data, and About/version.
 - Screenshots, screen recording and the recent-apps preview are allowed.
 - Optional Google Drive backup through Android's system folder picker. Install the free Google Drive app, sign in there, and pick a Drive folder once. No Google Cloud project or paid plan is needed. Local storage stays primary. A dedicated Google account just for backups is a good idea. Backups are not encrypted.
-- On launch, checks the public GitHub Releases page for a newer version and shows an **Update available** dialog. The Update button opens the official P Vault website; it never installs anything by itself.
-- Everything lives in the app's private storage. The only network request is the GitHub version check; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
+- On launch, checks the public GitHub Releases page for a newer version and shows an **Update available** dialog. Tap **Update now** and the release APK downloads inside P Vault, is checked (it must be P Vault, not older, and signed with the same key), and is handed to Android's installer. Android still asks you to confirm, and the first time it asks you to allow P Vault to install apps. If the in-app download fails, **Use browser** opens the download instead.
+- Everything lives in the app's private storage. The only network requests are the GitHub version check and, when you choose to update, the APK download from the GitHub release; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
 
 ## Stack
 
@@ -42,14 +42,14 @@ Metadata is the filename: `<timestamp>_<title>.<ext>`. Reels are small `.reel` f
 Requirements: JDK 17+ and the Android SDK (platform 35, build-tools 35.0.0).
 
 ```powershell
-.\gradlew assembleDebug
+.\gradlew assembleRelease
 ```
 
-The debug APK is written to `app\build\outputs\apk\debug\app-debug.apk`.
+The APK is written to `app\build\outputs\apk\release\app-release.apk`. It is an optimised release build signed with the debug key, because every earlier P Vault was signed with that key and updates must match it. `build.ps1` does the same and copies the result to `P-Vault.apk`.
 
 ## Updates
 
-P Vault reads the latest release from `https://api.github.com/repos/muhammadshanp/p-vault/releases/latest` when it opens. If the release tag is newer than the installed version, it shows **Update available** with a button that opens the [updates page](https://muhammadshanp.github.io/p-vault-website/update.html).
+P Vault reads the latest release from `https://api.github.com/repos/muhammadshanp/p-vault/releases/latest` when it opens. If the release tag is newer than the installed version, it shows **Update available**; **Update now** downloads the release APK inside the app and opens Android's installer.
 
 To publish an update:
 
@@ -97,7 +97,7 @@ Backups are ordinary zip files, not encrypted. Anyone with access to the Google 
 
 Drive backup is one-way, not live sync. Auto-backup runs only while P Vault is open; if you close the app before the 20-second wait, the pending change is retried on the next launch when Drive is connected. The backup reminder appears only when you open the app; it is not a background notification.
 
-P Vault writes to the folder through Android's storage provider, and the Google Drive app does the network upload. The app's only other network use is the GitHub update check. If the Drive app reports that storage is full, free space and back up again.
+P Vault writes to the folder through Android's storage provider, and the Google Drive app does the network upload. The app's only other network use is the GitHub update check and update download. If the Drive app reports that storage is full, free space and back up again.
 
 
 ## Settings
