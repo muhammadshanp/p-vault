@@ -54,8 +54,11 @@ P Vault reads the latest release from `https://api.github.com/repos/muhammadshan
 To publish an update:
 
 1. Raise `versionCode` and `versionName` in `app/build.gradle.kts`.
-2. Build `P-Vault.apk`.
-3. Create a GitHub release with a tag such as `v1.10`, attach `P-Vault.apk`, and publish it.
+2. Merge to `main`.
+
+The **Release** workflow then builds `P-Vault.apk`, checks it is signed with the original key, and publishes a release tagged `v<versionName>`. If a draft release with that tag exists, its notes are kept and the APK is attached to it. A version that is already published is left alone. The workflow needs the `DEBUG_KEYSTORE_BASE64` repository secret (the base64 text of the `debug.keystore` that signed earlier releases).
+
+To release by hand instead, build `P-Vault.apk` with `build.ps1` on the original PC, create a GitHub release with a tag such as `v1.10`, attach the APK, and publish it.
 
 The tag must contain the version number (`v1.10` or `1.10` both work). No update file needs to be uploaded separately. Offline launches skip the check silently.
 
