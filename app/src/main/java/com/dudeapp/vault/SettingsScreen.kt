@@ -2,6 +2,13 @@ package com.dudeapp.vault
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +46,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,8 +84,20 @@ fun SettingsScreen(
         }.getOrNull().orEmpty().ifBlank { "1.6" }
     }
 
-    BackHandler(onBack = onBack)
+    // Settings fades and slides in when opened, and plays the reverse before closing.
+    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+    val close = { visible.targetState = false }
+    LaunchedEffect(visible.isIdle, visible.currentState) {
+        if (visible.isIdle && !visible.currentState && !visible.targetState) onBack()
+    }
 
+    BackHandler(onBack = close)
+
+    AnimatedVisibility(
+        visibleState = visible,
+        enter = fadeIn(tween(200)) + slideInHorizontally(tween(240)) { it / 5 },
+        exit = fadeOut(tween(140)) + slideOutHorizontally(tween(180)) { it / 5 },
+    ) {
     Box(Modifier.fillMaxSize()) {
         Backdrop()
         Column(
@@ -91,7 +111,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(onClick = close) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
                 Text(
@@ -291,6 +311,7 @@ fun SettingsScreen(
                 }
             }
         }
+    }
     }
 
     if (changePinOpen) {
