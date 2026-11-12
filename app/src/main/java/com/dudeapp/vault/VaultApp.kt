@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -728,10 +727,17 @@ fun VaultApp(
                     },
                 )
 
+                // The pager and the + button share the space between the header and the
+                // navigation bar, so nothing is ever drawn underneath the bar.
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
                 HorizontalPager(
                     state = pagerState,
                     beyondViewportPageCount = 1,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val currentTab = Tab.entries[page]
                     val isHome = currentTab == Tab.HOME
@@ -870,7 +876,7 @@ fun VaultApp(
                                 )
                             } else {
                                 LazyColumn(
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -906,7 +912,7 @@ fun VaultApp(
                                 )
                             } else {
                                 LazyColumn(
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -940,7 +946,7 @@ fun VaultApp(
                         } else {
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(2),
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier
@@ -966,27 +972,28 @@ fun VaultApp(
                         }
                     }
                 }
-            }
 
-            BottomBar(
-                selected = tab,
-                onSelect = { target -> switchTab(target) },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-
-            if (!selecting) {
-                FloatingActionButton(
-                    onClick = { sectionAdd() },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .navigationBarsPadding()
-                        .padding(end = 20.dp, bottom = BottomBarHeight + 17.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add")
+                if (!selecting) {
+                    FloatingActionButton(
+                        onClick = { sectionAdd() },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 16.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add")
+                    }
                 }
+                }
+
+                // Highlight follows the pager itself (taps and swipes), so the bar can
+                // never disagree with the page that is on screen.
+                BottomBar(
+                    selected = Tab.entries[pagerState.targetPage.coerceIn(0, Tab.entries.lastIndex)],
+                    onSelect = { target -> switchTab(target) },
+                )
             }
 
             if (addOpen) {
@@ -1396,7 +1403,7 @@ private fun HomeContent(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 172.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { HomeHero(total = total) }
@@ -1943,7 +1950,7 @@ private fun EmptyState(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(start = 36.dp, end = 36.dp, bottom = 120.dp),
+            .padding(start = 36.dp, end = 36.dp, bottom = 48.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
