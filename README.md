@@ -92,6 +92,7 @@ The folder permission is remembered, so you connect once. If you uninstall the D
 - **Backup reminder:** when you open P Vault with Drive connected, it offers a backup when the last successful one is older than the interval you chose in Settings (daily, weekly, every 2 weeks or monthly). **Later** snoozes it for the same interval. This is only an in-app reminder; it does not upload by itself.
 - **Backups kept:** the connected folder keeps the newest 1, 2, 3, 5 or 10 `P_Vault_*.zip` files as set in Settings. Older P_Vault backups in that folder are deleted. Old `Dude_*.zip` files are left alone.
 - **Restore from a zip file (local or Drive)** opens the same Android picker, so you can pick a backup from the Drive folder or from the phone.
+- **Restore merges.** Files already on the phone stay. Items from the backup are added; ones the phone already has are skipped, and a vault item or reel with the same name but different content is kept as a second copy. Reel categories and chats with the same name are combined.
 
 Backups are ordinary zip files, not encrypted. Anyone with access to the Google account can read them. Keep P Vault open while a backup or restore is running; Android can stop a backgrounded app on a large vault.
 
@@ -130,9 +131,9 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 - Uninstalling the app deletes the local vault. Drive backups remain in Google Drive if you made them.
 - Deleting a chat deletes its messages. Deleting all chats does not recreate the default chats.
 - Forgetting the PIN while app lock is on means no way in.
-- Drive backup is one-way and auto-backup runs only while P Vault is open. A backup can be interrupted if Android kills the app. Restore replaces the local vault. The connected folder keeps the number of P_Vault zips you choose in Settings; use a dedicated folder per phone.
+- Drive backup is one-way and auto-backup runs only while P Vault is open. A backup can be interrupted if Android kills the app. Restore adds the backup to the local vault and never removes what is already on the phone. The connected folder keeps the number of P_Vault zips you choose in Settings; use a dedicated folder per phone.
 - Drive backup requires the Google Drive app and a folder you grant access to. If the app is uninstalled or the folder is removed, connect again.
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.4 (versionCode 34).
+`com.dudeapp.vault` — version 0.5.5 (versionCode 35).

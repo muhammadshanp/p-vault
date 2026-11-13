@@ -1380,7 +1380,7 @@ fun VaultApp(
             onDismissRequest = { if (!drive.busy) restoreUri = null },
             title = { Text("Restore backup?") },
             text = {
-                Text("This replaces the local vault with the selected zip. It cannot be undone.")
+                Text("This adds everything from the selected zip to your vault. Files already on this phone are kept.")
             },
             confirmButton = {
                 TextButton(
