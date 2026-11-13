@@ -8,16 +8,20 @@ import com.google.firebase.messaging.RemoteMessage
 const val PUSH_TOPIC = "all"
 
 /**
- * Receives Firebase Cloud Messaging pushes. While P Vault is closed or in the background,
- * Android shows the notification by itself; this service only has to show the ones that
- * arrive while the app is open.
+ * Receives Firebase Cloud Messaging pushes. The admin panel sends "data" messages, which
+ * Firebase always hands to this service, open app or not, so each one can be saved for
+ * the in-app list as well as shown. (A message composed in the Firebase console is shown
+ * by Android itself while the app is closed and only reaches this service when it is open.)
  */
 class PushService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val title = message.notification?.title ?: message.data["title"]
         val body = message.notification?.body ?: message.data["body"]
         if (title.isNullOrBlank() && body.isNullOrBlank()) return
-        showPushNotification(this, title?.takeIf { it.isNotBlank() } ?: "P Vault", body.orEmpty())
+        val shownTitle = title?.takeIf { it.isNotBlank() } ?: "P Vault"
+        // Keep it for the list behind the bell, then show it in the status bar.
+        PushInbox(this).add(PushItem(shownTitle, body.orEmpty(), System.currentTimeMillis()))
+        showPushNotification(this, shownTitle, body.orEmpty())
     }
 
     override fun onNewToken(token: String) {

@@ -115,4 +115,17 @@ class BackupReminderTest {
         assertFalse(connectPromptDue(lastAsked = 50 * day, now = 53 * day))
         assertTrue(connectPromptDue(lastAsked = 50 * day, now = 57 * day))
     }
+
+    @Test
+    fun inboxKeepsNewestFirstAndSurvivesSaving() {
+        var items = emptyList<PushItem>()
+        items = inboxWithNew(items, PushItem("First", "a", 1_000))
+        items = inboxWithNew(items, PushItem("Second", "b", 200_000))
+        // The same message delivered again a moment later is not listed twice.
+        items = inboxWithNew(items, PushItem("Second", "b", 201_000))
+        assertEquals(listOf("Second", "First"), items.map { it.title })
+        assertEquals(items, inboxFromJson(inboxToJson(items)))
+        assertEquals(2, inboxWithNew(items, PushItem("Third", "c", 900_000), limit = 2).size)
+        assertEquals(emptyList<PushItem>(), inboxFromJson("broken"))
+    }
 }

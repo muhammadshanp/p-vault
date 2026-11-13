@@ -45,7 +45,8 @@ class UpdateCheckerTest {
         assertTrue(json.getBoolean("validate_only"))
         val message = json.getJSONObject("message")
         assertEquals("all", message.getString("topic"))
-        assertEquals("Hello", message.getJSONObject("notification").getString("title"))
-        assertEquals("World", message.getJSONObject("notification").getString("body"))
+        assertEquals("Hello", message.getJSONObject("data").getString("title"))
+        assertEquals("World", message.getJSONObject("data").getString("body"))
+        assertFalse(message.has("notification"))
     }
 }
