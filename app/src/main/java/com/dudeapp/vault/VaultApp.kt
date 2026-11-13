@@ -54,6 +54,7 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
@@ -192,6 +193,12 @@ fun VaultApp(
     var drive by remember { mutableStateOf(driveStore.state()) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupReminder by remember { mutableStateOf(false) }
+    var connectPrompt by remember { mutableStateOf(false) }
+    val news = remember { AnnouncementStore(context) }
+    var announcements by remember { mutableStateOf(news.cached()) }
+    var seenNews by remember { mutableStateOf(news.seenNumber()) }
+    var notificationsOpen by remember { mutableStateOf(false) }
+    var newsPopup by remember { mutableStateOf<Announcement?>(null) }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -262,7 +269,13 @@ fun VaultApp(
 
     LaunchedEffect(Unit) {
         if (sharedText != null) return@LaunchedEffect
-        if (!drive.connected) return@LaunchedEffect
+        if (!drive.connected) {
+            // Nothing is backed up anywhere: suggest Drive now and then, once there is
+            // something worth keeping.
+            val worthAsking = withContext(Dispatchers.IO) { store.hasUserContent() }
+            if (worthAsking && driveStore.connectPromptDue()) connectPrompt = true
+            return@LaunchedEffect
+        }
         if (driveStore.hasPending()) {
             autoBackupTick += 1
             return@LaunchedEffect
@@ -275,6 +288,24 @@ fun VaultApp(
     LaunchedEffect(Unit) {
         val latest = checkForUpdate(currentVersion) ?: return@LaunchedEffect
         presentUpdate(latest)
+    }
+
+    LaunchedEffect(Unit) {
+        val latest = news.fetch() ?: return@LaunchedEffect
+        announcements = latest
+        val newest = latest.firstOrNull() ?: return@LaunchedEffect
+        if (newest.number > news.notifiedNumber()) {
+            news.markNotified(newest.number)
+            showAnnouncementNotification(context, newest)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED && !notificationAsked
+            ) {
+                notificationAsked = true
+                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (newest.number > seenNews && sharedText == null) newsPopup = newest
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -684,7 +715,7 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen && !notificationsOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -702,7 +733,20 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (settingsOpen) {
+    if (notificationsOpen) {
+        NotificationsScreen(
+            news = news,
+            items = announcements,
+            unreadAfter = seenNews,
+            onItems = { announcements = it },
+            onBack = {
+                // Everything on the list has now been read.
+                announcements.firstOrNull()?.let { news.markSeen(it.number) }
+                seenNews = news.seenNumber()
+                notificationsOpen = false
+            },
+        )
+    } else if (settingsOpen) {
         SettingsScreen(
             theme = theme,
             settings = settings,
@@ -780,6 +824,8 @@ fun VaultApp(
                     updateReady = availableUpdate != null,
                     onProfile = { closeMenu { profileOpen = true } },
                     onSettings = { closeMenu { settingsOpen = true } },
+                    unreadNews = announcements.count { it.number > seenNews },
+                    onNotifications = { closeMenu { notificationsOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1317,6 +1363,76 @@ fun VaultApp(
                         }
                     },
                     onDismiss = { categoriesOpen = false },
+                )
+            }
+
+            if (connectPrompt) {
+                AlertDialog(
+                    onDismissRequest = {
+                        driveStore.markConnectPromptShown()
+                        connectPrompt = false
+                    },
+                    title = { Text("Back up to Google Drive?") },
+                    text = {
+                        Text("Your vault is only on this phone. If the phone is lost or the app is removed, everything in it is gone. Connect a Google Drive folder to keep a backup.")
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                driveStore.markConnectPromptShown()
+                                connectPrompt = false
+                                connectDrive()
+                            },
+                        ) {
+                            Text("Connect Drive")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                driveStore.markConnectPromptShown()
+                                connectPrompt = false
+                            },
+                        ) {
+                            Text("Later")
+                        }
+                    },
+                )
+            }
+
+            val popup = newsPopup
+            if (popup != null) {
+                AlertDialog(
+                    onDismissRequest = {
+                        news.markSeen(popup.number)
+                        seenNews = news.seenNumber()
+                        newsPopup = null
+                    },
+                    title = { Text(popup.title) },
+                    text = {
+                        Text(popup.body.ifBlank { "A new message from the P Vault team." })
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                news.markSeen(popup.number)
+                                seenNews = news.seenNumber()
+                                newsPopup = null
+                            },
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                newsPopup = null
+                                notificationsOpen = true
+                            },
+                        ) {
+                            Text("See all")
+                        }
+                    },
                 )
             }
 
@@ -1868,6 +1984,8 @@ private fun MenuDrawer(
     updateReady: Boolean,
     onProfile: () -> Unit,
     onSettings: () -> Unit,
+    unreadNews: Int,
+    onNotifications: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -1896,6 +2014,12 @@ private fun MenuDrawer(
         Spacer(Modifier.height(10.dp))
         MenuDrawerItem(Icons.Outlined.Person, "Profile", onProfile)
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
+        MenuDrawerItem(
+            icon = Icons.Outlined.Notifications,
+            label = if (unreadNews > 0) "Notifications ($unreadNews new)" else "Notifications",
+            onClick = onNotifications,
+            highlight = unreadNews > 0,
+        )
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
             icon = Icons.Outlined.SystemUpdateAlt,
