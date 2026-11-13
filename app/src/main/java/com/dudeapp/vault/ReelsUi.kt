@@ -2,6 +2,7 @@ package com.dudeapp.vault
 
 import android.net.Uri
 import android.util.Patterns
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,8 +43,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -150,6 +154,45 @@ fun CategoryChips(
     }
 }
 
+/** The Instagram glyph: gradient tile with a white camera outline, drawn in code. */
+@Composable
+fun InstagramLogo(modifier: Modifier = Modifier) {
+    Canvas(modifier.clip(RoundedCornerShape(16.dp))) {
+        val w = size.width
+        val h = size.height
+        // Purple-blue wash from the top left, warm glow from the bottom left.
+        drawRect(
+            Brush.linearGradient(
+                listOf(Color(0xFF4F5BD5), Color(0xFF962FBF), Color(0xFFD62976)),
+                start = Offset(0f, 0f),
+                end = Offset(w, h),
+            ),
+        )
+        drawRect(
+            Brush.radialGradient(
+                0f to Color(0xFFFEDA75),
+                0.25f to Color(0xFFFA7E1E),
+                0.55f to Color(0xFFD62976),
+                1f to Color(0x00D62976),
+                center = Offset(w * 0.27f, h * 1.07f),
+                radius = w * 1.15f,
+            ),
+        )
+        val stroke = Stroke(width = w * 0.065f)
+        val inset = w * 0.24f
+        val side = w - inset * 2
+        drawRoundRect(
+            color = Color.White,
+            topLeft = Offset(inset, inset),
+            size = Size(side, side),
+            cornerRadius = CornerRadius(side * 0.3f),
+            style = stroke,
+        )
+        drawCircle(Color.White, radius = side * 0.24f, center = Offset(w / 2, h / 2), style = stroke)
+        drawCircle(Color.White, radius = w * 0.04f, center = Offset(w / 2 + side * 0.27f, h / 2 - side * 0.27f))
+    }
+}
+
 @Composable
 fun ReelCard(
     reel: Reel,
@@ -166,20 +209,7 @@ fun ReelCard(
             .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = if (selecting) 14.dp else 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(54.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFFE1306C)))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(28.dp),
-            )
-        }
+        InstagramLogo(Modifier.size(54.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
