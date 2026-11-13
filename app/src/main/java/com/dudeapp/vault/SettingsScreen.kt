@@ -10,6 +10,26 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +54,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -108,7 +127,7 @@ fun SettingsScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(start = 8.dp, end = 20.dp, top = 6.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = close) {
@@ -116,7 +135,8 @@ fun SettingsScreen(
                 }
                 Text(
                     text = "Settings",
-                    style = MaterialTheme.typography.headlineSmall,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
@@ -125,43 +145,74 @@ fun SettingsScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 16.dp)
                     .padding(bottom = 32.dp),
             ) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
+
+                // App card: version at a glance, and the update button when there is one.
+                Surface(
+                    shape = RoundedCornerShape(26.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("P Vault", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (update != null) "Version $version · ${update.version} is available" else "Version $version · up to date",
+                                    fontSize = 13.sp,
+                                )
+                            }
+                        }
+                        if (update != null) {
+                            Spacer(Modifier.height(14.dp))
+                            Button(onClick = onUpdate, modifier = Modifier.fillMaxWidth()) {
+                                Text("Update to ${update.version}")
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(22.dp))
 
                 SettingsGroup("Appearance") {
-                    SettingsItem(
-                        title = "Theme",
-                        subtitle = "Choose how the app looks.",
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ThemePreset.entries.forEach { preset ->
-                                item(key = preset.name) {
-                                    FilterChip(
-                                        selected = preset == theme,
-                                        onClick = { onTheme(preset) },
-                                        label = {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(
-                                                    Modifier
-                                                        .size(10.dp)
-                                                        .clip(CircleShape)
-                                                        .background(preset.primary),
-                                                )
-                                                Spacer(Modifier.width(6.dp))
-                                                Text(preset.label)
-                                            }
-                                        },
-                                    )
-                                }
-                            }
+                        ThemePreset.entries.forEach { preset ->
+                            ThemeCard(
+                                preset = preset,
+                                selected = preset == theme,
+                                onClick = { onTheme(preset) },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
 
                 SettingsGroup("Security") {
                     SettingsItem(
+                        icon = Icons.Outlined.Lock,
+                        tint = Accent.Photo,
                         title = "App lock",
                         subtitle = "Ask for your PIN when P Vault opens.",
                         trailing = {
@@ -181,14 +232,16 @@ fun SettingsScreen(
                     }
                     SettingsDivider()
                     SettingsItem(
+                        icon = Icons.Outlined.Key,
+                        tint = Accent.Photo,
                         title = "Change PIN",
                         subtitle = "Use 4 to 6 digits.",
-                        trailing = {
-                            TextButton(onClick = { changePinOpen = true }) { Text("Change") }
-                        },
+                        onClick = { changePinOpen = true },
                     )
                     SettingsDivider()
                     SettingsItem(
+                        icon = Icons.Outlined.Fingerprint,
+                        tint = Accent.Photo,
                         title = "Fingerprint unlock",
                         subtitle = if (biometricsAvailable) {
                             "Unlock with your fingerprint."
@@ -205,6 +258,8 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsItem(
+                        icon = Icons.Outlined.Timer,
+                        tint = Accent.Photo,
                         title = "Auto-lock after",
                         subtitle = "Lock the app after you leave it. Shorter is safer.",
                     ) {
@@ -219,6 +274,8 @@ fun SettingsScreen(
 
                 SettingsGroup("Backup") {
                     SettingsItem(
+                        icon = Icons.Outlined.Backup,
+                        tint = Accent.Chat,
                         title = "Auto-backup",
                         subtitle = "Back up shortly after a change while P Vault is open.",
                         trailing = {
@@ -230,6 +287,8 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsItem(
+                        icon = Icons.Outlined.Notifications,
+                        tint = Accent.Chat,
                         title = "Backup reminder",
                         subtitle = "Ask me when my newest backup is older than this.",
                     ) {
@@ -242,6 +301,8 @@ fun SettingsScreen(
                     }
                     SettingsDivider()
                     SettingsItem(
+                        icon = Icons.Outlined.Inventory2,
+                        tint = Accent.Chat,
                         title = "Backups kept",
                         subtitle = "Delete older P Vault zips from the connected Drive folder.",
                     ) {
@@ -256,59 +317,45 @@ fun SettingsScreen(
 
                 SettingsGroup("Data") {
                     SettingsItem(
+                        icon = Icons.Outlined.FileUpload,
+                        tint = Accent.Note,
                         title = "Export vault",
                         subtitle = "Save a copy of your vault as a zip file.",
-                        trailing = { TextButton(onClick = onExport) { Text("Export") } },
+                        onClick = onExport,
                     )
                     SettingsDivider()
                     SettingsItem(
+                        icon = Icons.Outlined.FileDownload,
+                        tint = Accent.Note,
                         title = "Import backup",
-                        subtitle = "Restore from a P Vault zip file.",
-                        trailing = { TextButton(onClick = onImport) { Text("Import") } },
+                        subtitle = "Add a P Vault zip to this vault. Files already here are kept.",
+                        onClick = onImport,
                     )
-                    SettingsDivider()
+                }
+
+                SettingsGroup("Danger zone", danger = true) {
                     SettingsItem(
+                        icon = Icons.Outlined.Delete,
+                        tint = MaterialTheme.colorScheme.error,
                         title = "Clear vault data",
+                        titleColor = MaterialTheme.colorScheme.error,
                         subtitle = "Delete local photos, PDFs, notes, reels, chats and your profile. Drive backups stay.",
-                        trailing = {
-                            TextButton(
-                                onClick = { clearOpen = true },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error,
-                                ),
-                            ) { Text("Clear") }
-                        },
+                        onClick = { clearOpen = true },
                     )
                 }
 
-                if (update != null) {
-                    SettingsGroup("Update") {
-                        SettingsItem(
-                            title = "P Vault ${update.version} is available",
-                            subtitle = "Download and install the newest version.",
-                            trailing = { TextButton(onClick = onUpdate) { Text("Install") } },
-                        )
-                    }
-                }
-
-                SettingsGroup("About") {
-                    SettingsItem(
-                        title = "P Vault $version",
-                        subtitle = "Local-first. Your vault stays on this device.",
-                    ) {
-                        Text(
-                            "Backups are plain zip files, not encrypted.",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Updates are checked and downloaded from P Vault's GitHub releases.",
-                            color = TextSoft,
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
+                Text(
+                    "Local-first. Your vault stays on this device.\n" +
+                        "Backups are plain zip files, not encrypted.\n" +
+                        "Updates are checked and downloaded from P Vault's GitHub releases.",
+                    color = TextSoft,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                )
             }
         }
     }
@@ -333,49 +380,146 @@ fun SettingsScreen(
     }
 }
 
+/** A small picture of the theme: page colour, a card, an accent dot. */
+@Composable
+private fun ThemeCard(
+    preset: ThemePreset,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier
+            .clip(shape)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                shape = shape,
+            )
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(10.dp),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(preset.background)
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(preset.primary),
+                )
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .height(6.dp)
+                        .width(36.dp)
+                        .clip(CircleShape)
+                        .background(preset.onBackground.copy(alpha = 0.6f)),
+                )
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(preset.surface)
+                    .border(1.dp, preset.outline, RoundedCornerShape(8.dp)),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                preset.label,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.weight(1f),
+            )
+            if (selected) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SettingsGroup(
     title: String,
+    danger: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val accent = if (danger) MaterialTheme.colorScheme.error else TextSoft
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(bottom = 18.dp),
+            .padding(bottom = 20.dp),
     ) {
         Text(
-            text = title.uppercase(),
-            color = TextSoft,
-            fontSize = 12.sp,
+            text = title,
+            color = accent,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp),
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
         )
         Surface(
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
+            border = BorderStroke(
+                1.dp,
+                if (danger) accent.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+            ),
         ) {
             Column(Modifier.fillMaxWidth(), content = content)
         }
     }
 }
 
+/**
+ * One row: tinted icon tile, title and subtitle, then either a control ([trailing]) or,
+ * for rows that open something ([onClick]), an arrow. The whole row is the tap target.
+ */
 @Composable
 private fun SettingsItem(
+    icon: ImageVector,
+    tint: Color,
     title: String,
     subtitle: String? = null,
+    titleColor: Color = Color.Unspecified,
+    onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(title, color = titleColor, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 if (subtitle != null) {
                     Text(subtitle, color = TextSoft, fontSize = 12.sp, lineHeight = 16.sp)
                 }
@@ -383,11 +527,19 @@ private fun SettingsItem(
             if (trailing != null) {
                 Spacer(Modifier.width(12.dp))
                 trailing()
+            } else if (onClick != null) {
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = TextSoft,
+                )
             }
         }
         if (content != null) {
-            Spacer(Modifier.height(8.dp))
-            content()
+            Spacer(Modifier.height(10.dp))
+            // Lines up with the text, past the icon tile.
+            Column(Modifier.padding(start = 52.dp), content = content)
         }
     }
 }
@@ -395,7 +547,7 @@ private fun SettingsItem(
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(start = 66.dp, end = 14.dp),
         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
     )
 }
