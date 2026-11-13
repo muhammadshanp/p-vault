@@ -1,5 +1,7 @@
 package com.dudeapp.vault
 
+import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.Color
@@ -272,6 +275,24 @@ fun SettingsScreen(
                     }
                 }
 
+                SettingsGroup("Notifications") {
+                    SettingsItem(
+                        icon = Icons.Outlined.Notifications,
+                        tint = Accent.Reel,
+                        title = "Push notifications",
+                        subtitle = "News from the P Vault team and update alerts. Tap to turn them on or off in Android's settings.",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        },
+                    )
+                }
+
                 SettingsGroup("Backup") {
                     SettingsItem(
                         icon = Icons.Outlined.Backup,
@@ -287,7 +308,7 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsItem(
-                        icon = Icons.Outlined.Notifications,
+                        icon = Icons.Outlined.Schedule,
                         tint = Accent.Chat,
                         title = "Backup reminder",
                         subtitle = "Ask me when my newest backup is older than this.",

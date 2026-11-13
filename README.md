@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Notifications from the P Vault team, with an admin sign-in to send them. A weekly suggestion to connect Google Drive when no backup folder is set.
+- **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Push notifications from the P Vault team through Firebase. A weekly suggestion to connect Google Drive when no backup folder is set.
 - **0.5.5** — Restoring a backup adds it to the vault and keeps the files already on the phone. Reels show the Instagram logo.
 - **0.5.4** — Reliable Google Drive backups: every backup has its own name, clean-up never removes the newest one, and the write is verified.
 - **0.5.3** — Slide-in menu from the three-line button; profile picture at the top right.
@@ -39,7 +39,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Screenshots, screen recording and the recent-apps preview are allowed.
 - Optional Google Drive backup through Android's system folder picker. Install the free Google Drive app, sign in there, and pick a Drive folder once. No Google Cloud project or paid plan is needed. Local storage stays primary. A dedicated Google account just for backups is a good idea. Backups are not encrypted.
 - On launch, checks the public GitHub Releases page for a newer version and shows an **Update available** dialog. Tap **Update now** and the release APK downloads inside P Vault, is checked (it must be P Vault, not older, and signed with the same key), and is handed to Android's installer. Android still asks you to confirm, and the first time it asks you to allow P Vault to install apps. If the in-app download fails, **Use browser** opens the download instead.
-- Everything lives in the app's private storage. The only network requests are the GitHub version check, the notifications list from the same GitHub repository and, when you choose to update, the APK download from the GitHub release; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
+- Everything lives in the app's private storage. The network is used for the GitHub version check, the APK download from the GitHub release when you choose to update, and Firebase Cloud Messaging, which registers the device with Google so push notifications can be delivered; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
 
 ## Stack
 
@@ -47,7 +47,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Coil for images, built-in `PdfRenderer` for PDFs
 - `androidx.biometric` for fingerprint
 - Android Storage Access Framework (`DocumentsContract`) for the Drive folder
-- No database, no backend, no blur effects. P Vault writes a normal zip; the Google Drive app uploads it. One HTTPS request checks the latest GitHub release on launch.
+- No database, no backend of its own, no blur effects. P Vault writes a normal zip; the Google Drive app uploads it. One HTTPS request checks the latest GitHub release on launch. Firebase Cloud Messaging delivers push notifications.
 
 Metadata is the filename: `<timestamp>_<title>.<ext>`. Reels are small `.reel` files containing the URL, grouped in `reels/NN_<Category>` folders. `reels/00_Pending` is created automatically for shared reels. Chats are folders in `chats/NN_<Name>`, one timestamped `.txt` file per message; editing rewrites that file, deleting removes it. A chat picture is stored as `avatar_<timestamp>` in the same folder.
 
@@ -78,16 +78,11 @@ The tag must contain the version number (`v0.5.5` or `0.5.5` both work). No upda
 
 ## Notifications
 
-The menu has a **Notifications** screen with messages from the P Vault admin. A new message also appears as a dialog and a status-bar notification the next time the app is opened. P Vault has no server, so messages are only fetched while the app is open; they do not arrive while it is closed.
+P Vault receives push notifications through Firebase Cloud Messaging (free plan), so a message arrives even when the app is closed. Android 13 and newer ask once for permission to show notifications; Settings → Notifications opens Android's switch for them.
 
-Messages are open issues on this repository with the label `notification`, written by the repository owner. Issues from anyone else are ignored.
+To send a message to everyone, open the [Firebase console](https://console.firebase.google.com/project/p-vault-app/messaging), choose **Messaging** → **New campaign** → **Notifications**, write the title and text, target the app `com.dudeapp.vault` (or the topic `all`), and publish. Only people with access to the Firebase project can send.
 
-To send one, either:
-
-- **In the app:** Notifications → **Admin sign-in**, paste a GitHub fine-grained token for the owner account with **Issues: Read and write** on this repository, then **New notification**. The token is stored only on that phone and is not included in backups. The bin icon removes a message for everyone.
-- **On GitHub:** open a new issue as the owner, add the label `notification`. The title and text are the message. Close the issue to remove it.
-
-Messages are public, because the repository is public.
+`app/google-services.json` identifies the Firebase project. It contains identifiers, not passwords. Firebase Analytics is not included.
 
 ## Data and reinstall
 

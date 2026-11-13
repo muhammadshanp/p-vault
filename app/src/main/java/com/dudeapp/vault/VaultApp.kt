@@ -54,7 +54,6 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
@@ -194,11 +193,6 @@ fun VaultApp(
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupReminder by remember { mutableStateOf(false) }
     var connectPrompt by remember { mutableStateOf(false) }
-    val news = remember { AnnouncementStore(context) }
-    var announcements by remember { mutableStateOf(news.cached()) }
-    var seenNews by remember { mutableStateOf(news.seenNumber()) }
-    var notificationsOpen by remember { mutableStateOf(false) }
-    var newsPopup by remember { mutableStateOf<Announcement?>(null) }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -286,26 +280,25 @@ fun VaultApp(
     }
 
     LaunchedEffect(Unit) {
-        val latest = checkForUpdate(currentVersion) ?: return@LaunchedEffect
-        presentUpdate(latest)
+        // Push notifications: listen for messages to all users, and ask once for
+        // permission to show them (Android 13 and newer).
+        ensurePushChannel(context)
+        subscribeToPushes()
+        val pushPrefs = context.getSharedPreferences("dude_app", Context.MODE_PRIVATE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            !pushPrefs.getBoolean("push_permission_asked", false)
+        ) {
+            pushPrefs.edit().putBoolean("push_permission_asked", true).apply()
+            notificationAsked = true
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     LaunchedEffect(Unit) {
-        val latest = news.fetch() ?: return@LaunchedEffect
-        announcements = latest
-        val newest = latest.firstOrNull() ?: return@LaunchedEffect
-        if (newest.number > news.notifiedNumber()) {
-            news.markNotified(newest.number)
-            showAnnouncementNotification(context, newest)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED && !notificationAsked
-            ) {
-                notificationAsked = true
-                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        if (newest.number > seenNews && sharedText == null) newsPopup = newest
+        val latest = checkForUpdate(currentVersion) ?: return@LaunchedEffect
+        presentUpdate(latest)
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -715,7 +708,7 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen && !notificationsOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -733,20 +726,7 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (notificationsOpen) {
-        NotificationsScreen(
-            news = news,
-            items = announcements,
-            unreadAfter = seenNews,
-            onItems = { announcements = it },
-            onBack = {
-                // Everything on the list has now been read.
-                announcements.firstOrNull()?.let { news.markSeen(it.number) }
-                seenNews = news.seenNumber()
-                notificationsOpen = false
-            },
-        )
-    } else if (settingsOpen) {
+    if (settingsOpen) {
         SettingsScreen(
             theme = theme,
             settings = settings,
@@ -824,8 +804,6 @@ fun VaultApp(
                     updateReady = availableUpdate != null,
                     onProfile = { closeMenu { profileOpen = true } },
                     onSettings = { closeMenu { settingsOpen = true } },
-                    unreadNews = announcements.count { it.number > seenNews },
-                    onNotifications = { closeMenu { notificationsOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1400,42 +1378,6 @@ fun VaultApp(
                 )
             }
 
-            val popup = newsPopup
-            if (popup != null) {
-                AlertDialog(
-                    onDismissRequest = {
-                        news.markSeen(popup.number)
-                        seenNews = news.seenNumber()
-                        newsPopup = null
-                    },
-                    title = { Text(popup.title) },
-                    text = {
-                        Text(popup.body.ifBlank { "A new message from the P Vault team." })
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                news.markSeen(popup.number)
-                                seenNews = news.seenNumber()
-                                newsPopup = null
-                            },
-                        ) {
-                            Text("OK")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = {
-                                newsPopup = null
-                                notificationsOpen = true
-                            },
-                        ) {
-                            Text("See all")
-                        }
-                    },
-                )
-            }
-
             if (backupReminder) {
                 AlertDialog(
                     onDismissRequest = {
@@ -1984,8 +1926,6 @@ private fun MenuDrawer(
     updateReady: Boolean,
     onProfile: () -> Unit,
     onSettings: () -> Unit,
-    unreadNews: Int,
-    onNotifications: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -2014,12 +1954,6 @@ private fun MenuDrawer(
         Spacer(Modifier.height(10.dp))
         MenuDrawerItem(Icons.Outlined.Person, "Profile", onProfile)
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
-        MenuDrawerItem(
-            icon = Icons.Outlined.Notifications,
-            label = if (unreadNews > 0) "Notifications ($unreadNews new)" else "Notifications",
-            onClick = onNotifications,
-            highlight = unreadNews > 0,
-        )
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
             icon = Icons.Outlined.SystemUpdateAlt,
