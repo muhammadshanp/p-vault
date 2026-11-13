@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.9** — The navigation pill moves with the page instantly, with no lag.
 - **0.5.8** — The navigation pill slides smoothly between tabs and follows your finger while swiping.
 - **0.5.7** — New floating navigation capsule with a glowing pill for the current tab; lists scroll behind it and the + button sits above it.
 - **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Push notifications from the P Vault team through Firebase, with an admin panel for the owner to send them. The start-up logo fades out smoothly. A bell icon at the top lists received notifications. A weekly suggestion to connect Google Drive when no backup folder is set.
@@ -172,4 +173,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.8 (versionCode 38).
+`com.dudeapp.vault` — version 0.5.9 (versionCode 39).

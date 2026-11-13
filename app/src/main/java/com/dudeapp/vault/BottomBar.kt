@@ -1,7 +1,5 @@
 package com.dudeapp.vault
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -37,10 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -62,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.flow.collectLatest
 
 private val BarHeight = 68.dp
 private val BarBottomGap = 12.dp
@@ -99,19 +94,15 @@ fun PagerBottomBar(
         derivedStateOf { Tab.entries[pagerState.targetPage.coerceIn(0, Tab.entries.lastIndex)] }
     }
     // Where the pill is, in tabs: 0 = first tab, 1.5 = halfway between the 2nd and 3rd.
-    // It chases the pager with a soft spring, so it glides after a tap and stays under
-    // the finger during a swipe.
-    val position = remember(pagerState) { Animatable(pagerState.currentPage.toFloat()) }
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
-            .collectLatest { target ->
-                position.animateTo(
-                    target.coerceIn(0f, Tab.entries.lastIndex.toFloat()),
-                    spring(dampingRatio = 0.78f, stiffness = 380f),
-                )
-            }
-    }
-    BottomBar(selected = selected, position = { position.value }, onSelect = onSelect, modifier = modifier)
+    // It is the pager's own position, so the pill moves in the same frame as the page,
+    // with nothing chasing behind it.
+    val last = Tab.entries.lastIndex.toFloat()
+    BottomBar(
+        selected = selected,
+        position = { (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, last) },
+        onSelect = onSelect,
+        modifier = modifier,
+    )
 }
 
 /**
