@@ -1,7 +1,7 @@
 package com.dudeapp.vault
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -36,6 +37,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -43,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -50,11 +57,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.collectLatest
 
 private val BarHeight = 68.dp
 private val BarBottomGap = 12.dp
+private val PillWidth = 58.dp
 
 /**
  * How much of the bottom of the screen the floating bar covers, system navigation
@@ -74,8 +86,8 @@ enum class Tab(val label: String, val icon: ImageVector, val selectedIcon: Image
 
 /**
  * The bar for the tab pager. The highlight follows the pager itself (taps and swipes),
- * so it can never disagree with the page on screen. Reading the pager position in here,
- * rather than in the screen that owns the pager, means a swipe only redraws this bar.
+ * so it can never disagree with the page on screen. The pill's position is read while
+ * drawing, not while composing, so a swipe moves it without rebuilding the bar.
  */
 @Composable
 fun PagerBottomBar(
@@ -86,23 +98,39 @@ fun PagerBottomBar(
     val selected by remember(pagerState) {
         derivedStateOf { Tab.entries[pagerState.targetPage.coerceIn(0, Tab.entries.lastIndex)] }
     }
-    BottomBar(selected = selected, onSelect = onSelect, modifier = modifier)
+    // Where the pill is, in tabs: 0 = first tab, 1.5 = halfway between the 2nd and 3rd.
+    // It chases the pager with a soft spring, so it glides after a tap and stays under
+    // the finger during a swipe.
+    val position = remember(pagerState) { Animatable(pagerState.currentPage.toFloat()) }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+            .collectLatest { target ->
+                position.animateTo(
+                    target.coerceIn(0f, Tab.entries.lastIndex.toFloat()),
+                    spring(dampingRatio = 0.78f, stiffness = 380f),
+                )
+            }
+    }
+    BottomBar(selected = selected, position = { position.value }, onSelect = onSelect, modifier = modifier)
 }
 
 /**
  * The bottom navigation: a soft white capsule that floats over the content, so lists
- * scroll behind it. The current tab is a glowing pill; the others are quiet grey icons
- * with their names underneath.
+ * scroll behind it. One glowing pill slides to the current tab; the other tabs are quiet
+ * grey icons with their names underneath.
  */
 @Composable
 fun BottomBar(
     selected: Tab,
+    position: () -> Float,
     onSelect: (Tab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val systemInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val capsule = CircleShape
-    Row(
+    val accent = MaterialTheme.colorScheme.primary
+    var rowWidth by remember { mutableIntStateOf(0) }
+    Box(
         modifier
             .padding(start = 20.dp, end = 20.dp, bottom = systemInset + BarBottomGap)
             .widthIn(max = 460.dp)
@@ -116,17 +144,39 @@ fun BottomBar(
                 spotColor = Color.Black.copy(alpha = 0.35f),
             )
             .background(MaterialTheme.colorScheme.surface, capsule)
-            .padding(horizontal = 8.dp)
-            .selectableGroup(),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 8.dp),
     ) {
-        Tab.entries.forEach { tab ->
-            BarItem(
-                tab = tab,
-                selected = tab == selected,
-                onClick = { if (tab != selected) onSelect(tab) },
-                modifier = Modifier.weight(1f),
+        // The glowing pill, behind the icons. Its shadow is tinted with its own colour.
+        if (rowWidth > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset {
+                        val slot = rowWidth.toFloat() / Tab.entries.size
+                        IntOffset((slot * position() + (slot - PillWidth.toPx()) / 2f).roundToInt(), 0)
+                    }
+                    .size(width = PillWidth, height = 44.dp)
+                    .shadow(elevation = 12.dp, shape = CircleShape, ambientColor = accent, spotColor = accent)
+                    .background(accent, CircleShape),
             )
+        }
+        Row(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { rowWidth = it.width }
+                .selectableGroup(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Tab.entries.forEachIndexed { index, tab ->
+                BarItem(
+                    tab = tab,
+                    selected = tab == selected,
+                    // 1 when the pill is exactly on this tab, 0 when it is a tab away.
+                    highlight = { (1f - abs(position() - index)).coerceIn(0f, 1f) },
+                    onClick = { if (tab != selected) onSelect(tab) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -135,14 +185,14 @@ fun BottomBar(
 private fun BarItem(
     tab: Tab,
     selected: Boolean,
+    highlight: () -> Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = MaterialTheme.colorScheme.primary
     Box(
         modifier
             .fillMaxHeight()
-            // No ripple: the pill appearing is the feedback, and a ripple would spill
+            // No ripple: the pill sliding in is the feedback, and a ripple would spill
             // outside the capsule's rounded ends.
             .selectable(
                 selected = selected,
@@ -154,51 +204,42 @@ private fun BarItem(
             .semantics { contentDescription = tab.label },
         contentAlignment = Alignment.Center,
     ) {
-        Crossfade(targetState = selected, animationSpec = tween(200), label = "barItem") { isSelected ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (isSelected) {
-                    // The glowing pill: its shadow is tinted with its own colour.
-                    Box(
-                        Modifier
-                            .size(width = 58.dp, height = 44.dp)
-                            .shadow(
-                                elevation = 12.dp,
-                                shape = CircleShape,
-                                ambientColor = accent,
-                                spotColor = accent,
-                            )
-                            .background(accent, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = tab.selectedIcon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(23.dp),
-                        )
-                        Text(
-                            text = tab.label,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.padding(top = 3.dp),
-                        )
-                    }
-                }
+        Column(
+            // As the pill arrives the name fades out and the icon settles in the middle.
+            Modifier.graphicsLayer { translationY = highlight() * 8.5.dp.toPx() },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = tab.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(23.dp)
+                        .graphicsLayer { alpha = 1f - highlight() },
+                )
+                Icon(
+                    imageVector = tab.selectedIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { alpha = highlight() },
+                )
             }
+            Text(
+                text = tab.label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier
+                    .padding(top = 3.dp)
+                    .graphicsLayer { alpha = 1f - highlight() },
+            )
         }
     }
 }
