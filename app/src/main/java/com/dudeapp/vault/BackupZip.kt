@@ -32,6 +32,9 @@ internal object BackupZip {
             root.walkTopDown().forEach { file ->
                 val relative = file.relativeTo(root).invariantSeparatorsPath
                 if (relative.isEmpty()) return@forEach
+                // Only the vault itself goes in. Android libraries also keep small files
+                // in this folder, and a backup containing those could not be restored.
+                if (!isVaultPath(relative)) return@forEach
                 if (file.isDirectory) {
                     zip.putNextEntry(ZipEntry("$relative/"))
                     zip.closeEntry()
@@ -59,8 +62,14 @@ internal object BackupZip {
                         zip.closeEntry()
                         continue
                     }
-                    if (!allowed(strippedName)) {
-                        return BackupZipResult(false, "That file is not a P Vault backup")
+                    if (!isSafePath(strippedName)) {
+                        return BackupZipResult(false, "That backup contains an unsafe path")
+                    }
+                    if (!isVaultPath(strippedName)) {
+                        // Not part of the vault (older versions could include stray app
+                        // files). Skip it instead of refusing the whole backup.
+                        zip.closeEntry()
+                        continue
                     }
                     val target = File(staging, strippedName)
                     if (!target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
@@ -106,12 +115,17 @@ internal object BackupZip {
             ?.take(40)
     }
 
-    private fun allowed(name: String): Boolean {
+    /** No empty, "." or ".." segments, so the entry cannot escape the restore folder. */
+    private fun isSafePath(name: String): Boolean {
         val clean = name.trimEnd('/')
         if (clean.isEmpty() || clean.startsWith("/")) return false
-        val parts = clean.split('/')
-        if (parts.any { it.isEmpty() || it == "." || it == ".." }) return false
-        return when (parts.first()) {
+        return clean.split('/').none { it.isEmpty() || it == "." || it == ".." }
+    }
+
+    /** True for the folders and the one file that make up a vault. */
+    private fun isVaultPath(name: String): Boolean {
+        val clean = name.trimEnd('/')
+        return when (clean.substringBefore('/')) {
             "vault", "reels", "chats" -> true
             else -> clean == "profile_avatar"
         }

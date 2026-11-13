@@ -76,4 +76,35 @@ class BackupReminderTest {
             backupNamesToDelete(names, keep = 1),
         )
     }
+
+    @Test
+    fun sameNamedBackupsAreNotAllDeleted() {
+        // Drive allows several files with one name. Only the surplus copies may go.
+        val files = listOf(
+            BackupFile("a", "P_Vault.zip", 100),
+            BackupFile("b", "P_Vault.zip", 200),
+            BackupFile("c", "P_Vault.zip", 300),
+        )
+        assertEquals(listOf("a"), backupsToDelete(files, keep = 2).map { it.id })
+    }
+
+    @Test
+    fun timestampedBackupsOutrankLegacyNames() {
+        val files = listOf(
+            BackupFile("old1", "P_Vault.zip", 900),
+            BackupFile("new1", "P_Vault_20261113_100000_000.zip", 100),
+            BackupFile("new2", "P_Vault_20261113_110000_000.zip", 200),
+            BackupFile("other", "holiday.zip", 999),
+        )
+        assertEquals(listOf("old1"), backupsToDelete(files, keep = 2).map { it.id })
+    }
+
+    @Test
+    fun theBackupJustWrittenIsNeverDeleted() {
+        val files = listOf(
+            BackupFile("a", "P_Vault_20261113_120000_000.zip", 0),
+            BackupFile("just", "P_Vault_20261113_100000_000.zip", 0),
+        )
+        assertEquals(emptyList<String>(), backupsToDelete(files, keep = 1, protectId = "just").map { it.id })
+    }
 }

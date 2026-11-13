@@ -335,8 +335,9 @@ fun VaultApp(
     fun refresh(notifyAuto: Boolean = true) {
         version += 1
         if (notifyAuto) {
-            autoBackupTick += 1
+            // Mark first, so the auto-backup that the tick starts always sees the change.
             driveStore.markPending()
+            autoBackupTick += 1
         }
     }
 
