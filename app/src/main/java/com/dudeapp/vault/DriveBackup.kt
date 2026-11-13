@@ -185,11 +185,13 @@ class DriveBackupStore(context: Context) {
         }
     }
 
+    /**
+     * Adds the backup to the vault. Everything already on the phone stays; see [BackupMerge].
+     */
     fun restoreFromZip(source: Uri): BackupResult {
         val staging = File(app.noBackupFilesDir, "restore_staging")
-        val old = File(app.noBackupFilesDir, "restore_old")
+        File(app.noBackupFilesDir, "restore_old").deleteRecursively()
         staging.deleteRecursively()
-        old.deleteRecursively()
         staging.mkdirs()
 
         val read = runCatching {
@@ -200,31 +202,25 @@ class DriveBackupStore(context: Context) {
             return BackupResult(false, read?.error ?: "Could not open that file")
         }
 
-        val current = app.filesDir.listFiles().orEmpty()
-        try {
-            current.forEach { moveTo(it, File(old, it.name)) }
-        } catch (_: Exception) {
-            old.listFiles().orEmpty().forEach { runCatching { moveTo(it, File(app.filesDir, it.name)) } }
-            staging.deleteRecursively()
-            return BackupResult(false, "Could not prepare the restore")
-        }
-
         return try {
-            staging.listFiles().orEmpty().forEach { moveTo(it, File(app.filesDir, it.name)) }
-            listOf("vault", "reels", "chats").forEach { File(app.filesDir, it).mkdirs() }
-            if (File(app.filesDir, "reels").listFiles()?.any { it.isDirectory } != true) {
-                File(app.filesDir, "reels/00_Pending").mkdirs()
-            }
-            if (read.profileName != null) ProfileStore(app).setName(read.profileName)
-            prefs.edit().putBoolean("pending", false).apply()
-            old.deleteRecursively()
-            staging.deleteRecursively()
-            BackupResult(true, "Backup restored")
+            val added = BackupMerge.merge(staging, app.filesDir)
+            val profile = ProfileStore(app)
+            if (read.profileName != null && profile.load().name.isBlank()) profile.setName(read.profileName)
+            // The vault now holds more than the newest backup does.
+            if (added > 0) markPending()
+            BackupResult(
+                true,
+                when (added) {
+                    0 -> "Nothing new in that backup. Your files are unchanged."
+                    1 -> "Restored 1 file. Your existing files were kept."
+                    else -> "Restored $added files. Your existing files were kept."
+                },
+            )
         } catch (_: Exception) {
-            app.filesDir.listFiles().orEmpty().forEach { runCatching { it.deleteRecursively() } }
-            old.listFiles().orEmpty().forEach { runCatching { moveTo(it, File(app.filesDir, it.name)) } }
+            // Merging only ever adds files, so whatever was on the phone is still there.
+            BackupResult(false, "The restore stopped part-way. Your existing files are safe; try again.")
+        } finally {
             staging.deleteRecursively()
-            BackupResult(false, "Could not restore that backup")
         }
     }
 
