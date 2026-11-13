@@ -69,6 +69,8 @@ dependencies {
     // Push notifications only. Analytics is not included.
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")
+    // Google sign-in for the admin panel.
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

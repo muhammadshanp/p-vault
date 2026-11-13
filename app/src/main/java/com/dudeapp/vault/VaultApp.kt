@@ -53,6 +53,8 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -193,6 +195,8 @@ fun VaultApp(
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupReminder by remember { mutableStateOf(false) }
     var connectPrompt by remember { mutableStateOf(false) }
+    var adminOpen by remember { mutableStateOf(false) }
+    var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -708,7 +712,7 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -726,7 +730,13 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (settingsOpen) {
+    if (adminOpen) {
+        AdminScreen(
+            onExternal = onExternal,
+            onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
+            onBack = { adminOpen = false },
+        )
+    } else if (settingsOpen) {
         SettingsScreen(
             theme = theme,
             settings = settings,
@@ -804,6 +814,8 @@ fun VaultApp(
                     updateReady = availableUpdate != null,
                     onProfile = { closeMenu { profileOpen = true } },
                     onSettings = { closeMenu { settingsOpen = true } },
+                    isAdmin = isAdmin,
+                    onAdmin = { closeMenu { adminOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1926,6 +1938,8 @@ private fun MenuDrawer(
     updateReady: Boolean,
     onProfile: () -> Unit,
     onSettings: () -> Unit,
+    isAdmin: Boolean,
+    onAdmin: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -1962,12 +1976,19 @@ private fun MenuDrawer(
             highlight = updateReady,
         )
         MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
+        if (isAdmin) {
+            MenuDrawerItem(Icons.Outlined.AdminPanelSettings, "Admin panel", onAdmin)
+        }
         Spacer(Modifier.weight(1f))
         Text(
             text = "Version $version",
             color = TextSoft,
             fontSize = 12.sp,
-            modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
+            // Press and hold the version to open the admin sign-in. It is kept out of
+            // sight because only the owner of P Vault can use it.
+            modifier = Modifier
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { onAdmin() }) }
+                .padding(horizontal = 28.dp, vertical = 16.dp),
         )
     }
 }

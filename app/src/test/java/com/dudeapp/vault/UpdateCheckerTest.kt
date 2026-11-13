@@ -38,4 +38,14 @@ class UpdateCheckerTest {
         assertFalse(isNewerVersion("1.8", "1.8"))
         assertFalse(isNewerVersion("1.8", "1.9"))
     }
+
+    @Test
+    fun pushRequestTargetsEveryInstall() {
+        val json = org.json.JSONObject(pushRequestJson(" Hello ", "World", validateOnly = true))
+        assertTrue(json.getBoolean("validate_only"))
+        val message = json.getJSONObject("message")
+        assertEquals("all", message.getString("topic"))
+        assertEquals("Hello", message.getJSONObject("notification").getString("title"))
+        assertEquals("World", message.getJSONObject("notification").getString("body"))
+    }
 }

@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Push notifications from the P Vault team through Firebase. A weekly suggestion to connect Google Drive when no backup folder is set.
+- **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Push notifications from the P Vault team through Firebase, with an admin panel for the owner to send them. A weekly suggestion to connect Google Drive when no backup folder is set.
 - **0.5.5** — Restoring a backup adds it to the vault and keeps the files already on the phone. Reels show the Instagram logo.
 - **0.5.4** — Reliable Google Drive backups: every backup has its own name, clean-up never removes the newest one, and the write is verified.
 - **0.5.3** — Slide-in menu from the three-line button; profile picture at the top right.
@@ -80,7 +80,19 @@ The tag must contain the version number (`v0.5.5` or `0.5.5` both work). No upda
 
 P Vault receives push notifications through Firebase Cloud Messaging (free plan), so a message arrives even when the app is closed. Android 13 and newer ask once for permission to show notifications; Settings → Notifications opens Android's switch for them.
 
-To send a message to everyone, open the [Firebase console](https://console.firebase.google.com/project/p-vault-app/messaging), choose **Messaging** → **New campaign** → **Notifications**, write the title and text, target the app `com.dudeapp.vault` (or the topic `all`), and publish. Only people with access to the Firebase project can send.
+### Admin panel
+
+The owner can send a notification to all users from inside the app:
+
+1. Open the menu, then press and hold **Version …** at the bottom. The admin panel opens.
+2. Tap **Sign in with Google** and choose the Google account that owns the Firebase project.
+3. Write a title and message and tap **Send to all users**.
+
+After the first sign-in, **Admin panel** stays in the menu on that phone. Google decides who may send: only accounts with access to the Firebase project are accepted, and no key or password is stored in the app. One-time setup in the Firebase console: add the SHA-1 of the signing key under Project settings → Your apps, and enable Google under Authentication → Sign-in method.
+
+### Firebase console
+
+To send a message to everyone without the app, open the [Firebase console](https://console.firebase.google.com/project/p-vault-app/messaging), choose **Messaging** → **New campaign** → **Notifications**, write the title and text, target the app `com.dudeapp.vault` (or the topic `all`), and publish. Only people with access to the Firebase project can send.
 
 `app/google-services.json` identifies the Firebase project. It contains identifiers, not passwords. Firebase Analytics is not included.
 
