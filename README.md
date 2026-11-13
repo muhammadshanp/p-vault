@@ -102,7 +102,7 @@ P Vault writes to the folder through Android's storage provider, and the Google 
 
 ## Settings
 
-Open Settings from the gear beside your name. It includes:
+Tap the three-line menu button at the top left to slide the menu in: Profile, Settings, Back up now, Check for updates and About. Your profile picture at the top right opens your profile. Open Settings from the menu. It includes:
 
 - Theme: Light or Dark.
 - App lock on/off, change PIN, fingerprint unlock, and auto-lock delay.
@@ -135,4 +135,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.2 (versionCode 32).
+`com.dudeapp.vault` — version 0.5.3 (versionCode 33).

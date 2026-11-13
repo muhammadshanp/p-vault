@@ -45,11 +45,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -58,15 +61,20 @@ import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +99,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -538,6 +547,35 @@ fun VaultApp(
         }
     }
 
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var aboutOpen by remember { mutableStateOf(false) }
+
+    /** Slides the menu shut, then runs the chosen action. */
+    fun closeMenu(then: () -> Unit = {}) {
+        scope.launch {
+            drawerState.close()
+            then()
+        }
+    }
+
+    fun checkUpdatesNow() {
+        if (availableUpdate != null) {
+            updateDialogOpen = true
+            return
+        }
+        Toast.makeText(context, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            val latest = checkForUpdate(currentVersion)
+            when {
+                latest == null ->
+                    Toast.makeText(context, "Could not check. Is the internet on?", Toast.LENGTH_LONG).show()
+                isNewerVersion(latest.version, currentVersion) -> presentUpdate(latest)
+                else ->
+                    Toast.makeText(context, "You have the latest version", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     fun exportVault() {
         onExternal()
         exportPicker.launch(driveStore.suggestedName())
@@ -726,6 +764,27 @@ fun VaultApp(
             },
         )
     } else {
+        // Back closes the menu first.
+        BackHandler(enabled = drawerState.isOpen) { closeMenu() }
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            // Swipes belong to the tab pager; the menu opens from its button and can be
+            // swiped or tapped away once it is open.
+            gesturesEnabled = drawerState.isOpen,
+            drawerContent = {
+                MenuDrawer(
+                    profile = profile,
+                    version = currentVersion,
+                    updateReady = availableUpdate != null,
+                    onProfile = { closeMenu { profileOpen = true } },
+                    onSettings = { closeMenu { settingsOpen = true } },
+                    onBackup = { closeMenu { backupNow() } },
+                    onCheckUpdates = { closeMenu { checkUpdatesNow() } },
+                    onAbout = { closeMenu { aboutOpen = true } },
+                )
+            },
+        ) {
         Box(Modifier.fillMaxSize()) {
             Backdrop()
 
@@ -737,7 +796,7 @@ fun VaultApp(
                 ProfileHeader(
                     profile = profile,
                     onProfile = { profileOpen = true },
-                    onSettings = { settingsOpen = true },
+                    onMenu = { scope.launch { drawerState.open() } },
                     query = query,
                     onQuery = { query = it },
                     showSearch = tab != Tab.HOME,
@@ -1300,6 +1359,18 @@ fun VaultApp(
                 )
             }
         }
+        }
+    }
+
+    if (aboutOpen) {
+        AboutDialog(
+            version = currentVersion,
+            onWebsite = {
+                aboutOpen = false
+                openUrl(context, "https://muhammadshanp.github.io/p-vault-website/")
+            },
+            onDismiss = { aboutOpen = false },
+        )
     }
 
     val pendingRestore = restoreUri
@@ -1758,11 +1829,160 @@ private fun HeaderButton(
     }
 }
 
+/** The round profile picture (or a person icon when none is set). */
+@Composable
+private fun ProfileAvatar(profile: UserProfile, size: Dp, onClick: (() -> Unit)? = null) {
+    val base = Modifier
+        .size(size)
+        .clip(CircleShape)
+        .background(MaterialTheme.colorScheme.primaryContainer)
+    Box(
+        if (onClick != null) base.clickable(onClick = onClick) else base,
+        contentAlignment = Alignment.Center,
+    ) {
+        val avatar = profile.avatar
+        if (avatar != null) {
+            AsyncImage(
+                model = avatar,
+                contentDescription = "Profile",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.Person,
+                contentDescription = "Profile",
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(size * 0.52f),
+            )
+        }
+    }
+}
+
+/** The slide-in menu: who you are at the top, then the places you can go. */
+@Composable
+private fun MenuDrawer(
+    profile: UserProfile,
+    version: String,
+    updateReady: Boolean,
+    onProfile: () -> Unit,
+    onSettings: () -> Unit,
+    onBackup: () -> Unit,
+    onCheckUpdates: () -> Unit,
+    onAbout: () -> Unit,
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.width(288.dp),
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+        drawerContentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp)) {
+            ProfileAvatar(profile = profile, size = 60.dp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = profile.name.trim().ifBlank { "P Vault" },
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "Private vault · on this device",
+                color = TextSoft,
+                fontSize = 13.sp,
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f))
+        Spacer(Modifier.height(10.dp))
+        MenuDrawerItem(Icons.Outlined.Person, "Profile", onProfile)
+        MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
+        MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
+        MenuDrawerItem(
+            icon = Icons.Outlined.SystemUpdateAlt,
+            label = if (updateReady) "Update available" else "Check for updates",
+            onClick = onCheckUpdates,
+            highlight = updateReady,
+        )
+        MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "Version $version",
+            color = TextSoft,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
+        )
+    }
+}
+
+@Composable
+private fun MenuDrawerItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    highlight: Boolean = false,
+) {
+    val tint = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(
+            text = label,
+            color = tint,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun AboutDialog(version: String, onWebsite: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        icon = { IconBadge(icon = Icons.Outlined.Lock, tint = MaterialTheme.colorScheme.primary, size = 56.dp, iconSize = 28.dp) },
+        title = { Text("P Vault", textAlign = TextAlign.Center) },
+        text = {
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "Version $version",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "A private vault for photos, PDFs, notes and reels. Everything stays on this device unless you back it up to Google Drive.",
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "The PIN is an app lock, not encryption, and Drive backups are plain zip files.",
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = { TextButton(onClick = onWebsite) { Text("Website") } },
+    )
+}
+
 @Composable
 private fun ProfileHeader(
     profile: UserProfile,
     onProfile: () -> Unit,
-    onSettings: () -> Unit,
+    onMenu: () -> Unit,
     query: String,
     onQuery: (String) -> Unit,
     placeholder: String,
@@ -1786,68 +2006,37 @@ private fun ProfileHeader(
     Column(Modifier.padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .clickable(onClick = onProfile),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val avatar = profile.avatar
-                    if (avatar != null) {
-                        AsyncImage(
-                            model = avatar,
-                            contentDescription = "Profile",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Outlined.Person,
-                            contentDescription = "Profile",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = when {
-                            name.isBlank() -> "Tap to set up your profile"
-                            welcome -> "Welcome back"
-                            else -> "P Vault"
-                        },
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = when {
-                            name.isBlank() -> "Welcome"
-                            welcome -> firstName
-                            else -> name
-                        },
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            HeaderButton(Icons.Default.Menu, "Menu", onMenu)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = when {
+                        name.isBlank() -> "Tap your picture to set up a profile"
+                        welcome -> "Welcome back"
+                        else -> "P Vault"
+                    },
+                    color = TextSoft,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = when {
+                        name.isBlank() -> "Welcome"
+                        welcome -> firstName
+                        else -> name
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Spacer(Modifier.width(8.dp))
             if (showSearch && !searchOpen) {
                 HeaderButton(Icons.Default.Search, "Search", onSearchOpen)
                 Spacer(Modifier.width(8.dp))
             }
-            HeaderButton(Icons.Outlined.Settings, "Settings", onSettings)
+            ProfileAvatar(profile = profile, size = 44.dp, onClick = onProfile)
         }
         Spacer(Modifier.height(14.dp))
         if (showSearch && searchOpen) {
