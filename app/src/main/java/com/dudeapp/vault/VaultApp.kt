@@ -56,6 +56,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
@@ -196,6 +197,10 @@ fun VaultApp(
     var backupReminder by remember { mutableStateOf(false) }
     var connectPrompt by remember { mutableStateOf(false) }
     var adminOpen by remember { mutableStateOf(false) }
+    var inboxOpen by remember { mutableStateOf(false) }
+    val pushInbox = remember { PushInbox(context) }
+    val inboxChange = PushInbox.changes.intValue
+    val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
@@ -712,7 +717,7 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -730,7 +735,9 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (adminOpen) {
+    if (inboxOpen) {
+        InboxScreen(onBack = { inboxOpen = false })
+    } else if (adminOpen) {
         AdminScreen(
             onExternal = onExternal,
             onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
@@ -834,6 +841,8 @@ fun VaultApp(
                     profile = profile,
                     onProfile = { profileOpen = true },
                     onMenu = { scope.launch { drawerState.open() } },
+                    unreadNotifications = unreadPushes,
+                    onNotifications = { inboxOpen = true },
                     query = query,
                     onQuery = { query = it },
                     showSearch = tab != Tab.HOME,
@@ -2063,6 +2072,8 @@ private fun ProfileHeader(
     profile: UserProfile,
     onProfile: () -> Unit,
     onMenu: () -> Unit,
+    unreadNotifications: Int,
+    onNotifications: () -> Unit,
     query: String,
     onQuery: (String) -> Unit,
     placeholder: String,
@@ -2116,6 +2127,24 @@ private fun ProfileHeader(
                 HeaderButton(Icons.Default.Search, "Search", onSearchOpen)
                 Spacer(Modifier.width(8.dp))
             }
+            Box {
+                HeaderButton(
+                    Icons.Outlined.Notifications,
+                    if (unreadNotifications > 0) "Notifications, $unreadNotifications new" else "Notifications",
+                    onNotifications,
+                )
+                if (unreadNotifications > 0) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 9.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
             ProfileAvatar(profile = profile, size = 44.dp, onClick = onProfile)
         }
         Spacer(Modifier.height(14.dp))

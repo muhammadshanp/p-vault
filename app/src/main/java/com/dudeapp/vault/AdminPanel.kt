@@ -69,11 +69,10 @@ private const val SCOPE_EMAIL = "email"
 internal fun pushRequestJson(title: String, body: String, validateOnly: Boolean = false): String {
     val message = JSONObject()
         .put("topic", PUSH_TOPIC)
-        .put("notification", JSONObject().put("title", title.trim()).put("body", body.trim()))
-        .put(
-            "android",
-            JSONObject().put("notification", JSONObject().put("channel_id", "p_vault_news")),
-        )
+        // A "data" message: the app itself receives it, saves it for the bell list and
+        // shows it. High priority lets it through while the phone is idle.
+        .put("data", JSONObject().put("title", title.trim()).put("body", body.trim()))
+        .put("android", JSONObject().put("priority", "HIGH"))
     return JSONObject().put("validate_only", validateOnly).put("message", message).toString()
 }
 
