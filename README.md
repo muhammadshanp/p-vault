@@ -4,13 +4,26 @@ Website: **https://muhammadshanp.github.io/p-vault-website/** (source: [p-vault-
 
 A private vault for photos, PDFs, text notes and Instagram Reels. Android only. Local by default, with optional Google Drive backup.
 
+## Download
+
+Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/P-Vault.apk** (Android 8.0 or newer). All versions are on the [Releases page](https://github.com/muhammadshanp/p-vault/releases). Once installed, P Vault offers later updates by itself.
+
+## What's new
+
+- **0.5.5** — Restoring a backup adds it to the vault and keeps the files already on the phone.
+- **0.5.4** — Reliable Google Drive backups: every backup has its own name, clean-up never removes the newest one, and the write is verified.
+- **0.5.3** — Slide-in menu from the three-line button; profile picture at the top right.
+- **0.5.2** — Updates download and install from inside the app; smoother swiping between tabs.
+- **0.5.1** — Rebuilt bottom navigation and an open/close animation for Settings.
+- **0.5.0** — Redesigned interface.
+
 ## What it does
 
 - Your profile: name and photo, stored on the device and included in Drive backups when you use them.
 - A clean white theme by default, with an optional flat Dark theme.
 - Import images (system photo picker) and PDFs (system file picker) — no storage permission needed.
 - Write, view and edit plain text notes.
-- A WhatsApp-style Chats view inside Notes, with Anime, Tech, AI, Movies and College chats, plus your own. Give each chat its own picture from the photo icon in its header or the chat manager, and change or remove it from the same menu. Rename or delete chats from the edit button beside the Chats title. Every message has a saved tick; tap a message to select it, then edit or delete it. Messages stay on the device.
+- A WhatsApp-style Chats view inside Notes. Create your own chats and add text, photo and voice messages (voice notes need the microphone permission). Give each chat its own picture from the photo icon in its header or the chat manager, and change or remove it from the same menu. Rename or delete chats from the edit button beside the Chats title. Every message has a saved tick; tap a message to select it, then edit or delete it. Messages stay on the device.
 - Save Instagram Reels as links, organised into categories (Pending, Tech, AI, Anime, Others, plus your own). Links are validated before saving.
 - Share a reel from Instagram straight into P Vault; it opens the save dialog with Pending selected.
 - Browse in five tabs: Files, Reels, Images, PDFs, Notes. Search by title, filter reels by category.
@@ -58,9 +71,9 @@ To publish an update:
 
 The **Release** workflow then builds `P-Vault.apk`, checks it is signed with the original key, and publishes a release tagged `v<versionName>`. If a draft release with that tag exists, its notes are kept and the APK is attached to it. A version that is already published is left alone. The workflow needs the `DEBUG_KEYSTORE_BASE64` repository secret (the base64 text of the `debug.keystore` that signed earlier releases).
 
-To release by hand instead, build `P-Vault.apk` with `build.ps1` on the original PC, create a GitHub release with a tag such as `v1.10`, attach the APK, and publish it.
+To release by hand instead, build `P-Vault.apk` with `build.ps1` on the original PC, create a GitHub release with a tag such as `v0.5.5`, attach the APK, and publish it.
 
-The tag must contain the version number (`v1.10` or `1.10` both work). No update file needs to be uploaded separately. Offline launches skip the check silently.
+The tag must contain the version number (`v0.5.5` or `0.5.5` both work). No update file needs to be uploaded separately. Offline launches skip the check silently.
 
 ## Data and reinstall
 
