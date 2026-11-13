@@ -40,6 +40,28 @@ internal fun backupNamesToDelete(names: List<String>, keep: Int = KEEP_BACKUPS):
         .drop(keep)
         .toSet()
 
+private fun isBackupName(name: String): Boolean =
+    (name == "P_Vault.zip" || name.startsWith("P_Vault_")) && name.endsWith(".zip")
+
+/** One P Vault zip found in the backup folder. */
+internal data class BackupFile(val id: String, val name: String, val modified: Long)
+
+/**
+ * The backups to remove so that only the newest [keep] remain. Works on files, not names,
+ * because Drive allows several files with the same name: deleting "by name" would remove
+ * every copy at once. The file that was just written ([protectId]) is never returned.
+ */
+internal fun backupsToDelete(
+    files: List<BackupFile>,
+    keep: Int = KEEP_BACKUPS,
+    protectId: String? = null,
+): List<BackupFile> =
+    files.filter { isBackupName(it.name) }
+        // Timestamped names sort by age; the legacy "P_Vault.zip" sorts as oldest.
+        .sortedWith(compareByDescending<BackupFile> { it.name }.thenByDescending { it.modified })
+        .drop(keep.coerceAtLeast(1))
+        .filter { it.id != protectId }
+
 /**
  * Writes one ordinary zip into a folder picked through Android's system file picker.
  * The Google Drive app handles the upload; P Vault only writes through the picker.
@@ -132,7 +154,8 @@ class DriveBackupStore(context: Context) {
         val zip = runCatching { createZip() }.getOrElse {
             return BackupResult(false, "Could not create the backup file")
         }
-        val error = writeToTree(tree, zip)
+        var written: Uri? = null
+        val error = writeToTree(tree, zip) { written = it }
         zip.delete()
         if (error != null) return BackupResult(false, "Backup failed: $error")
 
@@ -140,8 +163,8 @@ class DriveBackupStore(context: Context) {
         val editor = prefs.edit().putLong("last_backup", System.currentTimeMillis())
         if (pendingAt <= startedAt) editor.putBoolean("pending", false)
         editor.apply()
-        pruneBackups(tree, keep)
-        return BackupResult(true, "Backed up to Google Drive")
+        pruneBackups(tree, keep, written)
+        return BackupResult(true, "Backup saved. The Drive app uploads it in the background.")
     }
 
     fun suggestedName(): String = "P_Vault.zip"
@@ -236,7 +259,7 @@ class DriveBackupStore(context: Context) {
     }
 
     /** Returns null on success, or a short reason on failure. */
-    private fun writeToTree(tree: Uri, zip: File): String? {
+    private fun writeToTree(tree: Uri, zip: File, onCreated: (Uri) -> Unit): String? {
         var created: Uri? = null
         return try {
             val parent = DocumentsContract.buildDocumentUriUsingTree(
@@ -247,11 +270,15 @@ class DriveBackupStore(context: Context) {
                 resolver,
                 parent,
                 "application/zip",
-                "P_Vault.zip",
+                // Each backup gets its own timestamped name (P_Vault_<stamp>.zip), so the
+                // newest one is always identifiable and older ones can be pruned safely.
+                zip.name,
             ) ?: return "Drive did not allow creating a file"
             val output = resolver.openOutputStream(created)
                 ?: throw IOException("Could not open the Drive folder")
-            output.use { sink -> zip.inputStream().use { it.copyTo(sink) } }
+            val copied = output.use { sink -> zip.inputStream().use { it.copyTo(sink) } }
+            if (copied != zip.length()) throw IOException("The backup was only partly written")
+            onCreated(created)
             null
         } catch (error: Exception) {
             created?.let { runCatching { DocumentsContract.deleteDocument(resolver, it) } }
@@ -259,36 +286,43 @@ class DriveBackupStore(context: Context) {
         }
     }
 
-    /** Keeps the newest P Vault zips; old Dude_ backups are left alone. */
-    private fun pruneBackups(tree: Uri, keep: Int) {
+    /** Keeps the newest P Vault zips; old Dude_ backups and other files are left alone. */
+    private fun pruneBackups(tree: Uri, keep: Int, justWritten: Uri?) {
         runCatching {
+            val protectId = justWritten?.let { runCatching { DocumentsContract.getDocumentId(it) }.getOrNull() }
             val children = DocumentsContract.buildChildDocumentsUriUsingTree(
                 tree,
                 DocumentsContract.getTreeDocumentId(tree),
             )
-            val backups = mutableListOf<Pair<String, Uri>>()
+            val backups = mutableListOf<BackupFile>()
             resolver.query(
                 children,
                 arrayOf(
                     DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                     DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED,
                 ),
                 null,
                 null,
                 null,
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
+                    val id = cursor.getString(0) ?: continue
                     val name = cursor.getString(1) ?: continue
-                    if (!name.endsWith(".zip")) continue
-                    if (name == "P_Vault.zip" || name.startsWith("P_Vault_")) {
-                        val id = cursor.getString(0) ?: continue
-                        backups += name to DocumentsContract.buildDocumentUriUsingTree(tree, id)
-                    }
+                    val modified = if (cursor.isNull(2)) 0L else cursor.getLong(2)
+                    backups += BackupFile(id, name, modified)
                 }
             }
-            val old = backupNamesToDelete(backups.map { it.first }, keep)
-            backups.filter { it.first in old }.forEach { (_, uri) ->
-                runCatching { DocumentsContract.deleteDocument(resolver, uri) }
+            // If the new backup is not listed yet, do not prune: without it in the list
+            // the count would be off and one good older backup would be removed too early.
+            if (protectId != null && backups.none { it.id == protectId }) return@runCatching
+            backupsToDelete(backups, keep, protectId).forEach { file ->
+                runCatching {
+                    DocumentsContract.deleteDocument(
+                        resolver,
+                        DocumentsContract.buildDocumentUriUsingTree(tree, file.id),
+                    )
+                }
             }
         }
     }

@@ -66,4 +66,41 @@ class BackupZipTest {
             base.deleteRecursively()
         }
     }
+
+    @Test
+    fun strayAppFilesAreLeftOutAndDoNotBlockRestore() {
+        val base = Files.createTempDirectory("dude-backup-stray").toFile()
+        try {
+            val root = File(base, "files").apply { mkdirs() }
+            File(root, "vault").mkdirs()
+            File(root, "vault/1_Hello.txt").writeText("hello")
+            File(root, "profileinstaller_profileWrittenFor_lastUpdateTime.dat").writeText("x")
+
+            val zip = File(base, "backup.zip")
+            BackupZip.write(root, zip, "Me")
+            val names = java.util.zip.ZipFile(zip).use { file -> file.entries().toList().map { it.name } }
+            assertFalse(names.any { it.startsWith("profileinstaller") })
+
+            // A backup made by an older version that did include the stray file.
+            val old = File(base, "old.zip")
+            ZipOutputStream(FileOutputStream(old)).use { output ->
+                output.putNextEntry(ZipEntry("dude_backup.txt"))
+                output.write("version=1\nprofileName=Me\n".toByteArray())
+                output.closeEntry()
+                output.putNextEntry(ZipEntry("profileinstaller_profileWrittenFor_lastUpdateTime.dat"))
+                output.write("x".toByteArray())
+                output.closeEntry()
+                output.putNextEntry(ZipEntry("vault/1_Hello.txt"))
+                output.write("hello".toByteArray())
+                output.closeEntry()
+            }
+            val staging = File(base, "staging").apply { mkdirs() }
+            val result = old.inputStream().use { BackupZip.read(it, staging) }
+            assertTrue(result.error, result.ok)
+            assertEquals("hello", File(staging, "vault/1_Hello.txt").readText())
+            assertFalse(File(staging, "profileinstaller_profileWrittenFor_lastUpdateTime.dat").exists())
+        } finally {
+            base.deleteRecursively()
+        }
+    }
 }
