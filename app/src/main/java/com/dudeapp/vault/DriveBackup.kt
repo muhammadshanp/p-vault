@@ -40,6 +40,10 @@ internal fun backupNamesToDelete(names: List<String>, keep: Int = KEEP_BACKUPS):
         .drop(keep)
         .toSet()
 
+/** The "connect Google Drive" suggestion comes back at most once a week. */
+internal fun connectPromptDue(lastAsked: Long, now: Long, intervalMs: Long = REMINDER_INTERVAL_MS): Boolean =
+    lastAsked <= 0L || now - lastAsked >= intervalMs || now < lastAsked
+
 private fun isBackupName(name: String): Boolean =
     (name == "P_Vault.zip" || name.startsWith("P_Vault_")) && name.endsWith(".zip")
 
@@ -95,6 +99,14 @@ class DriveBackupStore(context: Context) {
 
     fun markReminderShown() {
         prefs.edit().putLong("last_reminder", System.currentTimeMillis()).apply()
+    }
+
+    /** True when Drive was never connected and the user has not been asked for a week. */
+    fun connectPromptDue(now: Long = System.currentTimeMillis()): Boolean =
+        connectPromptDue(prefs.getLong("connect_prompt", 0L), now)
+
+    fun markConnectPromptShown() {
+        prefs.edit().putLong("connect_prompt", System.currentTimeMillis()).apply()
     }
 
     fun markPending() {

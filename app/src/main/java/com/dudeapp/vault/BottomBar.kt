@@ -1,6 +1,11 @@
 package com.dudeapp.vault
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material.icons.Icons
@@ -14,18 +19,19 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,15 +72,24 @@ fun BottomBar(
     onSelect: (Tab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        HorizontalDivider(
-            thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-        )
+    // A floating pill: the system navigation inset stays outside it, so the bar keeps
+    // the same gap above gesture and 3-button navigation.
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+    ) {
         NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             tonalElevation = 0.dp,
+            windowInsets = WindowInsets(0, 0, 0, 0),
         ) {
             Tab.entries.forEach { tab ->
                 val isSelected = tab == selected

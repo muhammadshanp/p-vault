@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "0.5.5"
+        versionCode = 36
+        versionName = "0.5.6"
     }
 
     buildTypes {
@@ -64,6 +65,12 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Push notifications only. Analytics is not included.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    // Google sign-in for the admin panel.
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

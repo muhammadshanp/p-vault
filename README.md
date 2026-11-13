@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Push notifications from the P Vault team through Firebase, with an admin panel for the owner to send them. The start-up logo fades out smoothly. A weekly suggestion to connect Google Drive when no backup folder is set.
 - **0.5.5** — Restoring a backup adds it to the vault and keeps the files already on the phone. Reels show the Instagram logo.
 - **0.5.4** — Reliable Google Drive backups: every backup has its own name, clean-up never removes the newest one, and the write is verified.
 - **0.5.3** — Slide-in menu from the three-line button; profile picture at the top right.
@@ -38,7 +39,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Screenshots, screen recording and the recent-apps preview are allowed.
 - Optional Google Drive backup through Android's system folder picker. Install the free Google Drive app, sign in there, and pick a Drive folder once. No Google Cloud project or paid plan is needed. Local storage stays primary. A dedicated Google account just for backups is a good idea. Backups are not encrypted.
 - On launch, checks the public GitHub Releases page for a newer version and shows an **Update available** dialog. Tap **Update now** and the release APK downloads inside P Vault, is checked (it must be P Vault, not older, and signed with the same key), and is handed to Android's installer. Android still asks you to confirm, and the first time it asks you to allow P Vault to install apps. If the in-app download fails, **Use browser** opens the download instead.
-- Everything lives in the app's private storage. The only network requests are the GitHub version check and, when you choose to update, the APK download from the GitHub release; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
+- Everything lives in the app's private storage. The network is used for the GitHub version check, the APK download from the GitHub release when you choose to update, and Firebase Cloud Messaging, which registers the device with Google so push notifications can be delivered; Drive uploads are handled by the Google Drive app. There is no backend and no other server.
 
 ## Stack
 
@@ -46,7 +47,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Coil for images, built-in `PdfRenderer` for PDFs
 - `androidx.biometric` for fingerprint
 - Android Storage Access Framework (`DocumentsContract`) for the Drive folder
-- No database, no backend, no blur effects. P Vault writes a normal zip; the Google Drive app uploads it. One HTTPS request checks the latest GitHub release on launch.
+- No database, no backend of its own, no blur effects. P Vault writes a normal zip; the Google Drive app uploads it. One HTTPS request checks the latest GitHub release on launch. Firebase Cloud Messaging delivers push notifications.
 
 Metadata is the filename: `<timestamp>_<title>.<ext>`. Reels are small `.reel` files containing the URL, grouped in `reels/NN_<Category>` folders. `reels/00_Pending` is created automatically for shared reels. Chats are folders in `chats/NN_<Name>`, one timestamped `.txt` file per message; editing rewrites that file, deleting removes it. A chat picture is stored as `avatar_<timestamp>` in the same folder.
 
@@ -74,6 +75,26 @@ The **Release** workflow then builds `P-Vault.apk`, checks it is signed with the
 To release by hand instead, build `P-Vault.apk` with `build.ps1` on the original PC, create a GitHub release with a tag such as `v0.5.5`, attach the APK, and publish it.
 
 The tag must contain the version number (`v0.5.5` or `0.5.5` both work). No update file needs to be uploaded separately. Offline launches skip the check silently.
+
+## Notifications
+
+P Vault receives push notifications through Firebase Cloud Messaging (free plan), so a message arrives even when the app is closed. Android 13 and newer ask once for permission to show notifications; Settings → Notifications opens Android's switch for them.
+
+### Admin panel
+
+The owner can send a notification to all users from inside the app:
+
+1. Open the menu, then press and hold **Version …** at the bottom. The admin panel opens.
+2. Tap **Sign in with Google** and choose the Google account that owns the Firebase project.
+3. Write a title and message and tap **Send to all users**.
+
+After the first sign-in, **Admin panel** stays in the menu on that phone. Google decides who may send: only accounts with access to the Firebase project are accepted, and no key or password is stored in the app. One-time setup in the Firebase console: add the SHA-1 of the signing key under Project settings → Your apps, and enable Google under Authentication → Sign-in method.
+
+### Firebase console
+
+To send a message to everyone without the app, open the [Firebase console](https://console.firebase.google.com/project/p-vault-app/messaging), choose **Messaging** → **New campaign** → **Notifications**, write the title and text, target the app `com.dudeapp.vault` (or the topic `all`), and publish. Only people with access to the Firebase project can send.
+
+`app/google-services.json` identifies the Firebase project. It contains identifiers, not passwords. Firebase Analytics is not included.
 
 ## Data and reinstall
 
@@ -149,4 +170,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.5 (versionCode 35).
+`com.dudeapp.vault` — version 0.5.6 (versionCode 36).

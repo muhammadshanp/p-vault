@@ -53,6 +53,8 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -192,6 +194,9 @@ fun VaultApp(
     var drive by remember { mutableStateOf(driveStore.state()) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupReminder by remember { mutableStateOf(false) }
+    var connectPrompt by remember { mutableStateOf(false) }
+    var adminOpen by remember { mutableStateOf(false) }
+    var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -262,7 +267,13 @@ fun VaultApp(
 
     LaunchedEffect(Unit) {
         if (sharedText != null) return@LaunchedEffect
-        if (!drive.connected) return@LaunchedEffect
+        if (!drive.connected) {
+            // Nothing is backed up anywhere: suggest Drive now and then, once there is
+            // something worth keeping.
+            val worthAsking = withContext(Dispatchers.IO) { store.hasUserContent() }
+            if (worthAsking && driveStore.connectPromptDue()) connectPrompt = true
+            return@LaunchedEffect
+        }
         if (driveStore.hasPending()) {
             autoBackupTick += 1
             return@LaunchedEffect
@@ -270,6 +281,23 @@ fun VaultApp(
         if (!driveStore.reminderDue(settings.reminderDays)) return@LaunchedEffect
         reminderNeverBackedUp = driveStore.lastBackupAt() == 0L
         backupReminder = true
+    }
+
+    LaunchedEffect(Unit) {
+        // Push notifications: listen for messages to all users, and ask once for
+        // permission to show them (Android 13 and newer).
+        ensurePushChannel(context)
+        subscribeToPushes()
+        val pushPrefs = context.getSharedPreferences("dude_app", Context.MODE_PRIVATE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            !pushPrefs.getBoolean("push_permission_asked", false)
+        ) {
+            pushPrefs.edit().putBoolean("push_permission_asked", true).apply()
+            notificationAsked = true
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -684,7 +712,7 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -702,7 +730,13 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (settingsOpen) {
+    if (adminOpen) {
+        AdminScreen(
+            onExternal = onExternal,
+            onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
+            onBack = { adminOpen = false },
+        )
+    } else if (settingsOpen) {
         SettingsScreen(
             theme = theme,
             settings = settings,
@@ -780,6 +814,8 @@ fun VaultApp(
                     updateReady = availableUpdate != null,
                     onProfile = { closeMenu { profileOpen = true } },
                     onSettings = { closeMenu { settingsOpen = true } },
+                    isAdmin = isAdmin,
+                    onAdmin = { closeMenu { adminOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1317,6 +1353,40 @@ fun VaultApp(
                         }
                     },
                     onDismiss = { categoriesOpen = false },
+                )
+            }
+
+            if (connectPrompt) {
+                AlertDialog(
+                    onDismissRequest = {
+                        driveStore.markConnectPromptShown()
+                        connectPrompt = false
+                    },
+                    title = { Text("Back up to Google Drive?") },
+                    text = {
+                        Text("Your vault is only on this phone. If the phone is lost or the app is removed, everything in it is gone. Connect a Google Drive folder to keep a backup.")
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                driveStore.markConnectPromptShown()
+                                connectPrompt = false
+                                connectDrive()
+                            },
+                        ) {
+                            Text("Connect Drive")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                driveStore.markConnectPromptShown()
+                                connectPrompt = false
+                            },
+                        ) {
+                            Text("Later")
+                        }
+                    },
                 )
             }
 
@@ -1868,6 +1938,8 @@ private fun MenuDrawer(
     updateReady: Boolean,
     onProfile: () -> Unit,
     onSettings: () -> Unit,
+    isAdmin: Boolean,
+    onAdmin: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -1904,12 +1976,19 @@ private fun MenuDrawer(
             highlight = updateReady,
         )
         MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
+        if (isAdmin) {
+            MenuDrawerItem(Icons.Outlined.AdminPanelSettings, "Admin panel", onAdmin)
+        }
         Spacer(Modifier.weight(1f))
         Text(
             text = "Version $version",
             color = TextSoft,
             fontSize = 12.sp,
-            modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
+            // Press and hold the version to open the admin sign-in. It is kept out of
+            // sight because only the owner of P Vault can use it.
+            modifier = Modifier
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { onAdmin() }) }
+                .padding(horizontal = 28.dp, vertical = 16.dp),
         )
     }
 }

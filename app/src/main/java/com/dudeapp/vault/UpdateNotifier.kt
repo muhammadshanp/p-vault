@@ -13,6 +13,7 @@ import android.os.Build
 
 private const val UPDATE_CHANNEL = "p_vault_updates"
 private const val UPDATE_NOTIFICATION_ID = 1001
+private const val NEWS_CHANNEL = "p_vault_news"
 
 /** Posts one tappable notification for the latest release. */
 fun showUpdateNotification(context: Context, update: AppUpdate) {
@@ -53,6 +54,45 @@ fun showUpdateNotification(context: Context, update: AppUpdate) {
         .setShowWhen(false)
         .build()
     manager.notify(UPDATE_NOTIFICATION_ID, notification)
+}
+
+/** Creates the channel pushes are shown in. Safe to call on every launch. */
+fun ensurePushChannel(context: Context) {
+    context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+        NotificationChannel(NEWS_CHANNEL, "News", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Messages from the P Vault team"
+        },
+    )
+}
+
+/** Shows a push that arrived while the app was open; tapping it opens P Vault. */
+fun showPushNotification(context: Context, title: String, body: String) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+        PackageManager.PERMISSION_GRANTED
+    ) {
+        return
+    }
+    ensurePushChannel(context)
+    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+    val open = PendingIntent.getActivity(
+        context,
+        1,
+        launch,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    val notification = Notification.Builder(context, NEWS_CHANNEL)
+        .setSmallIcon(R.drawable.ic_update_notification)
+        .setColor(0xFFE8633A.toInt())
+        .setContentTitle(title)
+        .setContentText(body)
+        .setStyle(Notification.BigTextStyle().bigText(body))
+        .setContentIntent(open)
+        .setAutoCancel(true)
+        .build()
+    // A different id per message, so a second push does not replace the first.
+    context.getSystemService(NotificationManager::class.java)
+        .notify((System.currentTimeMillis() % 100_000).toInt() + 2000, notification)
 }
 
 fun clearUpdateNotification(context: Context) {

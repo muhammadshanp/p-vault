@@ -107,4 +107,12 @@ class BackupReminderTest {
         )
         assertEquals(emptyList<String>(), backupsToDelete(files, keep = 1, protectId = "just").map { it.id })
     }
+
+    @Test
+    fun connectDriveSuggestionComesBackWeekly() {
+        val day = 24L * 60 * 60 * 1000
+        assertTrue(connectPromptDue(lastAsked = 0L, now = 50 * day))
+        assertFalse(connectPromptDue(lastAsked = 50 * day, now = 53 * day))
+        assertTrue(connectPromptDue(lastAsked = 50 * day, now = 57 * day))
+    }
 }

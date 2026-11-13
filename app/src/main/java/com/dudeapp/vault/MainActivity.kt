@@ -1,7 +1,9 @@
 package com.dudeapp.vault
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.DisposableEffect
@@ -30,6 +32,28 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Android 12+ shows the app icon while P Vault starts and then cuts to the app.
+        // Instead, let the icon grow slightly and fade, with the app appearing underneath.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { splash ->
+                val ease = DecelerateInterpolator()
+                splash.iconView?.animate()
+                    ?.scaleX(1.18f)
+                    ?.scaleY(1.18f)
+                    ?.alpha(0f)
+                    ?.setInterpolator(ease)
+                    ?.setDuration(280)
+                    ?.start()
+                splash.animate()
+                    .alpha(0f)
+                    .setInterpolator(ease)
+                    .setStartDelay(80)
+                    .setDuration(320)
+                    .withEndAction { splash.remove() }
+                    .start()
+            }
+        }
 
         theme = themeStore.load()
         val settings = settingsStore.load()
