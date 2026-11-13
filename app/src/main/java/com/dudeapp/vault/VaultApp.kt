@@ -1019,7 +1019,7 @@ fun VaultApp(
                                 )
                             } else {
                                 LazyColumn(
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -1055,7 +1055,7 @@ fun VaultApp(
                                 )
                             } else {
                                 LazyColumn(
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -1089,7 +1089,7 @@ fun VaultApp(
                         } else {
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(2),
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier
@@ -1121,7 +1121,7 @@ fun VaultApp(
                         onClick = { sectionAdd() },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 16.dp),
+                            .padding(end = 20.dp, bottom = floatingBarSpace() + 12.dp),
                         shape = RoundedCornerShape(20.dp),
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -1129,12 +1129,14 @@ fun VaultApp(
                         Icon(Icons.Default.Add, contentDescription = "Add")
                     }
                 }
-                }
 
+                // Drawn over the page, so content scrolls behind the floating capsule.
                 PagerBottomBar(
                     pagerState = pagerState,
                     onSelect = { target -> switchTab(target) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
+                }
             }
 
             if (addOpen) {
@@ -1632,7 +1634,7 @@ private fun HomeContent(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { HomeHero(total = total) }
