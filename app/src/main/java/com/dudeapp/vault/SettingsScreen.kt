@@ -91,6 +91,9 @@ fun SettingsScreen(
     onTheme: (ThemePreset) -> Unit,
     onSettings: (AppSettings) -> Unit,
     onUpdate: () -> Unit,
+    backupProtected: Boolean,
+    /** A new password, or null to remove the protection. */
+    onBackupPassword: (String?) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onClearData: () -> Unit,
@@ -99,6 +102,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var changePinOpen by remember { mutableStateOf(false) }
     var clearOpen by remember { mutableStateOf(false) }
+    var backupPasswordOpen by remember { mutableStateOf(false) }
     val biometricsAvailable = remember { Auth.biometricsAvailable(context) }
     val version = remember {
         runCatching {
@@ -295,6 +299,18 @@ fun SettingsScreen(
 
                 SettingsGroup("Backup") {
                     SettingsItem(
+                        icon = Icons.Outlined.Key,
+                        tint = Accent.Chat,
+                        title = "Backup password",
+                        subtitle = if (backupProtected) {
+                            "On. Backups and exports are encrypted. Tap to change or turn off."
+                        } else {
+                            "Off. Anyone who can open your Drive folder can read the backups."
+                        },
+                        onClick = { backupPasswordOpen = true },
+                    )
+                    SettingsDivider()
+                    SettingsItem(
                         icon = Icons.Outlined.Backup,
                         tint = Accent.Chat,
                         title = "Auto-backup",
@@ -325,7 +341,7 @@ fun SettingsScreen(
                         icon = Icons.Outlined.Inventory2,
                         tint = Accent.Chat,
                         title = "Backups kept",
-                        subtitle = "Delete older P Vault zips from the connected Drive folder.",
+                        subtitle = "Delete older P Vault backups from the connected Drive folder.",
                     ) {
                         ChoiceChips(
                             options = KEEP_BACKUP_OPTIONS,
@@ -341,7 +357,11 @@ fun SettingsScreen(
                         icon = Icons.Outlined.FileUpload,
                         tint = Accent.Note,
                         title = "Export vault",
-                        subtitle = "Save a copy of your vault as a zip file.",
+                        subtitle = if (backupProtected) {
+                            "Save a password-protected copy of your vault."
+                        } else {
+                            "Save a copy of your vault as a zip file."
+                        },
                         onClick = onExport,
                     )
                     SettingsDivider()
@@ -349,7 +369,7 @@ fun SettingsScreen(
                         icon = Icons.Outlined.FileDownload,
                         tint = Accent.Note,
                         title = "Import backup",
-                        subtitle = "Add a P Vault zip to this vault. Files already here are kept.",
+                        subtitle = "Add a P Vault backup to this vault. Files already here are kept.",
                         onClick = onImport,
                     )
                 }
@@ -367,7 +387,11 @@ fun SettingsScreen(
 
                 Text(
                     "Local-first. Your vault stays on this device.\n" +
-                        "Backups are plain zip files, not encrypted.\n" +
+                        (if (backupProtected) {
+                            "Backups are encrypted with your backup password.\n"
+                        } else {
+                            "Backups are plain zip files, not encrypted.\n"
+                        }) +
                         "Updates are checked and downloaded from P Vault's GitHub releases.",
                     color = TextSoft,
                     fontSize = 12.sp,
@@ -384,6 +408,17 @@ fun SettingsScreen(
 
     if (changePinOpen) {
         ChangePinDialog(onDismiss = { changePinOpen = false })
+    }
+
+    if (backupPasswordOpen) {
+        BackupPasswordDialog(
+            protected = backupProtected,
+            onDismiss = { backupPasswordOpen = false },
+            onSet = {
+                backupPasswordOpen = false
+                onBackupPassword(it)
+            },
+        )
     }
 
     if (clearOpen) {
@@ -689,5 +724,79 @@ private fun ChangePinDialog(onDismiss: () -> Unit) {
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
+    )
+}
+
+@Composable
+private fun BackupPasswordDialog(
+    protected: Boolean,
+    onDismiss: () -> Unit,
+    onSet: (String?) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var repeat by remember { mutableStateOf("") }
+    val longEnough = password.length >= BackupCrypto.MIN_PASSWORD_LENGTH
+    val matches = password == repeat
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text(if (protected) "Change backup password" else "Protect backups") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Backups and exports are encrypted with this password. You will need it to " +
+                        "restore on another phone.",
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "There is no way to reset it. If you forget the password, those backups " +
+                        "cannot be opened.",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp,
+                )
+                if (!protected) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "After the next backup, the older unprotected zips are removed from the Drive folder.",
+                        color = TextSoft,
+                        fontSize = 13.sp,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text(if (protected) "New password" else "Password") },
+                    singleLine = true,
+                    supportingText = { Text("At least ${BackupCrypto.MIN_PASSWORD_LENGTH} characters") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                )
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = repeat,
+                    onValueChange = { repeat = it },
+                    label = { Text("Type it again") },
+                    singleLine = true,
+                    isError = repeat.isNotEmpty() && !matches,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                )
+                if (protected) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { onSet(null) }) {
+                        Text("Turn off protection", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSet(password) }, enabled = longEnough && matches) {
+                Text(if (protected) "Change" else "Protect")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

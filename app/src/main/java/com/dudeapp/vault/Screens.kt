@@ -7,7 +7,20 @@ import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -187,6 +200,9 @@ fun NoteDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     )
 }
 
+/** The star colour for favourites. */
+internal val FavouriteGold = Color(0xFFF5B301)
+
 @Composable
 fun DetailScreen(
     item: VaultItem,
@@ -195,8 +211,32 @@ fun DetailScreen(
     onChanged: (VaultItem) -> Unit,
     onDeleted: () -> Unit,
     onExternal: () -> Unit = {},
+    /** The photos to swipe through, in the order the Images tab shows them. */
+    photos: List<VaultItem> = emptyList(),
 ) {
     var current by remember(item) { mutableStateOf(item) }
+    var menuOpen by remember { mutableStateOf(false) }
+
+    // Swiping left and right moves through the photos. The pager is only used when the
+    // opened photo is in the list; notes and PDFs keep their single viewer.
+    val startPage = remember { photos.indexOfFirst { it.file == item.file } }
+    val swipeable = item.type == ItemType.IMAGE && startPage >= 0
+    val pagerState = rememberPagerState(initialPage = startPage.coerceAtLeast(0)) { photos.size }
+    val latestPhotos by rememberUpdatedState(photos)
+    // The page that `current` belongs to. It shows `current` itself, so a rename or a
+    // star appears at once, before the list behind it has been reloaded.
+    var currentPage by remember { mutableIntStateOf(startPage) }
+    if (swipeable) {
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.settledPage }.collect { page ->
+                val photo = latestPhotos.getOrNull(page)
+                if (photo != null && page != currentPage) {
+                    current = photo
+                    currentPage = page
+                }
+            }
+        }
+    }
     var saving by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
@@ -262,6 +302,24 @@ fun DetailScreen(
                 )
                 IconButton(
                     onClick = {
+                        val target = current
+                        scope.launch {
+                            val updated = withContext(Dispatchers.IO) {
+                                store.setFavourite(target, !target.favourite)
+                            }
+                            if (current.file == target.file) current = updated
+                            onChanged(updated)
+                        }
+                    },
+                ) {
+                    if (current.favourite) {
+                        Icon(Icons.Default.Star, contentDescription = "Remove from favourites", tint = FavouriteGold)
+                    } else {
+                        Icon(Icons.Outlined.StarBorder, contentDescription = "Add to favourites")
+                    }
+                }
+                IconButton(
+                    onClick = {
                         onExternal()
                         if (!shareVaultFile(context, current)) {
                             Toast.makeText(context, "Could not share the file", Toast.LENGTH_SHORT).show()
@@ -273,11 +331,35 @@ fun DetailScreen(
                 IconButton(onClick = { download() }, enabled = !saving) {
                     Icon(Icons.Default.Download, contentDescription = "Download to phone")
                 }
-                IconButton(onClick = { renameOpen = true }) {
-                    Icon(Icons.Default.Edit, contentDescription = "Rename")
-                }
-                IconButton(onClick = { deleteOpen = true }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                // Rename and Delete sit behind the menu so the title keeps its room.
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                renameOpen = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                deleteOpen = true
+                            },
+                        )
+                    }
                 }
             }
 
@@ -287,7 +369,21 @@ fun DetailScreen(
                     .fillMaxWidth(),
             ) {
                 when (current.type) {
-                    ItemType.IMAGE -> ImageViewer(current.file)
+                    ItemType.IMAGE -> if (swipeable) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            pageSpacing = 16.dp,
+                            key = { page -> page },
+                        ) { page ->
+                            val photo = if (page == currentPage) current else photos.getOrNull(page)
+                            if (photo != null) {
+                                ImageViewer(photo.file, active = page == pagerState.currentPage)
+                            }
+                        }
+                    } else {
+                        ImageViewer(current.file)
+                    }
                     ItemType.PDF -> PdfViewer(current.file)
                     ItemType.TEXT -> TextViewer(current, store)
                 }
@@ -376,9 +472,17 @@ private fun DeleteDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> 
 }
 
 @Composable
-private fun ImageViewer(file: File) {
+private fun ImageViewer(file: File, active: Boolean = true) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+
+    // A photo that was swiped away comes back at its normal size.
+    LaunchedEffect(active) {
+        if (!active) {
+            scale = 1f
+            offset = Offset.Zero
+        }
+    }
 
     Box(
         Modifier
@@ -405,9 +509,19 @@ private fun ImageViewer(file: File) {
                 .fillMaxSize()
                 .padding(horizontal = 48.dp)
                 .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 6f)
-                        offset = if (scale <= 1.01f) Offset.Zero else offset + pan
+                    // Two fingers zoom; one finger pans only while zoomed in. A one-finger
+                    // drag at normal size is left alone, so it swipes to the next photo.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            val fingers = event.changes.count { it.pressed }
+                            if (fingers >= 2 || scale > 1.01f) {
+                                scale = (scale * event.calculateZoom()).coerceIn(1f, 6f)
+                                offset = if (scale <= 1.01f) Offset.Zero else offset + event.calculatePan()
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
                     }
                 },
         )

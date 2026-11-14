@@ -65,6 +65,10 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
@@ -176,6 +180,10 @@ fun VaultApp(
     }
     // Sorted once per change, not once per page.
     val sortedItems = remember(vaultItems, sortOrder) { vaultItems.sortedFor(sortOrder) }
+    val photoItems = remember(sortedItems) { sortedItems.filter { it.type == ItemType.IMAGE } }
+    var backupProtected by remember { mutableStateOf(false) }
+    var restorePasswordFor by remember { mutableStateOf<Uri?>(null) }
+    var restorePasswordError by remember { mutableStateOf<String?>(null) }
     var reels by remember { mutableStateOf<List<Reel>>(emptyList()) }
     var categories by remember { mutableStateOf<List<String>>(emptyList()) }
     var chats by remember { mutableStateOf<List<ChatThread>>(emptyList()) }
@@ -204,6 +212,7 @@ fun VaultApp(
     var profileOpen by remember { mutableStateOf(false) }
     var chatAvatarTarget by remember { mutableStateOf<ChatThread?>(null) }
     var drive by remember { mutableStateOf(driveStore.state()) }
+    LaunchedEffect(Unit) { backupProtected = withContext(Dispatchers.IO) { driveStore.isEncrypted() } }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupReminder by remember { mutableStateOf(false) }
     var connectPrompt by remember { mutableStateOf(false) }
@@ -510,16 +519,22 @@ fun VaultApp(
         if (uri != null) restoreUri = uri
     }
 
-    val exportPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/zip"),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val result = withContext(Dispatchers.IO) { driveStore.exportTo(uri) }
-                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-            }
+    fun exportInto(uri: Uri?) {
+        if (uri == null) return
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { driveStore.exportTo(uri) }
+            Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
         }
     }
+
+    val exportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri -> exportInto(uri) }
+
+    // A password-protected export is not a zip, so it is saved as a plain data file.
+    val protectedExportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri -> exportInto(uri) }
 
     LaunchedEffect(sharedText) {
         val text = sharedText?.trim().orEmpty()
@@ -577,6 +592,33 @@ fun VaultApp(
         drive = driveStore.state().copy(message = result.message)
     }
 
+    /** Sets, changes (non-null) or removes (null) the password that protects backups. */
+    fun changeBackupPassword(password: String?) {
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                if (password == null) {
+                    driveStore.clearPassword()
+                    true
+                } else {
+                    driveStore.setPassword(password.toCharArray())
+                }
+            }
+            backupProtected = withContext(Dispatchers.IO) { driveStore.isEncrypted() }
+            if (!ok) {
+                Toast.makeText(context, "Could not set the password", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            Toast.makeText(
+                context,
+                if (password == null) "Backup password removed" else "Backups are now password-protected",
+                Toast.LENGTH_LONG,
+            ).show()
+            // Make a fresh backup in the new form soon.
+            driveStore.markPending()
+            autoBackupTick += 1
+        }
+    }
+
     fun backupNow(showToast: Boolean = true) {
         if (drive.busy) return
         if (!drive.connected) {
@@ -626,7 +668,11 @@ fun VaultApp(
 
     fun exportVault() {
         onExternal()
-        exportPicker.launch(driveStore.suggestedName())
+        if (backupProtected) {
+            protectedExportPicker.launch(driveStore.suggestedName())
+        } else {
+            exportPicker.launch(driveStore.suggestedName())
+        }
     }
 
     fun clearVaultData() {
@@ -678,13 +724,22 @@ fun VaultApp(
         backupNow(showToast = false)
     }
 
-    fun restoreBackup(uri: Uri) {
+    fun restoreBackup(uri: Uri, password: String? = null) {
         if (drive.busy) return
         autoBackupTick += 1
         autoBackupSkip = autoBackupTick
         drive = drive.copy(busy = true, message = null)
         scope.launch {
-            val result = withContext(Dispatchers.IO + NonCancellable) { driveStore.restoreFromZip(uri) }
+            val result = withContext(Dispatchers.IO + NonCancellable) {
+                driveStore.restoreFromZip(uri, password?.toCharArray())
+            }
+            if (result.passwordNeeded) {
+                // Ask for the password (again, if the one typed did not fit).
+                drive = driveStore.state().copy(busy = false)
+                restorePasswordError = if (password != null) result.message else null
+                restorePasswordFor = uri
+                return@launch
+            }
             profile = profileStore.load()
             open = null
             openChat = null
@@ -778,15 +833,13 @@ fun VaultApp(
                     installUpdate(it)
                 }
             },
+            backupProtected = backupProtected,
+            onBackupPassword = { changeBackupPassword(it) },
             onExport = { exportVault() },
             onImport = {
                 onExternal()
                 restorePicker.launch(
-                    arrayOf(
-                        "application/zip",
-                        "application/x-zip-compressed",
-                        "application/octet-stream",
-                    ),
+                    BACKUP_MIME_TYPES,
                 )
             },
             onClearData = { clearVaultData() },
@@ -819,6 +872,7 @@ fun VaultApp(
                 refresh()
             },
             onExternal = onExternal,
+            photos = photoItems,
         )
     } else {
         // Back closes the menu first.
@@ -933,6 +987,7 @@ fun VaultApp(
                         if (isHome) {
                             HomeContent(
                                 items = vaultItems,
+                                favourites = sortedItems.filter { it.favourite },
                                 reels = reels,
                                 chats = chats,
                                 onOpenItem = { open = it },
@@ -1316,11 +1371,7 @@ fun VaultApp(
                     onRestoreFile = {
                         onExternal()
                         restorePicker.launch(
-                            arrayOf(
-                                "application/zip",
-                                "application/x-zip-compressed",
-                                "application/octet-stream",
-                            ),
+                            BACKUP_MIME_TYPES,
                         )
                     },
                     onSave = { name ->
@@ -1509,7 +1560,7 @@ fun VaultApp(
             onDismissRequest = { if (!drive.busy) restoreUri = null },
             title = { Text("Restore backup?") },
             text = {
-                Text("This adds everything from the selected zip to your vault. Files already on this phone are kept.")
+Text("This adds everything from the selected backup to your vault. Files already on this phone are kept.")
             },
             confirmButton = {
                 TextButton(
@@ -1533,13 +1584,59 @@ fun VaultApp(
         )
     }
 
+    val passwordRestore = restorePasswordFor
+    if (passwordRestore != null) {
+        var typed by remember(passwordRestore) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { restorePasswordFor = null },
+            title = { Text("Backup password") },
+            text = {
+                Column {
+                    Text("This backup is password-protected. Type the password it was made with.")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = typed,
+                        onValueChange = {
+                            typed = it
+                            restorePasswordError = null
+                        },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        isError = restorePasswordError != null,
+                        supportingText = if (restorePasswordError != null) {
+                            { Text(restorePasswordError.orEmpty()) }
+                        } else {
+                            null
+                        },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        restorePasswordFor = null
+                        restoreBackup(passwordRestore, typed)
+                    },
+                    enabled = typed.isNotEmpty() && !drive.busy,
+                ) {
+                    Text("Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { restorePasswordFor = null }) { Text("Cancel") }
+            },
+        )
+    }
+
     if (restorePrompt) {
         AlertDialog(
             onDismissRequest = { dismissRestorePrompt() },
             title = { Text("Restore your vault?") },
             text = {
                 Text(
-                    "No vault data was found on this phone. If you backed up to Google Drive, restore the latest P_Vault zip now. Otherwise start fresh.",
+                    "No vault data was found on this phone. If you backed up to Google Drive, restore the latest P_Vault backup now. Otherwise start fresh.",
                 )
             },
             confirmButton = {
@@ -1548,11 +1645,7 @@ fun VaultApp(
                         dismissRestorePrompt()
                         onExternal()
                         restorePicker.launch(
-                            arrayOf(
-                                "application/zip",
-                                "application/x-zip-compressed",
-                                "application/octet-stream",
-                            ),
+                            BACKUP_MIME_TYPES,
                         )
                     },
                 ) {
@@ -1667,6 +1760,7 @@ fun VaultApp(
 @Composable
 private fun HomeContent(
     items: List<VaultItem>,
+    favourites: List<VaultItem>,
     reels: List<Reel>,
     chats: List<ChatThread>,
     onOpenItem: (VaultItem) -> Unit,
@@ -1679,6 +1773,8 @@ private fun HomeContent(
     val notes = items.count { it.type == ItemType.TEXT }
     val total = items.size + reels.size + chats.size
     val recent = items.take(4)
+    var allFavourites by remember { mutableStateOf(false) }
+    val shownFavourites = if (allFavourites) favourites else favourites.take(FAVOURITES_ON_HOME)
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -1741,6 +1837,24 @@ private fun HomeContent(
                         .fillMaxWidth()
                         .padding(top = 12.dp),
                 )
+            }
+        }
+
+        if (favourites.isNotEmpty()) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { HomeSectionTitle("Favourites") }
+                    if (favourites.size > FAVOURITES_ON_HOME) {
+                        TextButton(onClick = { allFavourites = !allFavourites }) {
+                            Text(if (allFavourites) "Show less" else "Show all ${favourites.size}")
+                        }
+                    }
+                }
+            }
+            shownFavourites.forEach { item ->
+                item(key = "fav:" + item.file.absolutePath) {
+                    HomeRecentRow(item = item, onClick = { onOpenItem(item) })
+                }
             }
         }
 
@@ -1911,6 +2025,16 @@ private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
         )
     }
 }
+
+@Composable
+private const val FAVOURITES_ON_HOME = 4
+
+/** Zips, and password-protected backups (which Drive lists as plain data files). */
+private val BACKUP_MIME_TYPES = arrayOf(
+    "application/zip",
+    "application/x-zip-compressed",
+    "application/octet-stream",
+)
 
 @Composable
 private fun HomeSectionTitle(title: String) {
@@ -2391,6 +2515,25 @@ private fun VaultCard(
                     text = if (item.type == ItemType.PDF) "PDF" else "Note",
                     color = TextSoft,
                     fontSize = 11.sp,
+                )
+            }
+        }
+
+        if (item.favourite && !selecting) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.42f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = "Favourite",
+                    tint = FavouriteGold,
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }

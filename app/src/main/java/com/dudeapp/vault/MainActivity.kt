@@ -1,5 +1,6 @@
 package com.dudeapp.vault
 
+import android.app.UiModeManager
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -56,6 +57,7 @@ class MainActivity : FragmentActivity() {
         }
 
         theme = themeStore.load()
+        applyNightMode(theme.dark)
         val settings = settingsStore.load()
         needsLockChoice = !settings.lockChoiceMade && !Auth.hasPin(this)
         needsSetup = !needsLockChoice && settings.appLock && !Auth.hasPin(this)
@@ -118,10 +120,25 @@ class MainActivity : FragmentActivity() {
                         onThemeChange = {
                             theme = it
                             themeStore.save(it)
+                            applyNightMode(it.dark)
                         },
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Tells Android which look P Vault uses, so the start-up screen (drawn by the system
+     * before any app code runs) is dark when the dark theme is chosen. Android 12+ only;
+     * the choice is remembered by the system for the next start.
+     */
+    private fun applyNightMode(dark: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        runCatching {
+            getSystemService(UiModeManager::class.java)?.setApplicationNightMode(
+                if (dark) UiModeManager.MODE_NIGHT_YES else UiModeManager.MODE_NIGHT_NO,
+            )
         }
     }
 

@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.util.Base64
+import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -17,7 +19,12 @@ data class DriveBackupState(
     val message: String? = null,
 )
 
-data class BackupResult(val ok: Boolean, val message: String)
+data class BackupResult(
+    val ok: Boolean,
+    val message: String,
+    /** The backup is password-protected and a (different) password must be typed. */
+    val passwordNeeded: Boolean = false,
+)
 
 private const val REMINDER_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
 private const val KEEP_BACKUPS = 2
@@ -35,7 +42,7 @@ internal fun backupReminderDue(
 
 /** Names of old P Vault zips to remove; unrelated files and old Dude_ backups are ignored. */
 internal fun backupNamesToDelete(names: List<String>, keep: Int = KEEP_BACKUPS): Set<String> =
-    names.filter { (it == "P_Vault.zip" || it.startsWith("P_Vault_")) && it.endsWith(".zip") }
+    names.filter(::isBackupName)
         .sortedDescending()
         .drop(keep)
         .toSet()
@@ -44,8 +51,14 @@ internal fun backupNamesToDelete(names: List<String>, keep: Int = KEEP_BACKUPS):
 internal fun connectPromptDue(lastAsked: Long, now: Long, intervalMs: Long = REMINDER_INTERVAL_MS): Boolean =
     lastAsked <= 0L || now - lastAsked >= intervalMs || now < lastAsked
 
-private fun isBackupName(name: String): Boolean =
+private fun isBackupName(name: String): Boolean = isPlainBackupName(name) || isProtectedBackupName(name)
+
+private fun isPlainBackupName(name: String): Boolean =
     (name == "P_Vault.zip" || name.startsWith("P_Vault_")) && name.endsWith(".zip")
+
+private fun isProtectedBackupName(name: String): Boolean =
+    (name == "P_Vault.${BackupCrypto.EXTENSION}" || name.startsWith("P_Vault_")) &&
+        name.endsWith(".${BackupCrypto.EXTENSION}")
 
 /** One P Vault zip found in the backup folder. */
 internal data class BackupFile(val id: String, val name: String, val modified: Long)
@@ -54,17 +67,26 @@ internal data class BackupFile(val id: String, val name: String, val modified: L
  * The backups to remove so that only the newest [keep] remain. Works on files, not names,
  * because Drive allows several files with the same name: deleting "by name" would remove
  * every copy at once. The file that was just written ([protectId]) is never returned.
+ *
+ * With [dropPlain] (a backup password is set) the unprotected zips go as well: leaving
+ * them next to the protected backup would leave the vault readable without the password.
  */
 internal fun backupsToDelete(
     files: List<BackupFile>,
     keep: Int = KEEP_BACKUPS,
     protectId: String? = null,
-): List<BackupFile> =
-    files.filter { isBackupName(it.name) }
+    dropPlain: Boolean = false,
+): List<BackupFile> {
+    val candidates = files.filter {
+        if (dropPlain) isProtectedBackupName(it.name) else isBackupName(it.name)
+    }
+    val old = candidates
         // Timestamped names sort by age; the legacy "P_Vault.zip" sorts as oldest.
         .sortedWith(compareByDescending<BackupFile> { it.name }.thenByDescending { it.modified })
         .drop(keep.coerceAtLeast(1))
-        .filter { it.id != protectId }
+    val plain = if (dropPlain) files.filter { isPlainBackupName(it.name) } else emptyList()
+    return (old + plain).filter { it.id != protectId }
+}
 
 /**
  * Writes one ordinary zip into a folder picked through Android's system file picker.
@@ -108,6 +130,37 @@ class DriveBackupStore(context: Context) {
     fun markConnectPromptShown() {
         prefs.edit().putLong("connect_prompt", System.currentTimeMillis()).apply()
     }
+
+    // ---- Backup password ------------------------------------------------
+    // Only the stretched key is kept, never the password itself. It sits in the app's
+    // private storage, next to the vault it protects, so automatic backups can run
+    // without asking each time.
+
+    fun isEncrypted(): Boolean = storedKey() != null
+
+    /** Slow (key stretching); call off the main thread. */
+    fun setPassword(password: CharArray): Boolean = runCatching {
+        val salt = BackupCrypto.newSalt()
+        val key = BackupCrypto.deriveKey(password, salt)
+        prefs.edit()
+            .putString("enc_key", Base64.encodeToString(key, Base64.NO_WRAP))
+            .putString("enc_salt", Base64.encodeToString(salt, Base64.NO_WRAP))
+            .putInt("enc_iterations", BackupCrypto.DEFAULT_ITERATIONS)
+            .commit()
+    }.getOrDefault(false)
+
+    fun clearPassword() {
+        prefs.edit().remove("enc_key").remove("enc_salt").remove("enc_iterations").commit()
+    }
+
+    private class StoredKey(val key: ByteArray, val salt: ByteArray, val iterations: Int)
+
+    private fun storedKey(): StoredKey? = runCatching {
+        val key = Base64.decode(prefs.getString("enc_key", null) ?: return null, Base64.NO_WRAP)
+        val salt = Base64.decode(prefs.getString("enc_salt", null) ?: return null, Base64.NO_WRAP)
+        if (key.size != 32 || salt.isEmpty()) return null
+        StoredKey(key, salt, prefs.getInt("enc_iterations", BackupCrypto.DEFAULT_ITERATIONS))
+    }.getOrNull()
 
     fun markPending() {
         prefs.edit()
@@ -175,11 +228,11 @@ class DriveBackupStore(context: Context) {
         val editor = prefs.edit().putLong("last_backup", System.currentTimeMillis())
         if (pendingAt <= startedAt) editor.putBoolean("pending", false)
         editor.apply()
-        pruneBackups(tree, keep, written)
+        pruneBackups(tree, keep, written, dropPlain = isProtectedBackupName(zip.name))
         return BackupResult(true, "Backup saved. The Drive app uploads it in the background.")
     }
 
-    fun suggestedName(): String = "P_Vault.zip"
+    fun suggestedName(): String = if (isEncrypted()) "P_Vault.${BackupCrypto.EXTENSION}" else "P_Vault.zip"
 
     fun exportTo(target: Uri): BackupResult {
         val zip = runCatching { createZip() }.getOrElse {
@@ -200,15 +253,61 @@ class DriveBackupStore(context: Context) {
     /**
      * Adds the backup to the vault. Everything already on the phone stays; see [BackupMerge].
      */
-    fun restoreFromZip(source: Uri): BackupResult {
+    fun restoreFromZip(source: Uri, password: CharArray? = null): BackupResult {
         val staging = File(app.noBackupFilesDir, "restore_staging")
         File(app.noBackupFilesDir, "restore_old").deleteRecursively()
         staging.deleteRecursively()
         staging.mkdirs()
 
-        val read = runCatching {
-            resolver.openInputStream(source)?.use { BackupZip.read(it, staging) }
-        }.getOrNull()
+        // A protected backup is opened into a private temporary zip first.
+        val opened = File(app.noBackupFilesDir, "restore_opened.zip")
+        opened.delete()
+        val read = try {
+            val stream = resolver.openInputStream(source)
+            if (stream == null) {
+                null
+            } else {
+                BufferedInputStream(stream).use { input ->
+                    input.mark(BackupCrypto.headerPeekBytes)
+                    val start = ByteArray(BackupCrypto.headerPeekBytes)
+                    var filled = 0
+                    while (filled < start.size) {
+                        val got = input.read(start, filled, start.size - filled)
+                        if (got < 0) break
+                        filled += got
+                    }
+                    input.reset()
+                    if (!BackupCrypto.isEncrypted(start.copyOf(filled))) {
+                        BackupZip.read(input, staging)
+                    } else {
+                        val header = BackupCrypto.readHeader(input)
+                        val saved = storedKey()
+                        val key = when {
+                            password != null -> BackupCrypto.deriveKey(password, header.salt, header.iterations)
+                            // Made on this phone with the current password: no need to ask.
+                            saved != null && saved.salt.contentEquals(header.salt) -> saved.key
+                            else -> {
+                                staging.deleteRecursively()
+                                return BackupResult(false, "This backup needs its password", passwordNeeded = true)
+                            }
+                        }
+                        opened.outputStream().buffered().use { BackupCrypto.decrypt(input, header, key, it) }
+                        opened.inputStream().use { BackupZip.read(it, staging) }
+                    }
+                }
+            }
+        } catch (_: WrongPasswordException) {
+            staging.deleteRecursively()
+            return BackupResult(
+                false,
+                if (password != null) "Wrong password" else "This backup needs its password",
+                passwordNeeded = true,
+            )
+        } catch (_: Exception) {
+            null
+        } finally {
+            opened.delete()
+        }
         if (read == null || !read.ok) {
             staging.deleteRecursively()
             return BackupResult(false, read?.error ?: "Could not open that file")
@@ -253,8 +352,10 @@ class DriveBackupStore(context: Context) {
         )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
     }.getOrNull()
 
+    /** The backup file to hand out: a zip, or the zip sealed with the backup password. */
     private fun createZip(): File {
-        val backup = File(app.cacheDir, "P_Vault_${stamp()}.zip")
+        val stamp = stamp()
+        val backup = File(app.cacheDir, "P_Vault_$stamp.zip")
         val name = app.getSharedPreferences("dude_profile", Context.MODE_PRIVATE)
             .getString("name", "").orEmpty()
         try {
@@ -263,7 +364,22 @@ class DriveBackupStore(context: Context) {
             backup.delete()
             throw error
         }
-        return backup
+        val saved = storedKey() ?: return backup
+        val sealed = File(app.cacheDir, "P_Vault_$stamp.${BackupCrypto.EXTENSION}")
+        try {
+            backup.inputStream().buffered().use { input ->
+                sealed.outputStream().buffered().use { output ->
+                    BackupCrypto.encrypt(input, output, saved.key, saved.salt, saved.iterations)
+                }
+            }
+        } catch (error: Exception) {
+            // Never fall back to an unprotected backup when a password is set.
+            sealed.delete()
+            throw error
+        } finally {
+            backup.delete()
+        }
+        return sealed
     }
 
     /** Returns null on success, or a short reason on failure. */
@@ -277,7 +393,7 @@ class DriveBackupStore(context: Context) {
             created = DocumentsContract.createDocument(
                 resolver,
                 parent,
-                "application/zip",
+                if (isProtectedBackupName(zip.name)) "application/octet-stream" else "application/zip",
                 // Each backup gets its own timestamped name (P_Vault_<stamp>.zip), so the
                 // newest one is always identifiable and older ones can be pruned safely.
                 zip.name,
@@ -295,7 +411,7 @@ class DriveBackupStore(context: Context) {
     }
 
     /** Keeps the newest P Vault zips; old Dude_ backups and other files are left alone. */
-    private fun pruneBackups(tree: Uri, keep: Int, justWritten: Uri?) {
+    private fun pruneBackups(tree: Uri, keep: Int, justWritten: Uri?, dropPlain: Boolean = false) {
         runCatching {
             val protectId = justWritten?.let { runCatching { DocumentsContract.getDocumentId(it) }.getOrNull() }
             val children = DocumentsContract.buildChildDocumentsUriUsingTree(
@@ -324,7 +440,7 @@ class DriveBackupStore(context: Context) {
             // If the new backup is not listed yet, do not prune: without it in the list
             // the count would be off and one good older backup would be removed too early.
             if (protectId != null && backups.none { it.id == protectId }) return@runCatching
-            backupsToDelete(backups, keep, protectId).forEach { file ->
+            backupsToDelete(backups, keep, protectId, dropPlain).forEach { file ->
                 runCatching {
                     DocumentsContract.deleteDocument(
                         resolver,

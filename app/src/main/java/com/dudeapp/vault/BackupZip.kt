@@ -99,6 +99,9 @@ internal object BackupZip {
         if (avatar.exists() && !avatar.isFile) {
             return BackupZipResult(false, "That backup is damaged")
         }
+        // The favourites list is a convenience; a broken one is dropped, not fatal.
+        val favourites = File(staging, Favourites.FILE)
+        if (favourites.exists() && !favourites.isFile) favourites.deleteRecursively()
         return BackupZipResult(true, profileName = profileName)
     }
 
@@ -127,7 +130,7 @@ internal object BackupZip {
         val clean = name.trimEnd('/')
         return when (clean.substringBefore('/')) {
             "vault", "reels", "chats" -> true
-            else -> clean == "profile_avatar"
+            else -> clean == "profile_avatar" || clean == Favourites.FILE
         }
     }
 
