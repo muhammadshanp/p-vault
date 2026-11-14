@@ -743,7 +743,7 @@ fun VaultApp(
         drive = drive.copy(busy = true, message = null)
         scope.launch {
             val result = withContext(Dispatchers.IO + NonCancellable) {
-                driveStore.backupNow(settings.keepBackups)
+                driveStore.backupNow(settings.keepBackups, settings.backupLimitGb * GB)
             }
             drive = driveStore.state().copy(busy = false, message = result.message)
             if (showToast || !result.ok) {
@@ -950,6 +950,7 @@ fun VaultApp(
                 }
             },
             backupProtected = backupProtected,
+            lastBackupBytes = remember(drive) { driveStore.lastBackupBytes() },
             onBackupPassword = { changeBackupPassword(it) },
             onExport = { exportVault() },
             onImport = {

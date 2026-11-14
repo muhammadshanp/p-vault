@@ -175,4 +175,30 @@ class BackupReminderTest {
         // Without a password only the usual count applies: the oldest of the three goes.
         assertEquals(listOf("plain2"), backupsToDelete(files, keep = 2, protectId = "new").map { it.id })
     }
+
+    @Test
+    fun olderBackupsGoWhenTheKeptOnesDoNotFitTheLimit() {
+        val gb = 1024L * 1024 * 1024
+        val files = listOf(
+            BackupFile("a", "P_Vault_20261029_100000_000.zip", 1, 2 * gb),
+            BackupFile("b", "P_Vault_20261029_110000_000.zip", 2, 2 * gb),
+            BackupFile("c", "P_Vault_20261029_120000_000.zip", 3, 2 * gb),
+        )
+        // Three may be kept by count, but only two fit in 5 GB.
+        assertEquals(listOf("a"), backupsToDelete(files, keep = 3, limitBytes = 5 * gb).map { it.id })
+        // Everything fits in 6 GB.
+        assertEquals(emptyList<String>(), backupsToDelete(files, keep = 3, limitBytes = 6 * gb).map { it.id })
+        // The newest stays even when it alone is over the limit.
+        assertEquals(setOf("a", "b"), backupsToDelete(files, keep = 3, limitBytes = 1 * gb).map { it.id }.toSet())
+        // No limit: only the count applies.
+        assertEquals(emptyList<String>(), backupsToDelete(files, keep = 3).map { it.id })
+    }
+
+    @Test
+    fun sizesAreShownInPlainUnits() {
+        assertEquals("1.5 GB", sizeLabel(1536L * 1024 * 1024))
+        assertEquals("340 MB", sizeLabel(340L * 1024 * 1024))
+        assertEquals("2.5 MB", sizeLabel(2_621_440L))
+        assertEquals("under 0.1 MB", sizeLabel(10_000L))
+    }
 }

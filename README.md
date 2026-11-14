@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.12** — Scan a document to PDF. Take a photo straight into the vault. The + button on Images and PDFs opens a menu (Scan, Camera, Files or Gallery). Tick boxes in notes. Notifications sent from the Firebase console also land in the bell list.
+- **0.5.12** — Scan a document to PDF. Take a photo straight into the vault. The + button on Images and PDFs opens a menu (Scan, Camera, Files or Gallery). Tick boxes in notes. Notifications sent from the Firebase console also land in the bell list. Backup size limit (5 GB by default).
 - **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open. A Reminders list (alarm button beside the Chats title) shows everything you set.
 - **0.5.10** — Optional backup password: backups and exports are encrypted. Favourites, with a star on any file and a Favourites list on Home. Swipe left and right between photos. Dark start-up screen with the dark theme (Android 12+). Share several selected files (or reel links) at once. Settings switches are clearly visible and labelled On/Off.
 - **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
@@ -138,6 +138,7 @@ The folder permission is remembered, so you connect once. If you uninstall the D
 
 - **Auto-backup:** about 20 seconds after you stop changing the vault, P Vault writes a fresh full zip while the app is open. It only runs when a Drive folder is connected. Turn it off in Settings if you prefer manual backups only. If you close the app before the wait finishes, the pending change is retried when you next open P Vault with Drive connected. This is one-way; it never downloads changes from Drive.
 - **Backup reminder:** when you open P Vault with Drive connected, it offers a backup when the last successful one is older than the interval you chose in Settings (daily, weekly, every 2 weeks or monthly). **Later** snoozes it for the same interval. This is only an in-app reminder; it does not upload by itself.
+- **Backup size limit:** the most Drive space P Vault's backups may use: 1, 2, 5 (default), 10, 15, 50 or 100 GB, or no limit. A backup larger than the limit is not made and P Vault says so; when the kept backups would not fit together, the older ones are removed. A free Google account has 15 GB in total, shared with Gmail and Google Photos, so a higher limit needs a paid Google One plan.
 - **Backups kept:** the connected folder keeps the newest 1, 2, 3, 5 or 10 `P_Vault_*.zip` files as set in Settings. Older P_Vault backups in that folder are deleted. Old `Dude_*.zip` files are left alone.
 - **Restore from a zip file (local or Drive)** opens the same Android picker, so you can pick a backup from the Drive folder or from the phone.
 - **Restore merges.** Files already on the phone stay. Items from the backup are added; ones the phone already has are skipped, and a vault item or reel with the same name but different content is kept as a second copy. Reel categories and chats with the same name are combined.
