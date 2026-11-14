@@ -128,4 +128,24 @@ class BackupReminderTest {
         assertEquals(2, inboxWithNew(items, PushItem("Third", "c", 900_000), limit = 2).size)
         assertEquals(emptyList<PushItem>(), inboxFromJson("broken"))
     }
+
+    @Test
+    fun filesCanBeSortedByDateNameAndSize() {
+        val dir = java.nio.file.Files.createTempDirectory("dude-sort").toFile()
+        try {
+            fun item(stamp: Long, title: String, bytes: Int): VaultItem {
+                val file = java.io.File(dir, "${stamp}_$title.txt").apply { writeBytes(ByteArray(bytes)) }
+                return VaultItem(file, title, ItemType.TEXT, stamp)
+            }
+            val items = listOf(item(2, "banana", 5), item(3, "Apple", 50), item(1, "cherry", 500))
+            fun order(sort: SortOrder) = items.sortedFor(sort).map { it.title }
+            assertEquals(listOf("Apple", "banana", "cherry"), order(SortOrder.NEWEST))
+            assertEquals(listOf("cherry", "banana", "Apple"), order(SortOrder.OLDEST))
+            assertEquals(listOf("Apple", "banana", "cherry"), order(SortOrder.NAME_AZ))
+            assertEquals(listOf("cherry", "banana", "Apple"), order(SortOrder.NAME_ZA))
+            assertEquals(listOf("cherry", "Apple", "banana"), order(SortOrder.LARGEST))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

@@ -82,7 +82,7 @@ fun showPushNotification(context: Context, title: String, body: String) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
     val notification = Notification.Builder(context, NEWS_CHANNEL)
-        .setSmallIcon(R.drawable.ic_update_notification)
+        .setSmallIcon(R.drawable.ic_notification)
         .setColor(0xFFE8633A.toInt())
         .setContentTitle(title)
         .setContentText(body)
