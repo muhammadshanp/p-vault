@@ -804,6 +804,7 @@ fun VaultApp(
                 open = null
                 refresh()
             },
+            onExternal = onExternal,
         )
     } else {
         // Back closes the menu first.

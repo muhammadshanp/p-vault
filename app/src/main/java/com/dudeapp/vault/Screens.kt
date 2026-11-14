@@ -8,7 +8,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +36,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -190,14 +195,48 @@ fun DetailScreen(
     onBack: () -> Unit,
     onChanged: (VaultItem) -> Unit,
     onDeleted: () -> Unit,
+    onExternal: () -> Unit = {},
 ) {
     var current by remember(item) { mutableStateOf(item) }
+    var saving by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     BackHandler(onBack = onBack)
+
+    fun saved(ok: Boolean, where: String) {
+        saving = false
+        Toast.makeText(
+            context,
+            if (ok) "Saved to $where" else "Could not save the file",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
+    // Older Android has no shared Downloads collection for apps, so ask where to save.
+    val savePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*"),
+    ) { target ->
+        if (target == null) {
+            saving = false
+        } else {
+            scope.launch { saved(saveToPicked(context, current, target), "the chosen folder") }
+        }
+    }
+
+    fun download() {
+        if (saving) return
+        saving = true
+        if (canSaveToDownloads()) {
+            scope.launch { saved(saveToDownloads(context, current), "Downloads/P Vault") }
+        } else {
+            onExternal()
+            runCatching { savePicker.launch(exportName(current.title, current.file.extension)) }
+                .onFailure { saved(false, "") }
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Backdrop()
@@ -222,6 +261,19 @@ fun DetailScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
+                IconButton(
+                    onClick = {
+                        onExternal()
+                        if (!shareVaultFile(context, current)) {
+                            Toast.makeText(context, "Could not share the file", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share")
+                }
+                IconButton(onClick = { download() }, enabled = !saving) {
+                    Icon(Icons.Default.Download, contentDescription = "Download to phone")
+                }
                 IconButton(onClick = { renameOpen = true }) {
                     Icon(Icons.Default.Edit, contentDescription = "Rename")
                 }

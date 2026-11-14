@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Only the downloaded update APK is shared, and only with Android's installer. -->
+<!-- The downloaded update APK goes to Android's installer; a vault file is shared only
+     when the user taps Share on it. -->
 <paths>
     <cache-path name="updates" path="updates/" />
+    <files-path name="vault" path="vault/" />
 </paths>

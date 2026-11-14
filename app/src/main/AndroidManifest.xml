@@ -51,7 +51,7 @@
             android:value="p_vault_news" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_update_notification" />
+            android:resource="@drawable/ic_notification" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
