@@ -65,6 +65,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -223,7 +224,7 @@ fun SettingsScreen(
                         title = "App lock",
                         subtitle = "Ask for your PIN when P Vault opens.",
                         trailing = {
-                            Switch(
+                            OnOffSwitch(
                                 checked = settings.appLock,
                                 onCheckedChange = { onSettings(settings.copy(appLock = it)) },
                             )
@@ -256,7 +257,7 @@ fun SettingsScreen(
                             "No fingerprint is set up on this device."
                         },
                         trailing = {
-                            Switch(
+                            OnOffSwitch(
                                 checked = settings.biometricUnlock && biometricsAvailable,
                                 onCheckedChange = { onSettings(settings.copy(biometricUnlock = it)) },
                                 enabled = biometricsAvailable,
@@ -316,7 +317,7 @@ fun SettingsScreen(
                         title = "Auto-backup",
                         subtitle = "Back up shortly after a change while P Vault is open.",
                         trailing = {
-                            Switch(
+                            OnOffSwitch(
                                 checked = settings.autoBackup,
                                 onCheckedChange = { onSettings(settings.copy(autoBackup = it)) },
                             )
@@ -799,4 +800,49 @@ private fun BackupPasswordDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/**
+ * A switch that is clearly visible in both positions, with the word "On" or "Off" beside
+ * it. The stock colours draw the "off" position in near-white, which vanished on the cards.
+ */
+@Composable
+private fun OnOffSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = if (checked) "On" else "Off",
+            color = when {
+                !enabled -> TextSoft.copy(alpha = 0.6f)
+                checked -> scheme.primary
+                else -> TextSoft
+            },
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.width(8.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = scheme.primary,
+                checkedBorderColor = scheme.primary,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = scheme.onSurfaceVariant.copy(alpha = 0.55f),
+                uncheckedBorderColor = Color.Transparent,
+                disabledCheckedThumbColor = Color.White,
+                disabledCheckedTrackColor = scheme.primary.copy(alpha = 0.35f),
+                disabledCheckedBorderColor = Color.Transparent,
+                disabledUncheckedThumbColor = Color.White,
+                disabledUncheckedTrackColor = scheme.onSurfaceVariant.copy(alpha = 0.22f),
+                disabledUncheckedBorderColor = Color.Transparent,
+            ),
+        )
+    }
 }
