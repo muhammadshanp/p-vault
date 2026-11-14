@@ -49,4 +49,12 @@ class UpdateCheckerTest {
         assertEquals("World", message.getJSONObject("data").getString("body"))
         assertFalse(message.has("notification"))
     }
+
+    @Test
+    fun sharedSelectionUsesTheNarrowestCommonType() {
+        assertEquals("application/pdf", commonMime(listOf("application/pdf", "application/pdf")))
+        assertEquals("image/*", commonMime(listOf("image/png", "image/jpeg")))
+        assertEquals("*/*", commonMime(listOf("image/png", "application/pdf")))
+        assertEquals("Holiday.jpg", exportName("Holiday", "JPG"))
+    }
 }

@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.10** — Share several selected files (or reel links) at once.
 - **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
 - **0.5.8** — The navigation pill slides smoothly between tabs and follows your finger while swiping.
 - **0.5.7** — New floating navigation capsule with a glowing pill for the current tab; lists scroll behind it and the + button sits above it.
@@ -38,7 +39,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Pick up to 50 photos or several PDFs in one go.
 - Sort Images, PDFs and Notes with the sort button beside the section title: newest, oldest, name A to Z, name Z to A, or largest first. The choice is remembered.
 - Rename and delete items. Reels can be moved between categories; categories can be renamed (Pending is reserved).
-- Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together.
+- Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together. A selection of files or reels can also be shared in one go.
 - Search hints and item counts follow the current section.
 - Optionally locked behind a PIN (salted SHA-256 hash) and optional fingerprint. On first launch, P Vault asks whether you want a PIN; choose Skip to use it without a lock. The fingerprint prompt opens automatically when you return to the app; PIN is the fallback. Five wrong PIN attempts lock the app for 30 seconds. Auto-lock can run immediately, after 30 seconds, after 1 minute, or after 5 minutes. The launch PIN can be turned off in Settings.
 - A full Settings screen: theme, app lock on/off, change PIN, fingerprint unlock, auto-lock delay, auto-backup on/off, backup reminder interval, backups kept, export/import, clear vault data, and About/version.
@@ -176,4 +177,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.9 (versionCode 39).
+`com.dudeapp.vault` — version 0.5.10 (versionCode 40).

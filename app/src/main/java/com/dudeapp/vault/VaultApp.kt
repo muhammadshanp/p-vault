@@ -997,6 +997,34 @@ fun VaultApp(
                                 TextButton(onClick = { cancelSelection() }) {
                                     Text("Cancel")
                                 }
+                                // Chats are folders of messages, so there is nothing to hand
+                                // to another app; files and reel links can be shared.
+                                if (!isNotesChat) {
+                                    TextButton(
+                                        onClick = {
+                                            onExternal()
+                                            val opened = if (isReels) {
+                                                shareReelLinks(
+                                                    context,
+                                                    reels.filter { it.file.absolutePath in selectedPaths },
+                                                )
+                                            } else {
+                                                shareVaultFiles(
+                                                    context,
+                                                    sortedItems.filter { it.file.absolutePath in selectedPaths },
+                                                )
+                                            }
+                                            if (opened) {
+                                                cancelSelection()
+                                            } else {
+                                                Toast.makeText(context, "Could not share the selection", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        enabled = selectedPaths.isNotEmpty(),
+                                    ) {
+                                        Text("Share")
+                                    }
+                                }
                                 TextButton(
                                     onClick = {
                                         if (selectedPaths.isNotEmpty()) deleteSelectionOpen = true
