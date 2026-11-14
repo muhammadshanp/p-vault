@@ -70,6 +70,13 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import android.app.Activity
+import java.io.File
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
@@ -563,6 +570,111 @@ fun VaultApp(
         pdfPicker.launch(arrayOf("application/pdf"))
     }
 
+    // ---- Scan and camera ----------------------------------------------------
+    var addMenuOpen by remember { mutableStateOf(false) }
+    // Whether the photo being taken becomes a one-page PDF (from the PDFs tab) or a photo.
+    var cameraAsPdf by rememberSaveable { mutableStateOf(false) }
+
+    val scanLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val pdf = if (result.resultCode == Activity.RESULT_OK) {
+            GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pdf?.uri
+        } else {
+            null
+        }
+        if (pdf != null) {
+            scope.launch {
+                val added = withContext(Dispatchers.IO) {
+                    val item = store.addFile(pdf, "Scan ${captureStamp()}.pdf")
+                    // The scanner leaves its copy in the app's cache; the vault has its own now.
+                    runCatching { pdf.path?.let { File(it).delete() } }
+                    item
+                }
+                refresh()
+                Toast.makeText(
+                    context,
+                    if (added != null) "Scan saved to PDFs" else "Could not save the scan",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    fun launchScan() {
+        val activity = context as? Activity
+        if (activity == null) {
+            Toast.makeText(context, "The scanner could not be opened", Toast.LENGTH_SHORT).show()
+            return
+        }
+        onExternal()
+        startDocumentScan(
+            activity,
+            onReady = { request -> scanLauncher.launch(request) },
+            onUnavailable = {
+                Toast.makeText(
+                    context,
+                    "The document scanner is not available. It needs Google Play services and, the first time, the internet.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            },
+        )
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { taken ->
+        val asPdf = cameraAsPdf
+        scope.launch {
+            val added = withContext(Dispatchers.IO) {
+                val photo = cameraTempFile(context)
+                try {
+                    if (!taken || photo.length() == 0L) return@withContext null
+                    if (asPdf) {
+                        val pdf = File(photo.parentFile, "capture.pdf")
+                        try {
+                            if (photoToPdf(photo, pdf)) {
+                                store.addFile(Uri.fromFile(pdf), "Scan ${captureStamp()}.pdf")
+                            } else {
+                                null
+                            }
+                        } finally {
+                            pdf.delete()
+                        }
+                    } else {
+                        store.addFile(Uri.fromFile(photo), "Photo ${captureStamp()}.jpg")
+                    }
+                } finally {
+                    // Nothing is left outside the vault.
+                    photo.delete()
+                }
+            }
+            if (taken) {
+                refresh()
+                Toast.makeText(
+                    context,
+                    when {
+                        added == null -> "Could not save the photo"
+                        asPdf -> "Saved to PDFs"
+                        else -> "Saved to Images"
+                    },
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    fun launchCamera(asPdf: Boolean) {
+        cameraAsPdf = asPdf
+        onExternal()
+        runCatching {
+            cameraTempFile(context).delete()
+            cameraLauncher.launch(cameraTempUri(context))
+        }.onFailure {
+            Toast.makeText(context, "No camera app was found", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun pickChatAvatar(chat: ChatThread) {
         onExternal()
         chatAvatarTarget = chat
@@ -764,8 +876,8 @@ fun VaultApp(
         when (tab) {
             Tab.HOME -> addOpen = true
             Tab.REELS -> openReelDialog()
-            Tab.IMAGES -> launchPhotos()
-            Tab.PDFS -> launchPdfs()
+            // Photos and PDFs can come from several places, so + opens a small menu.
+            Tab.IMAGES, Tab.PDFS -> addMenuOpen = true
             Tab.NOTES -> if (chatView) chatDialogOpen = true else noteOpen = true
         }
     }
@@ -1225,16 +1337,47 @@ fun VaultApp(
                 }
 
                 if (!selecting) {
-                    FloatingActionButton(
-                        onClick = { sectionAdd() },
-                        modifier = Modifier
+                    Box(
+                        Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 20.dp, bottom = floatingBarSpace() + 12.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
+                        FloatingActionButton(
+                            onClick = { sectionAdd() },
+                            shape = RoundedCornerShape(20.dp),
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add")
+                        }
+                        // Opens upwards from the + button (there is no room below it).
+                        DropdownMenu(
+                            expanded = addMenuOpen,
+                            onDismissRequest = { addMenuOpen = false },
+                        ) {
+                            val forPdfs = tab == Tab.PDFS
+                            if (forPdfs) {
+                                AddMenuItem(Icons.Outlined.DocumentScanner, Accent.Pdf, "Scan document") {
+                                    addMenuOpen = false
+                                    launchScan()
+                                }
+                            }
+                            AddMenuItem(Icons.Outlined.PhotoCamera, Accent.Photo, "Camera") {
+                                addMenuOpen = false
+                                launchCamera(asPdf = forPdfs)
+                            }
+                            if (forPdfs) {
+                                AddMenuItem(Icons.Outlined.FolderOpen, Accent.Note, "Files") {
+                                    addMenuOpen = false
+                                    launchPdfs()
+                                }
+                            } else {
+                                AddMenuItem(Icons.Outlined.Image, Accent.Photo, "Gallery") {
+                                    addMenuOpen = false
+                                    launchPhotos()
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1257,6 +1400,14 @@ fun VaultApp(
                     onPickPdf = {
                         addOpen = false
                         launchPdfs()
+                    },
+                    onScan = {
+                        addOpen = false
+                        launchScan()
+                    },
+                    onCamera = {
+                        addOpen = false
+                        launchCamera(asPdf = false)
                     },
                     onTextNote = {
                         addOpen = false
@@ -2114,6 +2265,16 @@ private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
     }
 }
 
+/** One line of the menu that opens from the + button. */
+@Composable
+private fun AddMenuItem(icon: ImageVector, tint: Color, label: String, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = tint) },
+        onClick = onClick,
+    )
+}
+
 private const val FAVOURITES_ON_HOME = 4
 
 /** Zips, and password-protected backups (which Drive lists as plain data files). */
@@ -2701,8 +2862,8 @@ private fun EmptyState(
                         } else {
                             "Tap + to write your first note."
                         }
-                        Tab.IMAGES -> "Tap + to import photos from your gallery."
-                        Tab.PDFS -> "Tap + to import a PDF document."
+                        Tab.IMAGES -> "Tap + to take a photo or import from your gallery."
+                        Tab.PDFS -> "Tap + to scan a document or import PDF files."
                         Tab.HOME -> "Tap + to add a photo, PDF, note or reel."
                     }
                 },

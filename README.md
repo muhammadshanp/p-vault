@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.12** — Scan a document to PDF. Take a photo straight into the vault. The + button on Images and PDFs opens a menu (Scan, Camera, Files or Gallery). Tick boxes in notes. Notifications sent from the Firebase console also land in the bell list.
 - **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open. A Reminders list (alarm button beside the Chats title) shows everything you set.
 - **0.5.10** — Optional backup password: backups and exports are encrypted. Favourites, with a star on any file and a Favourites list on Home. Swipe left and right between photos. Dark start-up screen with the dark theme (Android 12+). Share several selected files (or reel links) at once. Settings switches are clearly visible and labelled On/Off.
 - **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
@@ -39,6 +40,9 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Open a photo, PDF or note and use **Share** to send it to another app or **Download** to save a copy to the phone's Downloads/P Vault folder (on Android 9 and older you pick the folder).
 - Pick up to 50 photos or several PDFs in one go.
 - Sort Images, PDFs and Notes with the sort button beside the section title: newest, oldest, name A to Z, name Z to A, or largest first. The choice is remembered.
+- **Scan a document**: on the PDFs tab tap **+ → Scan document**. Google's scanner finds the page edges, straightens the pages and saves them as one PDF. It needs Google Play services, and the internet the first time (to fetch the scanner).
+- **Camera**: **+ → Camera** takes a photo straight into the vault, so it never appears in the phone's gallery. From the PDFs tab the photo is saved as a one-page PDF.
+- **Checklists in notes**: a line that starts with `[ ]` is a tick box and `[x]` a ticked one. Tap a box to tick it, or use the "Add a checklist item" field under the note.
 - Star a file to keep it in **Favourites** on the Home page.
 - Swipe left and right in an opened photo to move through your photos; pinch to zoom.
 - Rename and delete items (in the ⋮ menu of an opened file). Reels can be moved between categories; categories can be renamed (Pending is reserved).
@@ -182,4 +186,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.11 (versionCode 41).
+`com.dudeapp.vault` — version 0.5.12 (versionCode 42).

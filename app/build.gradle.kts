@@ -13,8 +13,8 @@ android {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 41
-        versionName = "0.5.11"
+        versionCode = 42
+        versionName = "0.5.12"
     }
 
     buildTypes {
@@ -71,6 +71,9 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging")
     // Google sign-in for the admin panel.
     implementation("com.google.android.gms:play-services-auth:21.3.0")
+
+    // Document scanner ("Scan a document"); the scanner itself lives in Google Play services.
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
