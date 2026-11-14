@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Push notifications show the P Vault mark.
+- **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
 - **0.5.8** — The navigation pill slides smoothly between tabs and follows your finger while swiping.
 - **0.5.7** — New floating navigation capsule with a glowing pill for the current tab; lists scroll behind it and the + button sits above it.
 - **0.5.6** — Floating bottom navigation bar with rounded corners. New Settings layout. Push notifications from the P Vault team through Firebase, with an admin panel for the owner to send them. The start-up logo fades out smoothly. A bell icon at the top lists received notifications. A weekly suggestion to connect Google Drive when no backup folder is set.
@@ -35,6 +35,8 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - The Notes tab opens Chats by default; switch the Chats/Notes chips to see plain notes.
 - A floating + button on every tab, including Home: add a file, reel, photo, PDF, note or chat.
 - Open a photo, PDF or note and use **Share** to send it to another app or **Download** to save a copy to the phone's Downloads/P Vault folder (on Android 9 and older you pick the folder).
+- Pick up to 50 photos or several PDFs in one go.
+- Sort Images, PDFs and Notes with the sort button beside the section title: newest, oldest, name A to Z, name Z to A, or largest first. The choice is remembered.
 - Rename and delete items. Reels can be moved between categories; categories can be renamed (Pending is reserved).
 - Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together.
 - Search hints and item counts follow the current section.

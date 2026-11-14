@@ -8,6 +8,27 @@ import java.util.Locale
 
 enum class ItemType { IMAGE, PDF, TEXT }
 
+/** How the Images, PDFs and Notes lists are ordered. */
+enum class SortOrder(val label: String) {
+    NEWEST("Newest first"),
+    OLDEST("Oldest first"),
+    NAME_AZ("Name A to Z"),
+    NAME_ZA("Name Z to A"),
+    LARGEST("Largest first"),
+}
+
+internal fun List<VaultItem>.sortedFor(order: SortOrder): List<VaultItem> = when (order) {
+    SortOrder.NEWEST -> sortedByDescending { it.stamp }
+    SortOrder.OLDEST -> sortedBy { it.stamp }
+    SortOrder.NAME_AZ -> sortedWith(compareBy<VaultItem> { it.title.lowercase() }.thenByDescending { it.stamp })
+    SortOrder.NAME_ZA -> sortedWith(compareByDescending<VaultItem> { it.title.lowercase() }.thenByDescending { it.stamp })
+    SortOrder.LARGEST -> {
+        // Read each size once; asking the disk inside the comparison would be slow.
+        val sizes = associate { it.file.absolutePath to it.file.length() }
+        sortedWith(compareByDescending<VaultItem> { sizes[it.file.absolutePath] ?: 0L }.thenByDescending { it.stamp })
+    }
+}
+
 data class VaultItem(
     val file: File,
     val title: String,

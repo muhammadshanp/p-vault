@@ -62,6 +62,9 @@ import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
@@ -165,6 +168,14 @@ fun VaultApp(
     var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     var deleteSelectionOpen by remember { mutableStateOf(false) }
     var vaultItems by remember { mutableStateOf<List<VaultItem>>(emptyList()) }
+    val sortPrefs = remember { context.getSharedPreferences("dude_app", Context.MODE_PRIVATE) }
+    var sortOrder by remember {
+        mutableStateOf(
+            SortOrder.entries.firstOrNull { it.name == sortPrefs.getString("file_sort", null) } ?: SortOrder.NEWEST,
+        )
+    }
+    // Sorted once per change, not once per page.
+    val sortedItems = remember(vaultItems, sortOrder) { vaultItems.sortedFor(sortOrder) }
     var reels by remember { mutableStateOf<List<Reel>>(emptyList()) }
     var categories by remember { mutableStateOf<List<String>>(emptyList()) }
     var chats by remember { mutableStateOf<List<ChatThread>>(emptyList()) }
@@ -421,23 +432,26 @@ fun VaultApp(
     }
 
     val imagePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(10),
+        ActivityResultContracts.PickMultipleVisualMedia(50),
     ) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
-                withContext(Dispatchers.IO) { uris.forEach { store.addFile(it, "Image.jpg") } }
+                val added = withContext(Dispatchers.IO) { uris.count { store.addFile(it, "Image.jpg") != null } }
                 refresh()
+                Toast.makeText(context, addedMessage(added, uris.size, "photo"), Toast.LENGTH_SHORT).show()
             }
         }
     }
 
+    // Several PDFs can be ticked in one go.
     val pdfPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isNotEmpty()) {
             scope.launch {
-                withContext(Dispatchers.IO) { store.addFile(uri, "Document.pdf") }
+                val added = withContext(Dispatchers.IO) { uris.count { store.addFile(it, "Document.pdf") != null } }
                 refresh()
+                Toast.makeText(context, addedMessage(added, uris.size, "PDF"), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -887,7 +901,7 @@ fun VaultApp(
                     val isHome = currentTab == Tab.HOME
                     val isReels = currentTab == Tab.REELS
                     val isNotesChat = currentTab == Tab.NOTES && chatView
-                    val currentVisibleFiles = vaultItems.filter { item ->
+                    val currentVisibleFiles = sortedItems.filter { item ->
                         val inTab = when (currentTab) {
                             Tab.HOME -> false
                             Tab.REELS -> false
@@ -956,6 +970,11 @@ fun VaultApp(
                                 else -> null
                             },
                             manageDescription = if (isReels) "Edit categories" else "Manage chats",
+                            sortOrder = if (isReels || isNotesChat) null else sortOrder,
+                            onSort = { chosen ->
+                                sortOrder = chosen
+                                sortPrefs.edit().putString("file_sort", chosen.name).apply()
+                            },
                         )
 
                         if (selecting) {
@@ -2186,7 +2205,10 @@ private fun SectionHeader(
     onSelect: () -> Unit,
     onManage: (() -> Unit)?,
     manageDescription: String,
+    sortOrder: SortOrder? = null,
+    onSort: (SortOrder) -> Unit = {},
 ) {
+    var sortOpen by remember { mutableStateOf(false) }
     Row(
         Modifier
             .fillMaxWidth()
@@ -2219,7 +2241,53 @@ private fun SectionHeader(
             HeaderButton(Icons.Outlined.Tune, manageDescription, onManage)
             Spacer(Modifier.width(8.dp))
         }
+        if (sortOrder != null) {
+            Box {
+                HeaderButton(Icons.AutoMirrored.Filled.Sort, "Sort $title", { sortOpen = true })
+                DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                    SortOrder.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    option.label,
+                                    fontWeight = if (option == sortOrder) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (option == sortOrder) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                            },
+                            trailingIcon = {
+                                if (option == sortOrder) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                sortOpen = false
+                                onSort(option)
+                            },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         HeaderButton(Icons.Default.Edit, "Select $title", onSelect)
+    }
+}
+
+/** "3 photos added", or how many were skipped when some could not be imported. */
+private fun addedMessage(added: Int, picked: Int, unit: String): String {
+    val noun = if (added == 1) unit else "${unit}s"
+    return when {
+        added == 0 -> "Nothing could be added"
+        added < picked -> "$added $noun added, ${picked - added} skipped"
+        else -> "$added $noun added"
     }
 }
 
