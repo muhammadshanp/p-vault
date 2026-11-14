@@ -182,8 +182,17 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Reminders that come due while P Vault is on screen show as a pop-up; the bump
+        // also brings up any that came due while it was closed.
+        ReminderCenter.appVisible = true
+        ReminderCenter.bump()
+    }
+
     override fun onStop() {
         super.onStop()
+        ReminderCenter.appVisible = false
         val settings = settingsStore.load()
         if (!external && !needsSetup && !needsLockChoice && settings.appLock) {
             if (settings.lockDelaySeconds == 0) {

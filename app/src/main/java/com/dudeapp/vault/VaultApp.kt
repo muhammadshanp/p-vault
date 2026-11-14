@@ -62,6 +62,7 @@ import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -199,6 +200,8 @@ fun VaultApp(
     var openChat by remember { mutableStateOf<ChatThread?>(null) }
     var chatDialogOpen by remember { mutableStateOf(false) }
     var chatsOpen by remember { mutableStateOf(false) }
+    var remindersOpen by remember { mutableStateOf(false) }
+    val reminderTick = ReminderCenter.tick.intValue
 
     var reelFilter by remember { mutableStateOf<String?>(null) }
     var reelDialogOpen by remember { mutableStateOf(false) }
@@ -683,6 +686,7 @@ fun VaultApp(
         scope.launch {
             val cleared = withContext(Dispatchers.IO) {
                 val ok = store.clearAll()
+                if (ok) Reminders.cancelAll(context)
                 if (ok) profileStore.clear()
                 ok
             }
@@ -1025,6 +1029,7 @@ fun VaultApp(
                                 else -> null
                             },
                             manageDescription = if (isReels) "Edit categories" else "Manage chats",
+                            onReminders = if (isNotesChat) { { remindersOpen = true } } else null,
                             sortOrder = if (isReels || isNotesChat) null else sortOrder,
                             onSort = { chosen ->
                                 sortOrder = chosen
@@ -1317,6 +1322,24 @@ fun VaultApp(
                             }
                         }
                     },
+                )
+            }
+
+            if (remindersOpen) {
+                RemindersSheet(
+                    // Reloads when a reminder comes due while the list is open.
+                    refreshKey = reminderTick,
+                    onOpenChat = { reminder ->
+                        val target = chats.firstOrNull { it.dir.absolutePath == reminder.chatDir }
+                            ?: chats.firstOrNull { it.name == reminder.chatName }
+                        if (target == null) {
+                            Toast.makeText(context, "That chat no longer exists", Toast.LENGTH_SHORT).show()
+                        } else {
+                            remindersOpen = false
+                            openChat = target
+                        }
+                    },
+                    onDismiss = { remindersOpen = false },
                 )
             }
 
@@ -1626,6 +1649,71 @@ Text("This adds everything from the selected backup to your vault. Files already
             },
             dismissButton = {
                 TextButton(onClick = { restorePasswordFor = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    // ---- Chat reminders ---------------------------------------------------
+    var dueReminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { Reminders.rearmAll(context) }
+    }
+    LaunchedEffect(reminderTick) {
+        dueReminders = withContext(Dispatchers.IO) {
+            ReminderStore.list(context).filter { it.fired }.sortedBy { it.at }
+        }
+    }
+    val dueReminder = dueReminders.firstOrNull()
+    if (dueReminder != null) {
+        val reminderChat = chats.firstOrNull { it.dir.absolutePath == dueReminder.chatDir }
+            ?: chats.firstOrNull { it.name == dueReminder.chatName }
+        fun finishReminder() {
+            Reminders.cancel(context, dueReminder)
+            dueReminders = dueReminders.filterNot { it.id == dueReminder.id }
+        }
+        AlertDialog(
+            onDismissRequest = { finishReminder() },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Reminder") },
+            text = {
+                Column {
+                    Text(
+                        text = dueReminder.chatName,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(text = dueReminder.text, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Set for " + reminderTimeLabel(context, dueReminder.at),
+                        color = TextSoft,
+                        fontSize = 12.sp,
+                    )
+                }
+            },
+            confirmButton = {
+                if (reminderChat != null) {
+                    TextButton(
+                        onClick = {
+                            finishReminder()
+                            settingsOpen = false
+                            inboxOpen = false
+                            open = null
+                            openChat = reminderChat
+                        },
+                    ) {
+                        Text("Open chat")
+                    }
+                } else {
+                    TextButton(onClick = { finishReminder() }) { Text("Done") }
+                }
+            },
+            dismissButton = {
+                if (reminderChat != null) {
+                    TextButton(onClick = { finishReminder() }) { Text("Done") }
+                }
             },
         )
     }
@@ -2358,6 +2446,7 @@ private fun SectionHeader(
     manageDescription: String,
     sortOrder: SortOrder? = null,
     onSort: (SortOrder) -> Unit = {},
+    onReminders: (() -> Unit)? = null,
 ) {
     var sortOpen by remember { mutableStateOf(false) }
     Row(
@@ -2387,6 +2476,10 @@ private fun SectionHeader(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             )
+        }
+        if (onReminders != null) {
+            HeaderButton(Icons.Outlined.Alarm, "Reminders", onReminders)
+            Spacer(Modifier.width(8.dp))
         }
         if (onManage != null) {
             HeaderButton(Icons.Outlined.Tune, manageDescription, onManage)
