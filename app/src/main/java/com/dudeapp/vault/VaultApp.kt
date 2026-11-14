@@ -671,7 +671,7 @@ fun VaultApp(
             cameraTempFile(context).delete()
             cameraLauncher.launch(cameraTempUri(context))
         }.onFailure {
-            Toast.makeText(context, "No camera app was found", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "The camera could not be opened", Toast.LENGTH_SHORT).show()
         }
     }
 
