@@ -16,7 +16,20 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: chmod +x gradlew
-      - run: ./gradlew --no-daemon assembleRelease testReleaseUnitTest
+      - name: Build and test
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon assembleRelease testReleaseUnitTest 2>&1 | tee build.log
+      # Shows compiler errors and failed tests on the run's summary page, so the cause
+      # can be read without opening the full log.
+      - name: Report errors
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "^e: |^w: .*deprecat.*error|FAILED$| FAILED|^\s+(java|org|kotlin)\.[A-Za-z.]+(Error|Exception)|What went wrong" -A1 build.log \
+            | grep -v "^--$" | head -n 40 | cut -c1-900 \
+            | while IFS= read -r line; do echo "::error::${line}"; done || true
       - uses: actions/upload-artifact@v4
         with:
           name: test-apk-not-for-release
