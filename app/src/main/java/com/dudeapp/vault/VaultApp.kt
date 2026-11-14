@@ -2026,7 +2026,6 @@ private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
     }
 }
 
-@Composable
 private const val FAVOURITES_ON_HOME = 4
 
 /** Zips, and password-protected backups (which Drive lists as plain data files). */
