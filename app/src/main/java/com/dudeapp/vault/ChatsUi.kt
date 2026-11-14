@@ -1316,3 +1316,132 @@ private fun ReminderChoice(label: String, color: Color = Color.Unspecified, onCl
             .padding(horizontal = 8.dp, vertical = 13.dp),
     )
 }
+
+/** Every reminder that is set, soonest first, with the ones already due on top. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RemindersSheet(
+    refreshKey: Int,
+    onOpenChat: (Reminder) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
+    var changing by remember { mutableStateOf<Reminder?>(null) }
+
+    fun reload() {
+        reminders = ReminderStore.list(context)
+            .sortedWith(compareByDescending<Reminder> { it.fired }.thenBy { it.at })
+    }
+    LaunchedEffect(refreshKey) { reload() }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp),
+        ) {
+            Text(
+                text = "Reminders",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (reminders.isEmpty()) {
+                    "No reminders yet. Hold a message in a chat and tap Remind me."
+                } else {
+                    "Tap a reminder to open its chat."
+                },
+                color = TextSoft,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            reminders.forEach { reminder ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onOpenChat(reminder) }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Alarm,
+                        contentDescription = null,
+                        tint = if (reminder.fired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = reminder.text,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = reminder.chatName + " · " +
+                                (if (reminder.fired) "Due since " else "") +
+                                reminderTimeLabel(context, reminder.at),
+                            color = if (reminder.fired) MaterialTheme.colorScheme.error else TextSoft,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(onClick = { changing = reminder }) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Change time",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            Reminders.cancel(context, reminder)
+                            reload()
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Remove reminder",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val target = changing
+    if (target != null) {
+        ReminderDialog(
+            existingAt = target.at,
+            onDismiss = { changing = null },
+            onRemove = {
+                Reminders.cancel(context, target)
+                changing = null
+                reload()
+            },
+            onPick = { at ->
+                Reminders.reschedule(context, target, at)
+                changing = null
+                reload()
+                Toast.makeText(
+                    context,
+                    "Reminder set for " + reminderTimeLabel(context, at),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            },
+        )
+    }
+}

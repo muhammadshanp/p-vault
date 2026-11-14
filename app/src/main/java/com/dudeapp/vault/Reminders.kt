@@ -174,6 +174,21 @@ object Reminders {
         return reminder
     }
 
+    /** Moves an existing reminder to a new time (a due one becomes upcoming again). */
+    fun reschedule(context: Context, reminder: Reminder, at: Long): Reminder {
+        context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_BASE + reminder.id)
+        val moved = ReminderStore.set(
+            context,
+            reminder.messagePath,
+            reminder.chatDir,
+            reminder.chatName,
+            reminder.text,
+            at,
+        )
+        schedule(context, moved)
+        return moved
+    }
+
     fun cancel(context: Context, reminder: Reminder) {
         runCatching {
             context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, reminder.id))

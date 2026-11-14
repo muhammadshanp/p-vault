@@ -62,6 +62,7 @@ import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -199,6 +200,8 @@ fun VaultApp(
     var openChat by remember { mutableStateOf<ChatThread?>(null) }
     var chatDialogOpen by remember { mutableStateOf(false) }
     var chatsOpen by remember { mutableStateOf(false) }
+    var remindersOpen by remember { mutableStateOf(false) }
+    val reminderTick = ReminderCenter.tick.intValue
 
     var reelFilter by remember { mutableStateOf<String?>(null) }
     var reelDialogOpen by remember { mutableStateOf(false) }
@@ -1026,6 +1029,7 @@ fun VaultApp(
                                 else -> null
                             },
                             manageDescription = if (isReels) "Edit categories" else "Manage chats",
+                            onReminders = if (isNotesChat) { { remindersOpen = true } } else null,
                             sortOrder = if (isReels || isNotesChat) null else sortOrder,
                             onSort = { chosen ->
                                 sortOrder = chosen
@@ -1318,6 +1322,24 @@ fun VaultApp(
                             }
                         }
                     },
+                )
+            }
+
+            if (remindersOpen) {
+                RemindersSheet(
+                    // Reloads when a reminder comes due while the list is open.
+                    refreshKey = reminderTick,
+                    onOpenChat = { reminder ->
+                        val target = chats.firstOrNull { it.dir.absolutePath == reminder.chatDir }
+                            ?: chats.firstOrNull { it.name == reminder.chatName }
+                        if (target == null) {
+                            Toast.makeText(context, "That chat no longer exists", Toast.LENGTH_SHORT).show()
+                        } else {
+                            remindersOpen = false
+                            openChat = target
+                        }
+                    },
+                    onDismiss = { remindersOpen = false },
                 )
             }
 
@@ -1632,7 +1654,6 @@ Text("This adds everything from the selected backup to your vault. Files already
     }
 
     // ---- Chat reminders ---------------------------------------------------
-    val reminderTick = ReminderCenter.tick.intValue
     var dueReminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { Reminders.rearmAll(context) }
@@ -2425,6 +2446,7 @@ private fun SectionHeader(
     manageDescription: String,
     sortOrder: SortOrder? = null,
     onSort: (SortOrder) -> Unit = {},
+    onReminders: (() -> Unit)? = null,
 ) {
     var sortOpen by remember { mutableStateOf(false) }
     Row(
@@ -2454,6 +2476,10 @@ private fun SectionHeader(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             )
+        }
+        if (onReminders != null) {
+            HeaderButton(Icons.Outlined.Alarm, "Reminders", onReminders)
+            Spacer(Modifier.width(8.dp))
         }
         if (onManage != null) {
             HeaderButton(Icons.Outlined.Tune, manageDescription, onManage)

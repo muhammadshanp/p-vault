@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open.
+- **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open. A Reminders list (alarm button beside the Chats title) shows everything you set.
 - **0.5.10** — Optional backup password: backups and exports are encrypted. Favourites, with a star on any file and a Favourites list on Home. Swipe left and right between photos. Dark start-up screen with the dark theme (Android 12+). Share several selected files (or reel links) at once. Settings switches are clearly visible and labelled On/Off.
 - **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
 - **0.5.8** — The navigation pill slides smoothly between tabs and follows your finger while swiping.
