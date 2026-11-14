@@ -148,4 +148,31 @@ class BackupReminderTest {
             dir.deleteRecursively()
         }
     }
+
+    @Test
+    fun protectedBackupsArePrunedLikeZips() {
+        val files = listOf(
+            BackupFile("a", "P_Vault_20261029_100000_000.pvault", 1),
+            BackupFile("b", "P_Vault_20261029_110000_000.pvault", 2),
+            BackupFile("c", "P_Vault_20261029_120000_000.pvault", 3),
+            BackupFile("x", "holiday.pvault", 4),
+        )
+        assertEquals(listOf("a"), backupsToDelete(files, keep = 2).map { it.id })
+    }
+
+    @Test
+    fun plainZipsAreRemovedOnceAPasswordIsSet() {
+        val files = listOf(
+            BackupFile("plain1", "P_Vault_20261029_100000_000.zip", 1),
+            BackupFile("plain2", "P_Vault.zip", 2),
+            BackupFile("new", "P_Vault_20261029_120000_000.pvault", 3),
+            BackupFile("other", "Dude_20260101_120000_000.zip", 4),
+        )
+        assertEquals(
+            setOf("plain1", "plain2"),
+            backupsToDelete(files, keep = 2, protectId = "new", dropPlain = true).map { it.id }.toSet(),
+        )
+        // Without a password only the usual count applies: the oldest of the three goes.
+        assertEquals(listOf("plain2"), backupsToDelete(files, keep = 2, protectId = "new").map { it.id })
+    }
 }

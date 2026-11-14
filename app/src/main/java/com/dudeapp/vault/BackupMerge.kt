@@ -27,6 +27,14 @@ internal object BackupMerge {
         if (avatar.isFile && avatar.length() > 0 && !(localAvatar.isFile && localAvatar.length() > 0)) {
             avatar.copyTo(localAvatar, overwrite = true)
         }
+
+        // Stars from the backup are added to the ones on the phone.
+        val stars = File(staging, Favourites.FILE)
+        if (stars.isFile) {
+            val local = File(target, Favourites.FILE)
+            val merged = Favourites.read(local) + Favourites.read(stars)
+            runCatching { Favourites.write(local, merged) }
+        }
         return added
     }
 

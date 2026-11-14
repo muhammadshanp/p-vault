@@ -35,7 +35,26 @@ data class VaultItem(
     val type: ItemType,
     /** Creation order, encoded in the filename prefix. */
     val stamp: Long,
+    /** Starred by the user; shown on the Home page. */
+    val favourite: Boolean = false,
 )
+
+/** Favourites are kept as one file name per line in a small text file beside the vault. */
+internal object Favourites {
+    const val FILE = "favourites"
+
+    fun read(file: File): Set<String> =
+        runCatching { file.readLines().map { it.trim() }.filter { it.isNotEmpty() }.toSet() }
+            .getOrDefault(emptySet())
+
+    fun write(file: File, names: Set<String>) {
+        if (names.isEmpty()) {
+            file.delete()
+        } else {
+            file.writeText(names.sorted().joinToString("\n", postfix = "\n"))
+        }
+    }
+}
 
 data class Reel(
     val file: File,
@@ -78,6 +97,7 @@ class VaultStore(private val context: Context) {
     private val reelsRoot = File(context.filesDir, "reels").apply { mkdirs() }
     private val chatsRoot = File(context.filesDir, "chats").apply { mkdirs() }
     private val chatPrefs = context.getSharedPreferences("dude_chats", Context.MODE_PRIVATE)
+    private val favouritesFile = File(context.filesDir, Favourites.FILE)
 
     init {
         ensureDefaultCategories()
@@ -91,15 +111,38 @@ class VaultStore(private val context: Context) {
             reelsRoot.walkTopDown().any { it.isFile } ||
             chatsRoot.walkTopDown().any { it.isFile }
 
-    fun list(): List<VaultItem> =
-        dir.listFiles()
+    fun list(): List<VaultItem> {
+        val starred = Favourites.read(favouritesFile)
+        return dir.listFiles()
             ?.mapNotNull { file ->
                 if (!file.isFile) return@mapNotNull null
                 val type = typeOf(file.name) ?: return@mapNotNull null
-                VaultItem(file, titleOf(file.name), type, stampOf(file.name))
+                VaultItem(file, titleOf(file.name), type, stampOf(file.name), file.name in starred)
             }
             ?.sortedByDescending { it.stamp }
             .orEmpty()
+    }
+
+    /** Stars or un-stars an item. Returns the item as it is now. */
+    @Synchronized
+    fun setFavourite(item: VaultItem, favourite: Boolean): VaultItem {
+        val names = Favourites.read(favouritesFile)
+        val name = item.file.name
+        runCatching { Favourites.write(favouritesFile, if (favourite) names + name else names - name) }
+            .onFailure { return item }
+        onChange?.invoke()
+        return item.copy(favourite = favourite)
+    }
+
+    /** Keeps the star with a file when its name changes or it is deleted. */
+    @Synchronized
+    private fun favouriteMoved(oldName: String, newName: String?) {
+        val names = Favourites.read(favouritesFile)
+        if (oldName !in names) return
+        runCatching {
+            Favourites.write(favouritesFile, if (newName != null) names - oldName + newName else names - oldName)
+        }
+    }
 
     /** Copies a picked document into the vault. Returns null if it is not an image or PDF. */
     fun addFile(uri: Uri, fallbackName: String): VaultItem? {
@@ -152,12 +195,14 @@ class VaultStore(private val context: Context) {
         val target = File(dir, "${stampOf(item.file.name)}_${sanitize(newTitle)}.${item.file.extension}")
         if (target == item.file) return item
         if (target.exists()) return null
+        val oldName = item.file.name
         if (!item.file.renameTo(target)) return null
-        return VaultItem(target, titleOf(target.name), item.type, stampOf(target.name))
+        favouriteMoved(oldName, target.name)
+        return VaultItem(target, titleOf(target.name), item.type, stampOf(target.name), item.favourite)
     }
 
     fun delete(item: VaultItem) {
-        item.file.delete()
+        if (item.file.delete()) favouriteMoved(item.file.name, null)
     }
 
     /** Removes all user content and restores the first-run folders, without touching the PIN. */
@@ -165,6 +210,7 @@ class VaultStore(private val context: Context) {
         dir.deleteRecursively()
         reelsRoot.deleteRecursively()
         chatsRoot.deleteRecursively()
+        favouritesFile.delete()
         dir.mkdirs()
         reelsRoot.mkdirs()
         chatsRoot.mkdirs()

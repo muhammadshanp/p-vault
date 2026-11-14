@@ -103,4 +103,31 @@ class BackupZipTest {
             base.deleteRecursively()
         }
     }
+
+    @Test
+    fun favouritesTravelWithTheBackupAndAreMergedOnRestore() {
+        val base = Files.createTempDirectory("dude-fav").toFile()
+        try {
+            val root = File(base, "files").apply { mkdirs() }
+            File(root, "vault").mkdirs()
+            File(root, "vault/1_Hello.txt").writeText("hello")
+            Favourites.write(File(root, Favourites.FILE), setOf("1_Hello.txt"))
+
+            val zip = File(base, "backup.zip")
+            BackupZip.write(root, zip, "")
+            val staging = File(base, "staging").apply { mkdirs() }
+            assertTrue(zip.inputStream().use { BackupZip.read(it, staging) }.ok)
+            assertEquals(setOf("1_Hello.txt"), Favourites.read(File(staging, Favourites.FILE)))
+
+            val phone = File(base, "phone").apply { mkdirs() }
+            File(phone, "vault").mkdirs()
+            File(phone, "vault/2_Local.txt").writeText("local")
+            Favourites.write(File(phone, Favourites.FILE), setOf("2_Local.txt"))
+            BackupMerge.merge(staging, phone)
+            assertEquals(setOf("1_Hello.txt", "2_Local.txt"), Favourites.read(File(phone, Favourites.FILE)))
+            assertTrue(File(phone, "vault/1_Hello.txt").isFile)
+        } finally {
+            base.deleteRecursively()
+        }
+    }
 }

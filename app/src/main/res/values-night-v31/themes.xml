@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Used on Android 12+ once the dark theme is chosen in P Vault (see MainActivity.applyNightMode),
+     so the start-up screen is dark instead of flashing white. -->
+<resources>
+    <style name="Theme.PVault" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_dark</item>
+        <item name="android:windowSplashScreenBackground">@color/window_dark</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+</resources>

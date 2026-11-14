@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_art_background">#16181D</color>
+    <!-- Matches the dark theme background in Theme.kt. -->
+    <color name="window_dark">#0C0D10</color>
 </resources>

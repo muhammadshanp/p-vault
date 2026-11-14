@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.10** — Optional backup password: backups and exports are encrypted. Favourites, with a star on any file and a Favourites list on Home. Swipe left and right between photos. Dark start-up screen with the dark theme (Android 12+). Share several selected files (or reel links) at once. Settings switches are clearly visible and labelled On/Off.
 - **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
 - **0.5.8** — The navigation pill slides smoothly between tabs and follows your finger while swiping.
 - **0.5.7** — New floating navigation capsule with a glowing pill for the current tab; lists scroll behind it and the + button sits above it.
@@ -37,8 +38,10 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - Open a photo, PDF or note and use **Share** to send it to another app or **Download** to save a copy to the phone's Downloads/P Vault folder (on Android 9 and older you pick the folder).
 - Pick up to 50 photos or several PDFs in one go.
 - Sort Images, PDFs and Notes with the sort button beside the section title: newest, oldest, name A to Z, name Z to A, or largest first. The choice is remembered.
-- Rename and delete items. Reels can be moved between categories; categories can be renamed (Pending is reserved).
-- Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together.
+- Star a file to keep it in **Favourites** on the Home page.
+- Swipe left and right in an opened photo to move through your photos; pinch to zoom.
+- Rename and delete items (in the ⋮ menu of an opened file). Reels can be moved between categories; categories can be renamed (Pending is reserved).
+- Tap the pencil on any section to select multiple files, reels, notes or chats and delete them together. A selection of files or reels can also be shared in one go.
 - Search hints and item counts follow the current section.
 - Optionally locked behind a PIN (salted SHA-256 hash) and optional fingerprint. On first launch, P Vault asks whether you want a PIN; choose Skip to use it without a lock. The fingerprint prompt opens automatically when you return to the app; PIN is the fallback. Five wrong PIN attempts lock the app for 30 seconds. Auto-lock can run immediately, after 30 seconds, after 1 minute, or after 5 minutes. The launch PIN can be turned off in Settings.
 - A full Settings screen: theme, app lock on/off, change PIN, fingerprint unlock, auto-lock delay, auto-backup on/off, backup reminder interval, backups kept, export/import, clear vault data, and About/version.
@@ -107,7 +110,7 @@ Messages sent this way appear in the status bar, but are only added to the bell 
 - **Updating the app keeps everything.** Installing a new APK over the old one does not touch the vault, settings, profile or Drive connection.
 - **Uninstalling deletes the local vault.** Android removes app-private files. Your Google Drive backups are not deleted.
 - **Android Auto Backup is enabled.** When Google backup is on and the vault fits Android's backup quota (about 25 MB), Android can restore the app-private files after a reinstall. This is not guaranteed and depends on the phone and backup timing.
-- **If Auto Backup does not restore**, the first launch with no local data shows **Restore your vault?**. Choose **Restore from Drive**, pick the latest `P_Vault_*.zip`, and the app restores it.
+- **If Auto Backup does not restore**, the first launch with no local data shows **Restore your vault?**. Choose **Restore from Drive**, pick the latest `P_Vault_*.zip` (or `.pvault` if you set a backup password), and the app restores it.
 - **Reconnect Drive once after a reinstall.** Android revokes the folder permission even when Auto Backup restores the saved folder name. Tap **Connect** and pick the same folder again; the existing backups stay there.
 - **An empty vault is not auto-backed up.** A fresh install cannot add an empty zip and push out a good backup. Normal **Backups kept** pruning still applies when a real backup is made.
 
@@ -134,7 +137,9 @@ The folder permission is remembered, so you connect once. If you uninstall the D
 - **Restore from a zip file (local or Drive)** opens the same Android picker, so you can pick a backup from the Drive folder or from the phone.
 - **Restore merges.** Files already on the phone stay. Items from the backup are added; ones the phone already has are skipped, and a vault item or reel with the same name but different content is kept as a second copy. Reel categories and chats with the same name are combined.
 
-Backups are ordinary zip files, not encrypted. Anyone with access to the Google account can read them. Keep P Vault open while a backup or restore is running; Android can stop a backgrounded app on a large vault.
+**Backup password (optional).** In Settings → Backup → **Backup password** you can set a password. From then on backups and exports are encrypted (AES-256-GCM, key stretched from the password with PBKDF2) and saved as `P_Vault_<timestamp>.pvault` instead of a zip. After the next successful backup, the older unprotected `P_Vault_*.zip` files are removed from the connected folder. Restoring on the same phone does not ask for the password; on another phone, or after a reinstall or a password change, it does. **There is no reset: if the password is forgotten, those backups cannot be opened.** Only the stretched key is kept on the phone, in the app's private storage.
+
+Without a backup password, backups are ordinary zip files, not encrypted, and anyone with access to the Google account can read them. The vault on the phone itself is not encrypted either way. Keep P Vault open while a backup or restore is running; Android can stop a backgrounded app on a large vault.
 
 Drive backup is one-way, not live sync. Auto-backup runs only while P Vault is open; if you close the app before the 20-second wait, the pending change is retried on the next launch when Drive is connected. The backup reminder appears only when you open the app; it is not a background notification.
 
@@ -176,4 +181,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.9 (versionCode 39).
+`com.dudeapp.vault` — version 0.5.10 (versionCode 40).

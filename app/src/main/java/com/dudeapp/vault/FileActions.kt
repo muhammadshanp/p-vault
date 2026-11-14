@@ -41,6 +41,54 @@ fun shareVaultFile(context: Context, item: VaultItem): Boolean = runCatching {
     true
 }.getOrDefault(false)
 
+/** One type for the whole selection when they agree, otherwise "any file". */
+internal fun commonMime(types: List<String>): String {
+    val distinct = types.distinct()
+    return when {
+        distinct.size == 1 -> distinct.first()
+        distinct.isNotEmpty() && distinct.all { it.startsWith("image/") } -> "image/*"
+        else -> "*/*"
+    }
+}
+
+/** Opens Android's share sheet for several vault files at once. */
+fun shareVaultFiles(context: Context, items: List<VaultItem>): Boolean {
+    if (items.isEmpty()) return false
+    if (items.size == 1) return shareVaultFile(context, items.first())
+    return runCatching {
+        val uris = ArrayList<Uri>(
+            items.map { item ->
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.updates",
+                    item.file,
+                    exportName(item.title, item.file.extension),
+                )
+            },
+        )
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE)
+            .setType(commonMime(items.map { mimeOf(it.file) }))
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(
+            Intent.createChooser(send, "Share ${items.size} files").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+        )
+        true
+    }.getOrDefault(false)
+}
+
+/** Shares saved reel links as text. */
+fun shareReelLinks(context: Context, reels: List<Reel>): Boolean {
+    if (reels.isEmpty()) return false
+    return runCatching {
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, reels.joinToString("\n") { it.url })
+        context.startActivity(Intent.createChooser(send, if (reels.size == 1) "Share reel" else "Share ${reels.size} reels"))
+        true
+    }.getOrDefault(false)
+}
+
 /** True when a copy can be put straight into the phone's Downloads folder. */
 fun canSaveToDownloads(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
