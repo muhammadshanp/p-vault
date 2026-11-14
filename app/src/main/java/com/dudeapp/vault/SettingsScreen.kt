@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.Color
@@ -93,6 +94,7 @@ fun SettingsScreen(
     onSettings: (AppSettings) -> Unit,
     onUpdate: () -> Unit,
     backupProtected: Boolean,
+    lastBackupBytes: Long,
     /** A new password, or null to remove the protection. */
     onBackupPassword: (String?) -> Unit,
     onExport: () -> Unit,
@@ -349,6 +351,47 @@ fun SettingsScreen(
                             selected = settings.keepBackups,
                             label = { it.toString() },
                             onSelect = { onSettings(settings.copy(keepBackups = it)) },
+                        )
+                    }
+                    SettingsDivider()
+                    SettingsItem(
+                        icon = Icons.Outlined.Storage,
+                        tint = Accent.Chat,
+                        title = "Backup size limit",
+                        subtitle = "The most Drive space P Vault's backups may use." +
+                            if (lastBackupBytes > 0L) " Your last backup was ${sizeLabel(lastBackupBytes)}." else "",
+                    ) {
+                        ChoiceChips(
+                            options = BACKUP_LIMIT_OPTIONS,
+                            selected = settings.backupLimitGb,
+                            label = { if (it == 0) "No limit" else "$it GB" },
+                            onSelect = { onSettings(settings.copy(backupLimitGb = it)) },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val limit = settings.backupLimitGb
+                        val beyondFree = limit == 0 || limit > FREE_DRIVE_GB
+                        Text(
+                            text = when {
+                                beyondFree ->
+                                    "A free Google account has $FREE_DRIVE_GB GB in total, shared with Gmail and " +
+                                        "Google Photos. A limit above that only works with a paid Google One plan."
+                                limit == FREE_DRIVE_GB ->
+                                    "This is all the space a free Google account has ($FREE_DRIVE_GB GB), and Gmail and " +
+                                        "Google Photos share it. Backups may fail if Drive is full."
+                                else ->
+                                    "A free Google account has $FREE_DRIVE_GB GB in total, shared with Gmail and Google Photos."
+                            },
+                            color = if (beyondFree) MaterialTheme.colorScheme.error else TextSoft,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "If a backup would be larger than the limit it is not made, and P Vault tells you. " +
+                                "Older backups are removed first when the kept ones would not fit together.",
+                            color = TextSoft,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
                         )
                     }
                 }

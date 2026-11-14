@@ -54,6 +54,19 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Checkbox
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -103,6 +116,8 @@ fun AddSheet(
     onDismiss: () -> Unit,
     onPickPhotos: () -> Unit,
     onPickPdf: () -> Unit,
+    onScan: () -> Unit,
+    onCamera: () -> Unit,
     onTextNote: () -> Unit,
     onReel: () -> Unit,
 ) {
@@ -113,6 +128,7 @@ fun AddSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp)
                 .padding(bottom = 40.dp),
         ) {
@@ -125,7 +141,9 @@ fun AddSheet(
             Text("Everything stays on this device.", color = TextSoft, fontSize = 13.sp)
             Spacer(Modifier.height(18.dp))
             AddRow(Icons.Outlined.Image, Accent.Photo, "Photos", "Import images from your gallery", onPickPhotos)
-            AddRow(Icons.Outlined.PictureAsPdf, Accent.Pdf, "PDF document", "Import a PDF file", onPickPdf)
+            AddRow(Icons.Outlined.PhotoCamera, Accent.Photo, "Take a photo", "Straight into the vault, not the gallery", onCamera)
+            AddRow(Icons.Outlined.PictureAsPdf, Accent.Pdf, "PDF documents", "Import PDF files", onPickPdf)
+            AddRow(Icons.Outlined.DocumentScanner, Accent.Pdf, "Scan a document", "Photograph pages and save them as a PDF", onScan)
             AddRow(Icons.AutoMirrored.Outlined.StickyNote2, Accent.Note, "Text note", "Write something down", onTextNote)
             AddRow(Icons.Outlined.PlayCircle, Accent.Reel, "Reel link", "Save an Instagram Reel", onReel)
         }
@@ -161,7 +179,7 @@ private fun AddRow(
 @Composable
 fun NoteDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var title by remember { mutableStateOf("") }
-    var body by remember { mutableStateOf("") }
+    var body by remember { mutableStateOf(TextFieldValue("")) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -186,12 +204,20 @@ fun NoteDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
                         .fillMaxWidth()
                         .heightIn(min = 130.dp),
                 )
+                TextButton(onClick = {
+                    val next = withNewTickBox(body.text)
+                    body = TextFieldValue(next, TextRange(next.length))
+                }) {
+                    Icon(Icons.Outlined.CheckBox, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add a tick box")
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(title, body) },
-                enabled = title.isNotBlank() || body.isNotBlank(),
+                onClick = { onSave(title, body.text) },
+                enabled = title.isNotBlank() || body.text.isNotBlank(),
             ) { Text("Save") }
         },
         dismissButton = {
@@ -625,7 +651,8 @@ private fun PdfPage(file: File, index: Int) {
 private fun TextViewer(item: VaultItem, store: VaultStore) {
     var text by remember(item.file.path) { mutableStateOf("") }
     var editing by remember(item.file.path) { mutableStateOf(false) }
-    var draft by remember(item.file.path) { mutableStateOf("") }
+    var draft by remember(item.file.path) { mutableStateOf(TextFieldValue("")) }
+    var newItem by remember(item.file.path) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(item.file.path) {
@@ -634,9 +661,25 @@ private fun TextViewer(item: VaultItem, store: VaultStore) {
         }
     }
 
+    /** Ticking a box or adding an item is saved straight away. */
+    fun change(updated: String) {
+        if (updated == text) return
+        text = updated
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { store.saveText(item, updated) } }
+        }
+    }
+
+    fun addItem() {
+        change(addChecklistItem(text, newItem))
+        newItem = ""
+    }
+
     Column(
         Modifier
             .fillMaxSize()
+            // Keeps the text and the "add item" field above the keyboard.
+            .imePadding()
             .padding(horizontal = 20.dp)
             .padding(bottom = 20.dp),
     ) {
@@ -647,7 +690,7 @@ private fun TextViewer(item: VaultItem, store: VaultStore) {
         ) {
             if (!editing) {
                 TextButton(onClick = {
-                    draft = text
+                    draft = TextFieldValue(text, TextRange(text.length))
                     editing = true
                 }) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -655,13 +698,23 @@ private fun TextViewer(item: VaultItem, store: VaultStore) {
                     Text("Edit")
                 }
             } else {
+                TextButton(onClick = {
+                    val next = withNewTickBox(draft.text)
+                    draft = TextFieldValue(next, TextRange(next.length))
+                }) {
+                    Icon(Icons.Outlined.CheckBox, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Tick box")
+                }
+                Spacer(Modifier.weight(1f))
                 TextButton(onClick = { editing = false }) { Text("Cancel") }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
-                    text = draft
+                    val saved = draft.text
+                    text = saved
                     editing = false
                     scope.launch {
-                        withContext(Dispatchers.IO) { store.saveText(item, draft) }
+                        withContext(Dispatchers.IO) { store.saveText(item, saved) }
                     }
                 }) { Text("Save") }
             }
@@ -677,19 +730,90 @@ private fun TextViewer(item: VaultItem, store: VaultStore) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
+            val lines = remember(text) { parseNoteLines(text) }
             Column(
                 Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
             ) {
-                SelectionContainer {
+                if (text.isBlank()) {
                     Text(
-                        text = text.ifBlank { "(Empty note)" },
+                        text = "(Empty note)",
+                        color = TextSoft,
                         style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = 24.sp,
                     )
                 }
+                // Ordinary lines are shown together as selectable text; each tick-box
+                // line becomes a row that can be tapped.
+                var index = 0
+                while (index < lines.size) {
+                    val line = lines[index]
+                    if (line.checked == null) {
+                        val start = index
+                        while (index < lines.size && lines[index].checked == null) index += 1
+                        val block = lines.subList(start, index).joinToString("\n") { it.text }
+                        if (block.isNotBlank()) {
+                            SelectionContainer {
+                                Text(
+                                    text = block,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    lineHeight = 24.sp,
+                                )
+                            }
+                        } else if (start > 0 && index < lines.size) {
+                            Spacer(Modifier.height(10.dp))
+                        }
+                    } else {
+                        val lineIndex = index
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { change(toggleNoteLine(text, lineIndex)) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = line.checked,
+                                onCheckedChange = { change(toggleNoteLine(text, lineIndex)) },
+                            )
+                            Text(
+                                text = line.text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (line.checked) TextSoft else Color.Unspecified,
+                                textDecoration = if (line.checked) TextDecoration.LineThrough else null,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = { change(removeNoteLine(text, lineIndex)) }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Remove item",
+                                    tint = TextSoft,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                        index += 1
+                    }
+                }
             }
+
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = newItem,
+                onValueChange = { newItem = it },
+                placeholder = { Text("Add a checklist item") },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Outlined.CheckBox, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { addItem() }, enabled = newItem.isNotBlank()) {
+                        Icon(Icons.Default.Add, contentDescription = "Add item")
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (newItem.isNotBlank()) addItem() }),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
