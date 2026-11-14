@@ -1,5 +1,8 @@
 package com.dudeapp.vault
 
+import android.text.format.DateUtils
+import android.app.TimePickerDialog
+import android.app.DatePickerDialog
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -54,6 +57,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Person
@@ -440,6 +444,21 @@ fun ChatScreen(
     var deleting by remember(chat.dir.absolutePath) { mutableStateOf<ChatMessage?>(null) }
     var pictureDialogOpen by remember(chat.dir.absolutePath) { mutableStateOf(false) }
     var photoViewer by remember { mutableStateOf<File?>(null) }
+    var reminders by remember { mutableStateOf(ReminderStore.list(context)) }
+    var remindingAbout by remember(chat.dir.absolutePath) { mutableStateOf<ChatMessage?>(null) }
+    // Android 13+ asks before P Vault may show notifications. The reminder is kept
+    // either way; without the permission it only appears as a pop-up inside the app.
+    val reminderPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                context,
+                "Notifications are off, so the reminder will only show inside P Vault.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var playingFile by remember { mutableStateOf<File?>(null) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
@@ -702,8 +721,22 @@ fun ChatScreen(
                         text = "1 selected",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.weight(1f),
                     )
+                    val hasReminder = reminders.any {
+                        it.messagePath == selectedMessage.file.absolutePath && !it.fired
+                    }
+                    TextButton(onClick = { remindingAbout = selectedMessage }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Alarm,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (hasReminder) "Reminder set" else "Remind me", fontSize = 13.sp)
+                    }
                     if (selectedMessage.type == ChatMessageType.TEXT) {
                         IconButton(onClick = {
                             editing = selectedMessage
@@ -897,6 +930,38 @@ fun ChatScreen(
         }
     }
 
+    val remindTarget = remindingAbout
+    if (remindTarget != null) {
+        val existing = reminders.firstOrNull {
+            it.messagePath == remindTarget.file.absolutePath && !it.fired
+        }
+        ReminderDialog(
+            existingAt = existing?.at,
+            onDismiss = { remindingAbout = null },
+            onRemove = {
+                existing?.let { Reminders.cancel(context, it) }
+                reminders = ReminderStore.list(context)
+                remindingAbout = null
+                selected = null
+                Toast.makeText(context, "Reminder removed", Toast.LENGTH_SHORT).show()
+            },
+            onPick = { at ->
+                Reminders.set(context, remindTarget, chat, at)
+                reminders = ReminderStore.list(context)
+                remindingAbout = null
+                selected = null
+                Toast.makeText(
+                    context,
+                    "Reminder set for " + reminderTimeLabel(context, at),
+                    Toast.LENGTH_LONG,
+                ).show()
+                if (!Reminders.canNotify(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    reminderPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+        )
+    }
+
     val deleteTarget = deleting
     if (deleteTarget != null) {
         AlertDialog(
@@ -908,6 +973,8 @@ fun ChatScreen(
                 TextButton(
                     onClick = {
                         if (store.deleteMessage(deleteTarget)) {
+                            Reminders.cancelFor(context, deleteTarget.file.absolutePath)
+                            reminders = ReminderStore.list(context)
                             messages = messages.filterNot { it.file == deleteTarget.file }
                             if (editing?.file == deleteTarget.file) {
                                 editing = null
@@ -1155,4 +1222,97 @@ private fun listTimeOf(context: Context, stamp: Long): String {
     } else {
         DateFormat.getDateFormat(context).format(Date(stamp))
     }
+}
+
+/** "Sat, 15 Nov, 9:00 am" in the phone's own date and time style. */
+internal fun reminderTimeLabel(context: Context, at: Long): String =
+    DateUtils.formatDateTime(
+        context,
+        at,
+        DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or
+            DateUtils.FORMAT_SHOW_WEEKDAY or DateUtils.FORMAT_ABBREV_ALL,
+    )
+
+/** Lets the user choose when to be reminded: a ready-made time, or any date and time. */
+@Composable
+private fun ReminderDialog(
+    existingAt: Long?,
+    onDismiss: () -> Unit,
+    onRemove: () -> Unit,
+    onPick: (Long) -> Unit,
+) {
+    val context = LocalContext.current
+    val options = remember { reminderOptions(System.currentTimeMillis()) }
+
+    fun pickDateAndTime() {
+        val start = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 1) }
+        val dates = DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                TimePickerDialog(
+                    context,
+                    { _, hour, minute ->
+                        val chosen = Calendar.getInstance().apply {
+                            set(year, month, day, hour, minute, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                        if (chosen <= System.currentTimeMillis()) {
+                            Toast.makeText(context, "Pick a time in the future", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onPick(chosen)
+                        }
+                    },
+                    start.get(Calendar.HOUR_OF_DAY),
+                    start.get(Calendar.MINUTE),
+                    DateFormat.is24HourFormat(context),
+                ).show()
+            },
+            start.get(Calendar.YEAR),
+            start.get(Calendar.MONTH),
+            start.get(Calendar.DAY_OF_MONTH),
+        )
+        dates.datePicker.minDate = System.currentTimeMillis() - 1_000
+        dates.show()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("Remind me about this") },
+        text = {
+            Column {
+                if (existingAt != null) {
+                    Text(
+                        "Reminder set for " + reminderTimeLabel(context, existingAt) + ". Pick a new time to change it.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                options.forEach { option ->
+                    ReminderChoice(option.label) { onPick(option.at) }
+                }
+                ReminderChoice("Pick date and time…") { pickDateAndTime() }
+                if (existingAt != null) {
+                    ReminderChoice("Remove reminder", MaterialTheme.colorScheme.error, onRemove)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ReminderChoice(label: String, color: Color = Color.Unspecified, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = color,
+        fontSize = 15.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 13.dp),
+    )
 }

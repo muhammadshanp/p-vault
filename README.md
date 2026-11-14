@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open.
 - **0.5.10** — Optional backup password: backups and exports are encrypted. Favourites, with a star on any file and a Favourites list on Home. Swipe left and right between photos. Dark start-up screen with the dark theme (Android 12+). Share several selected files (or reel links) at once. Settings switches are clearly visible and labelled On/Off.
 - **0.5.9** — The navigation pill moves with the page instantly, with no lag. Share and Download buttons on opened files. Pick several photos or PDFs at once. Sort Images, PDFs and Notes by date, name or size. Push notifications show the P Vault mark.
 - **0.5.8** — The navigation pill slides smoothly between tabs and follows your finger while swiping.
@@ -28,7 +29,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 - A clean white theme by default, with an optional flat Dark theme.
 - Import images (system photo picker) and PDFs (system file picker) — no storage permission needed.
 - Write, view and edit plain text notes.
-- A WhatsApp-style Chats view inside Notes. Create your own chats and add text, photo and voice messages (voice notes need the microphone permission). Give each chat its own picture from the photo icon in its header or the chat manager, and change or remove it from the same menu. Rename or delete chats from the edit button beside the Chats title. Every message has a saved tick; tap a message to select it, then edit or delete it. Messages stay on the device.
+- A WhatsApp-style Chats view inside Notes. Create your own chats and add text, photo and voice messages (voice notes need the microphone permission). Give each chat its own picture from the photo icon in its header or the chat manager, and change or remove it from the same menu. Rename or delete chats from the edit button beside the Chats title. Every message has a saved tick; tap a message to select it, then edit or delete it. **Remind me** on a selected message sets a reminder for a time you choose: a notification arrives then, or a pop-up if P Vault is open. Messages stay on the device.
 - Save Instagram Reels as links, organised into categories (Pending, Tech, AI, Anime, Others, plus your own). Links are validated before saving.
 - Share a reel from Instagram straight into P Vault; it opens the save dialog with Pending selected.
 - Browse in five tabs: Files, Reels, Images, PDFs, Notes. Search by title, filter reels by category.
@@ -181,4 +182,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.10 (versionCode 40).
+`com.dudeapp.vault` — version 0.5.11 (versionCode 41).

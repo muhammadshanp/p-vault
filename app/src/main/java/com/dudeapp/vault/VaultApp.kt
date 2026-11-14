@@ -683,6 +683,7 @@ fun VaultApp(
         scope.launch {
             val cleared = withContext(Dispatchers.IO) {
                 val ok = store.clearAll()
+                if (ok) Reminders.cancelAll(context)
                 if (ok) profileStore.clear()
                 ok
             }
@@ -1626,6 +1627,72 @@ Text("This adds everything from the selected backup to your vault. Files already
             },
             dismissButton = {
                 TextButton(onClick = { restorePasswordFor = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    // ---- Chat reminders ---------------------------------------------------
+    val reminderTick = ReminderCenter.tick.intValue
+    var dueReminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { Reminders.rearmAll(context) }
+    }
+    LaunchedEffect(reminderTick) {
+        dueReminders = withContext(Dispatchers.IO) {
+            ReminderStore.list(context).filter { it.fired }.sortedBy { it.at }
+        }
+    }
+    val dueReminder = dueReminders.firstOrNull()
+    if (dueReminder != null) {
+        val reminderChat = chats.firstOrNull { it.dir.absolutePath == dueReminder.chatDir }
+            ?: chats.firstOrNull { it.name == dueReminder.chatName }
+        fun finishReminder() {
+            Reminders.cancel(context, dueReminder)
+            dueReminders = dueReminders.filterNot { it.id == dueReminder.id }
+        }
+        AlertDialog(
+            onDismissRequest = { finishReminder() },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Reminder") },
+            text = {
+                Column {
+                    Text(
+                        text = dueReminder.chatName,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(text = dueReminder.text, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Set for " + reminderTimeLabel(context, dueReminder.at),
+                        color = TextSoft,
+                        fontSize = 12.sp,
+                    )
+                }
+            },
+            confirmButton = {
+                if (reminderChat != null) {
+                    TextButton(
+                        onClick = {
+                            finishReminder()
+                            settingsOpen = false
+                            inboxOpen = false
+                            open = null
+                            openChat = reminderChat
+                        },
+                    ) {
+                        Text("Open chat")
+                    }
+                } else {
+                    TextButton(onClick = { finishReminder() }) { Text("Done") }
+                }
+            },
+            dismissButton = {
+                if (reminderChat != null) {
+                    TextButton(onClick = { finishReminder() }) { Text("Done") }
+                }
             },
         )
     }
