@@ -840,6 +840,7 @@ fun VaultApp(
                 val ok = store.clearAll()
                 if (ok) Reminders.cancelAll(context)
                 if (ok) profileStore.clear()
+                if (ok) GoogleAccountStore(context).clear()
                 ok
             }
             if (!cleared) {
@@ -1588,6 +1589,34 @@ fun VaultApp(
                         restorePicker.launch(
                             BACKUP_MIME_TYPES,
                         )
+                    },
+                    onExternal = onExternal,
+                    onGoogleSignedIn = { user ->
+                        // Only fills gaps: a name or picture the user already chose is kept.
+                        var changed = false
+                        if (profile.name.isBlank() && user.name.isNotBlank()) {
+                            profileStore.setName(user.name.take(40))
+                            profile = profileStore.load()
+                            changed = true
+                        }
+                        if (changed) {
+                            autoBackupTick += 1
+                            driveStore.markPending()
+                        }
+                        if (profile.avatar == null && user.picture.isNotBlank()) {
+                            scope.launch {
+                                val saved = downloadGooglePicture(context, user.picture)?.let { file ->
+                                    withContext(Dispatchers.IO) {
+                                        profileStore.saveAvatar(Uri.fromFile(file)).also { file.delete() }
+                                    }
+                                }
+                                if (saved != null && profile.avatar == null) {
+                                    profile = profile.copy(avatar = saved)
+                                    autoBackupTick += 1
+                                    driveStore.markPending()
+                                }
+                            }
+                        }
                     },
                     onSave = { name ->
                         val changed = name != profile.name
