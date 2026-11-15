@@ -46,8 +46,8 @@ import org.json.JSONObject
  */
 
 internal const val SCOPE_DATASTORE = "https://www.googleapis.com/auth/datastore"
-private const val DOCS_ROOT = "projects/p-vault-app/databases/(default)/documents"
-private const val FIRESTORE = "https://firestore.googleapis.com/v1/$DOCS_ROOT"
+internal const val DOCS_ROOT = "projects/p-vault-app/databases/(default)/documents"
+internal const val FIRESTORE = "https://firestore.googleapis.com/v1/$DOCS_ROOT"
 private const val MAX_SPECIAL = 500
 
 /** A tidy lower-case address, or null when the text is not an email address. */
@@ -101,6 +101,9 @@ class AccessStore(private val context: Context) {
 
     /** True for the admin and for a signed-in address on the admin's list. */
     fun isSpecial(): Boolean = AdminStore(context).isAdmin() || prefs.getBoolean("special", false)
+
+    /** True only for a signed-in address on the admin's list; this is what Firebase checks too. */
+    fun isMember(): Boolean = prefs.getBoolean("special", false)
 
     fun clear() {
         prefs.edit().clear().apply()

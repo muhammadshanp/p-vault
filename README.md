@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.15** — People with special access can send a suggestion to the admin from the menu, with a screenshot or a short video (up to 10 MB). The admin reads them in the admin panel; each is deleted after 2 days.
 - **0.5.14** — Hold a photo, PDF or note to start selecting several, like a gallery. Optional "Sign in with Google" on the profile sheet; it fills in your name and picture. The admin can give special access to chosen Google addresses from the admin panel.
 - **0.5.13** — Copy a chat message. The camera permission is asked the first time you use Camera or Scan document.
 - **0.5.12** — Scan a document to PDF. Take a photo straight into the vault. The + button on Images and PDFs opens a menu (Scan, Camera, Files or Gallery). Tick boxes in notes. Notifications sent from the Firebase console also land in the bell list. Backup size limit (5 GB by default).
@@ -189,4 +190,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.14 (versionCode 44).
+`com.dudeapp.vault` — version 0.5.15 (versionCode 45).

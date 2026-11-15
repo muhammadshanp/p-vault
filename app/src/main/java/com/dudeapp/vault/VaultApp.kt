@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
@@ -235,7 +236,12 @@ fun VaultApp(
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     // Picks up special access given or removed by the admin since the last time.
-    LaunchedEffect(Unit) { AccessStore(context).refresh() }
+    var canSuggest by remember { mutableStateOf(AccessStore(context).isMember()) }
+    var suggestionOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        AccessStore(context).refresh()
+        canSuggest = AccessStore(context).isMember()
+    }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -848,6 +854,7 @@ fun VaultApp(
                 if (ok) profileStore.clear()
                 if (ok) GoogleAccountStore(context).clear()
                 if (ok) AccessStore(context).clear()
+                if (ok) canSuggest = false
                 ok
             }
             if (!cleared) {
@@ -1057,6 +1064,8 @@ fun VaultApp(
                     onSettings = { closeMenu { settingsOpen = true } },
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
+                    canSuggest = canSuggest,
+                    onSuggest = { closeMenu { suggestionOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1643,7 +1652,22 @@ fun VaultApp(
                             driveStore.markPending()
                         }
                     },
-                    onDismiss = { profileOpen = false },
+                    onDismiss = {
+                        profileOpen = false
+                        // Signing in or out on the sheet can change this.
+                        canSuggest = AccessStore(context).isMember()
+                    },
+                )
+            }
+
+            if (suggestionOpen) {
+                SuggestionDialog(
+                    onExternal = onExternal,
+                    onSent = {
+                        suggestionOpen = false
+                        Toast.makeText(context, "Suggestion sent. Thank you.", Toast.LENGTH_LONG).show()
+                    },
+                    onDismiss = { suggestionOpen = false },
                 )
             }
 
@@ -2456,6 +2480,8 @@ private fun MenuDrawer(
     onSettings: () -> Unit,
     isAdmin: Boolean,
     onAdmin: () -> Unit,
+    canSuggest: Boolean,
+    onSuggest: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -2491,6 +2517,9 @@ private fun MenuDrawer(
             onClick = onCheckUpdates,
             highlight = updateReady,
         )
+        if (canSuggest) {
+            MenuDrawerItem(Icons.Outlined.Lightbulb, "Give suggestion", onSuggest)
+        }
         MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
         if (isAdmin) {
             MenuDrawerItem(Icons.Outlined.AdminPanelSettings, "Admin panel", onAdmin)
