@@ -15,7 +15,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -408,6 +410,8 @@ fun VaultApp(
 
     fun toggleSelected(path: String) {
         selectedPaths = if (path in selectedPaths) selectedPaths - path else selectedPaths + path
+        // Like a gallery: unticking the last item leaves selection mode.
+        if (selectedPaths.isEmpty()) selecting = false
     }
 
     fun cancelSelection() {
@@ -1371,6 +1375,14 @@ fun VaultApp(
                                                 toggleSelected(item.file.absolutePath)
                                             } else {
                                                 open = item
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (selecting) {
+                                                toggleSelected(item.file.absolutePath)
+                                            } else {
+                                                selecting = true
+                                                selectedPaths = setOf(item.file.absolutePath)
                                             }
                                         },
                                     )
@@ -2769,19 +2781,21 @@ private fun addedMessage(added: Int, picked: Int, unit: String): String {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VaultCard(
     item: VaultItem,
     selected: Boolean,
     selecting: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val marked = selecting && selected
     Box(
         Modifier
             .aspectRatio(0.86f)
             .vaultCard(RoundedCornerShape(22.dp), marked)
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         when (item.type) {
             ItemType.IMAGE -> {
