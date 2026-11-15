@@ -15,7 +15,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -232,6 +234,8 @@ fun VaultApp(
     val inboxChange = PushInbox.changes.intValue
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
+    // Picks up special access given or removed by the admin since the last time.
+    LaunchedEffect(Unit) { AccessStore(context).refresh() }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -406,6 +410,8 @@ fun VaultApp(
 
     fun toggleSelected(path: String) {
         selectedPaths = if (path in selectedPaths) selectedPaths - path else selectedPaths + path
+        // Like a gallery: unticking the last item leaves selection mode.
+        if (selectedPaths.isEmpty()) selecting = false
     }
 
     fun cancelSelection() {
@@ -840,6 +846,8 @@ fun VaultApp(
                 val ok = store.clearAll()
                 if (ok) Reminders.cancelAll(context)
                 if (ok) profileStore.clear()
+                if (ok) GoogleAccountStore(context).clear()
+                if (ok) AccessStore(context).clear()
                 ok
             }
             if (!cleared) {
@@ -1369,6 +1377,14 @@ fun VaultApp(
                                                 open = item
                                             }
                                         },
+                                        onLongClick = {
+                                            if (selecting) {
+                                                toggleSelected(item.file.absolutePath)
+                                            } else {
+                                                selecting = true
+                                                selectedPaths = setOf(item.file.absolutePath)
+                                            }
+                                        },
                                     )
                                 }
                             }
@@ -1588,6 +1604,34 @@ fun VaultApp(
                         restorePicker.launch(
                             BACKUP_MIME_TYPES,
                         )
+                    },
+                    onExternal = onExternal,
+                    onGoogleSignedIn = { user ->
+                        // Only fills gaps: a name or picture the user already chose is kept.
+                        var changed = false
+                        if (profile.name.isBlank() && user.name.isNotBlank()) {
+                            profileStore.setName(user.name.take(40))
+                            profile = profileStore.load()
+                            changed = true
+                        }
+                        if (changed) {
+                            autoBackupTick += 1
+                            driveStore.markPending()
+                        }
+                        if (profile.avatar == null && user.picture.isNotBlank()) {
+                            scope.launch {
+                                val saved = downloadGooglePicture(context, user.picture)?.let { file ->
+                                    withContext(Dispatchers.IO) {
+                                        profileStore.saveAvatar(Uri.fromFile(file)).also { file.delete() }
+                                    }
+                                }
+                                if (saved != null && profile.avatar == null) {
+                                    profile = profile.copy(avatar = saved)
+                                    autoBackupTick += 1
+                                    driveStore.markPending()
+                                }
+                            }
+                        }
                     },
                     onSave = { name ->
                         val changed = name != profile.name
@@ -2737,19 +2781,21 @@ private fun addedMessage(added: Int, picked: Int, unit: String): String {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VaultCard(
     item: VaultItem,
     selected: Boolean,
     selecting: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val marked = selecting && selected
     Box(
         Modifier
             .aspectRatio(0.86f)
             .vaultCard(RoundedCornerShape(22.dp), marked)
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         when (item.type) {
             ItemType.IMAGE -> {

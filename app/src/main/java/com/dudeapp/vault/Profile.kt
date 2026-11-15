@@ -95,6 +95,8 @@ fun ProfileSheet(
     onDisconnectDrive: () -> Unit,
     onBackupNow: (String) -> Unit,
     onRestoreFile: () -> Unit,
+    onExternal: () -> Unit,
+    onGoogleSignedIn: (GoogleUser) -> Unit,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -122,7 +124,7 @@ fun ProfileSheet(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Stored on this phone. Drive backup is optional.",
+                text = "Stored on this phone. Google sign-in and Drive backup are optional.",
                 color = TextSoft,
                 fontSize = 13.sp,
                 modifier = Modifier.align(Alignment.Start),
@@ -167,6 +169,8 @@ fun ProfileSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(18.dp))
+            GoogleAccountSection(onExternal = onExternal, onSignedIn = onGoogleSignedIn)
+            Spacer(Modifier.height(12.dp))
             DriveBackupSection(
                 drive = drive,
                 onConnect = onConnectDrive,
