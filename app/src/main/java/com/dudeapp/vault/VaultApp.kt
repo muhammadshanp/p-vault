@@ -601,7 +601,7 @@ fun VaultApp(
         }
     }
 
-    fun launchScan() {
+    fun openScan() {
         val activity = context as? Activity
         if (activity == null) {
             Toast.makeText(context, "The scanner could not be opened", Toast.LENGTH_SHORT).show()
@@ -664,7 +664,7 @@ fun VaultApp(
         }
     }
 
-    fun launchCamera(asPdf: Boolean) {
+    fun openCamera(asPdf: Boolean) {
         cameraAsPdf = asPdf
         onExternal()
         runCatching {
@@ -674,6 +674,46 @@ fun VaultApp(
             Toast.makeText(context, "The camera could not be opened", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // Android asks for the camera the first time it is needed, not at start-up.
+    var afterCameraPermission by rememberSaveable { mutableStateOf("") }
+
+    fun runCameraAction(action: String) {
+        when (action) {
+            "scan" -> openScan()
+            "pdf" -> openCamera(asPdf = true)
+            "photo" -> openCamera(asPdf = false)
+        }
+    }
+
+    val cameraPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        val action = afterCameraPermission
+        afterCameraPermission = ""
+        if (granted) {
+            runCameraAction(action)
+        } else {
+            Toast.makeText(
+                context,
+                "P Vault needs the camera for this. You can allow it in Android's settings for P Vault.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    fun withCamera(action: String) {
+        if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            runCameraAction(action)
+        } else {
+            afterCameraPermission = action
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    fun launchScan() = withCamera("scan")
+
+    fun launchCamera(asPdf: Boolean) = withCamera(if (asPdf) "pdf" else "photo")
 
     fun pickChatAvatar(chat: ChatThread) {
         onExternal()

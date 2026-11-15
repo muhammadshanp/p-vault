@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.13** — Copy a chat message. The camera permission is asked the first time you use Camera or Scan document.
 - **0.5.12** — Scan a document to PDF. Take a photo straight into the vault. The + button on Images and PDFs opens a menu (Scan, Camera, Files or Gallery). Tick boxes in notes. Notifications sent from the Firebase console also land in the bell list. Backup size limit (5 GB by default).
 - **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open. A Reminders list (alarm button beside the Chats title) shows everything you set.
 - **0.5.10** — Optional backup password: backups and exports are encrypted. Favourites, with a star on any file and a Favourites list on Home. Swipe left and right between photos. Dark start-up screen with the dark theme (Android 12+). Share several selected files (or reel links) at once. Settings switches are clearly visible and labelled On/Off.
@@ -187,4 +188,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.12 (versionCode 42).
+`com.dudeapp.vault` — version 0.5.13 (versionCode 43).

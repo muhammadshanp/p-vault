@@ -1,5 +1,10 @@
 package com.dudeapp.vault
 
+import androidx.compose.material.icons.outlined.ContentCopy
+import android.os.PersistableBundle
+import android.content.ClipboardManager
+import android.content.ClipDescription
+import android.content.ClipData
 import android.text.format.DateUtils
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
@@ -717,14 +722,8 @@ fun ChatScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "1 selected",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.weight(1f),
-                    )
+                    // The buttons need the room, so the bar no longer spells out "1 selected".
+                    Spacer(Modifier.weight(1f))
                     val hasReminder = reminders.any {
                         it.messagePath == selectedMessage.file.absolutePath && !it.fired
                     }
@@ -736,6 +735,18 @@ fun ChatScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(if (hasReminder) "Reminder set" else "Remind me", fontSize = 13.sp)
+                    }
+                    if (selectedMessage.type == ChatMessageType.TEXT) {
+                        IconButton(onClick = {
+                            copyMessageText(context, selectedMessage.text)
+                            selected = null
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = "Copy message",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                     if (selectedMessage.type == ChatMessageType.TEXT) {
                         IconButton(onClick = {
@@ -1443,5 +1454,22 @@ fun RemindersSheet(
                 ).show()
             },
         )
+    }
+}
+
+/** Puts a message on the clipboard, marked private so Android does not show a preview of it. */
+private fun copyMessageText(context: Context, text: String) {
+    val copied = runCatching {
+        val clip = ClipData.newPlainText("P Vault message", text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            clip.description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
+    }.isSuccess
+    // Android 13+ shows its own "copied" note.
+    if (!copied || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        Toast.makeText(context, if (copied) "Copied" else "Could not copy", Toast.LENGTH_SHORT).show()
     }
 }
