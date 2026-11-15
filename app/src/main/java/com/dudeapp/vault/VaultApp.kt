@@ -232,6 +232,8 @@ fun VaultApp(
     val inboxChange = PushInbox.changes.intValue
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
+    // Picks up special access given or removed by the admin since the last time.
+    LaunchedEffect(Unit) { AccessStore(context).refresh() }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -841,6 +843,7 @@ fun VaultApp(
                 if (ok) Reminders.cancelAll(context)
                 if (ok) profileStore.clear()
                 if (ok) GoogleAccountStore(context).clear()
+                if (ok) AccessStore(context).clear()
                 ok
             }
             if (!cleared) {

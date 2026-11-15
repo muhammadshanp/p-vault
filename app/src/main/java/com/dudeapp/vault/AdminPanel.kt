@@ -94,7 +94,7 @@ class AdminStore(context: Context) {
 }
 
 /** Status code and response text, or null when there is no connection. */
-private suspend fun googleRequest(url: String, token: String, body: String?): Pair<Int, String>? =
+internal suspend fun googleRequest(url: String, token: String, body: String?): Pair<Int, String>? =
     withContext(Dispatchers.IO) {
         runCatching {
             val connection = URL(url).openConnection() as HttpURLConnection
@@ -185,7 +185,7 @@ fun AdminScreen(
     }
 
     /** Gets a Google pass for this account, showing Google's account screen when needed. */
-    fun withGoogle(next: (String) -> Unit) {
+    fun withGoogle(scopes: List<String> = listOf(SCOPE_MESSAGING, SCOPE_EMAIL), next: (String) -> Unit) {
         val host = activity
         if (host == null) {
             fail("Could not open Google sign-in.")
@@ -194,7 +194,7 @@ fun AdminScreen(
         busy = true
         error = null
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(Scope(SCOPE_MESSAGING), Scope(SCOPE_EMAIL)))
+            .setRequestedScopes(scopes.map { Scope(it) })
             .build()
         Identity.getAuthorizationClient(host).authorize(request)
             .addOnSuccessListener { result ->
@@ -356,6 +356,12 @@ fun AdminScreen(
                             }
                         }
                     }
+                    Spacer(Modifier.height(14.dp))
+                    SpecialAccessCard(
+                        busy = busy,
+                        withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
+                        onDone = { problem -> if (problem != null) fail(problem) else busy = false },
+                    )
                     Spacer(Modifier.height(14.dp))
                     Text(
                         "Signed in as ${email.orEmpty()}",

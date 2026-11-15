@@ -132,6 +132,8 @@ fun GoogleAccountSection(
     val scope = rememberCoroutineScope()
     val account = remember { GoogleAccountStore(context) }
     var email by remember { mutableStateOf(account.email()) }
+    val access = remember { AccessStore(context) }
+    var special by remember { mutableStateOf(access.isSpecial()) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -150,6 +152,7 @@ fun GoogleAccountSection(
                 email = user.email
                 busy = false
                 onSignedIn(user)
+                special = access.refresh()
             }
         }
     }
@@ -229,6 +232,8 @@ fun GoogleAccountSection(
                 TextButton(
                     onClick = {
                         account.clear()
+                        access.clear()
+                        special = access.isSpecial()
                         email = null
                         error = null
                     },
@@ -254,6 +259,15 @@ fun GoogleAccountSection(
                     Text("Sign in with Google", fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
+        if (special) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Special access is on for this account.",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
         }
         val problem = error
         if (problem != null) {

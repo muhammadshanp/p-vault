@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.14** — Optional "Sign in with Google" on the profile sheet; it fills in your name and picture.
+- **0.5.14** — Optional "Sign in with Google" on the profile sheet; it fills in your name and picture. The admin can give special access to chosen Google addresses from the admin panel.
 - **0.5.13** — Copy a chat message. The camera permission is asked the first time you use Camera or Scan document.
 - **0.5.12** — Scan a document to PDF. Take a photo straight into the vault. The + button on Images and PDFs opens a menu (Scan, Camera, Files or Gallery). Tick boxes in notes. Notifications sent from the Firebase console also land in the bell list. Backup size limit (5 GB by default).
 - **0.5.11** — Chat reminders: hold a message, tap **Remind me**, pick a time. A notification arrives then, or a pop-up if P Vault is open. A Reminders list (alarm button beside the Chats title) shows everything you set.
