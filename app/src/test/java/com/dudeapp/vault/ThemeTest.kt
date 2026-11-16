@@ -25,7 +25,7 @@ class ThemeTest {
 
     @Test
     fun aThemeNeedingAccessFallsBackToDark() {
-        val special = ThemePreset.all.first { it.special }
+        val special = ThemePreset.all.first { it.special && !it.adminOnly }
         assertEquals(special, special.forAccess(true))
         assertEquals(ThemePreset.DARK, special.forAccess(false))
         assertEquals(ThemePreset.DARK, special.withoutAccess())
@@ -39,7 +39,9 @@ class ThemeTest {
         assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(true, admin = false))
         assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
         // The admin always counts as having special access, so this is the single check.
-        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(false, admin = true))
+        // Both are needed: the flag on the theme and the owner's sign-in.
+        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(false, admin = true))
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
         // Nothing else is admin-only.
         ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { assertFalse(it.label, it.adminOnly) }
     }

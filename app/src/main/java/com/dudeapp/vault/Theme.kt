@@ -394,8 +394,8 @@ fun ThemePreset.withoutAccess(): ThemePreset =
     if (special || adminOnly) ThemePreset.DARK else this
 
 /**
- * The look to show now. [specialAccess] is the admin's list, [admin] the owner's own
- * sign-in; an admin-only look needs the second even when the first is granted.
+ * The look to show now. [specialAccess] is the admin's list (which always includes the
+ * admin), [admin] the owner's own sign-in; an admin-only look needs both.
  */
 fun ThemePreset.forAccess(specialAccess: Boolean, admin: Boolean = false): ThemePreset = when {
     adminOnly && !admin -> ThemePreset.DARK
