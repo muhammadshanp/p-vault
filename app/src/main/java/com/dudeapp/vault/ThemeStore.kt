@@ -230,17 +230,19 @@ fun RemoteBackdrop(picture: File, scrimColor: Color, scrim: Float) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to scrimColor.copy(alpha = scrim),
-                        0.45f to scrimColor.copy(alpha = scrim + 0.18f),
-                        1f to scrimColor,
+        if (scrim > 0f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to scrimColor.copy(alpha = scrim),
+                            0.45f to scrimColor.copy(alpha = scrim + 0.18f),
+                            1f to scrimColor,
+                        ),
                     ),
-                ),
-        )
+            )
+        }
     }
 }
 

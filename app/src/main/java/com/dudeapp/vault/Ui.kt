@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,12 +41,16 @@ fun accentOf(type: ItemType): Color = when (type) {
     ItemType.TEXT -> Accent.Note
 }
 
-/** The shared card look: a surface with a hairline border, or an accent ring when selected. */
+/**
+ * The shared card look: a surface with a hairline border, or an accent ring when selected.
+ * On the picture themes the surface is slightly see-through, so the background picture
+ * shows through the cards instead of being hidden behind them.
+ */
 @Composable
 fun Modifier.vaultCard(shape: Shape, marked: Boolean = false): Modifier =
     this
         .clip(shape)
-        .background(MaterialTheme.colorScheme.surface)
+        .background(MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha() + (if (marked) 0.1f else 0f)))
         .border(
             width = if (marked) 2.dp else 1.dp,
             color = if (marked) {
@@ -55,6 +60,28 @@ fun Modifier.vaultCard(shape: Shape, marked: Boolean = false): Modifier =
             },
             shape = shape,
         )
+
+/** How solid a card is: fully solid for plain themes, a little glassy on picture themes. */
+@Composable
+fun cardAlpha(): Float =
+    if (LocalThemePreset.current.backdrop is BackdropStyle.Plain) 1f else 0.78f
+
+/** A wash of the theme's accent over a card, strongest at the top left corner. */
+@Composable
+fun accentWash(accent: Color, strength: Float = 0.5f, shape: Shape): Modifier {
+    if (LocalThemePreset.current.backdrop is BackdropStyle.Plain) return this
+    return this.then(
+        Modifier
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    0f to accent.copy(alpha = 0.35f * strength),
+                    0.55f to accent.copy(alpha = 0.10f * strength),
+                    1f to Color.Transparent,
+                ),
+            ),
+    )
+}
 
 /** A tinted rounded square holding an icon. */
 @Composable
