@@ -60,9 +60,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** A look is offered only when this account has both special access and, if needed, admin. */
-private fun lockedFor(preset: ThemePreset, specialAccess: Boolean, admin: Boolean): Boolean =
-    (preset.special && !specialAccess) || (preset.adminOnly && !admin)
+/** A look is offered only when this account's level, and its shared looks, allow it. */
+private fun lockedFor(preset: ThemePreset, access: MyAccess): Boolean =
+    preset.special && (!access.theme || !access.allowsLook(preset.catalogId))
 
 /**
  * The look of the app: Light and Dark for everyone, and the picture looks for people with
@@ -71,9 +71,8 @@ private fun lockedFor(preset: ThemePreset, specialAccess: Boolean, admin: Boolea
 @Composable
 fun ThemesScreen(
     theme: ThemePreset,
-    specialAccess: Boolean,
-    /** The owner's own sign-in; a few looks are admin-only. */
-    admin: Boolean = false,
+    /** What this account may do: its level, its looks and its switches. */
+    access: MyAccess = MyAccess(),
     /** Opens the advanced page, where background and card pictures are chosen. */
     onAdvanced: () -> Unit = {},
     /** The advanced look in use, if any, so the entry can say so. */
@@ -134,7 +133,7 @@ fun ThemesScreen(
                                 color = TextSoft,
                                 fontSize = 13.sp,
                             )
-                            if (!specialAccess) {
+                            if (!access.theme) {
                                 Text(
                                     "Ask the admin for special access to unlock the other looks.",
                                     color = TextSoft,
@@ -143,7 +142,7 @@ fun ThemesScreen(
                             }
                             // Backgrounds and card pictures, kept apart, on their own page.
                             // The page is the admin's own, so the entry is hidden for everyone else.
-                            if (admin) {
+                            if (access.advanced) {
                             Spacer(Modifier.height(10.dp))
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
@@ -243,9 +242,9 @@ fun ThemesScreen(
                         ThemeOption(
                             preset = preset,
                             selected = preset == theme,
-                            locked = lockedFor(preset, specialAccess, admin),
+                            locked = lockedFor(preset, access),
                             onClick = {
-                                if (!lockedFor(preset, specialAccess, admin)) {
+                                if (!lockedFor(preset, access)) {
                                     onPick(preset)
                                     close()
                                 }
@@ -258,10 +257,10 @@ fun ThemesScreen(
                             preset = preset,
                             picture = themePicture(downloaded),
                             selected = preset.label == theme.label && preset.background == theme.background,
-                            locked = lockedFor(preset, specialAccess, admin),
+                            locked = lockedFor(preset, access),
                             badge = "New",
                             onClick = {
-                                if (specialAccess) {
+                                if (access.theme) {
                                     onPick(preset)
                                     close()
                                 }
@@ -434,10 +433,8 @@ private fun ThemeOption(
                 )
                 Text(
                     text = when {
-                        locked && preset.adminOnly -> "Admin only"
-                        locked -> "Special access"
+                        locked -> "Ask the admin for access"
                         badge != null -> "New · special"
-                        preset.adminOnly -> "Admin theme"
                         preset.special -> "Special theme"
                         else -> "Everyone"
                     },

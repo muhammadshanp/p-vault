@@ -144,12 +144,23 @@ private fun themeAt(entry: JSONObject?): DownloadedTheme? {
     )
 }
 
-/** True when this install may use the look: no list, or the signed-in address is on it. */
-internal fun DownloadedTheme.isAllowedFor(email: String?, specialAccess: Boolean): Boolean {
-    if (!specialAccess) return false
-    if (allowed.isEmpty()) return true
-    val who = email?.trim()?.lowercase() ?: return false
-    return who in allowed
+/**
+ * True when this install may use the look: the theme level is needed, and the look itself is
+ * either open to everyone with that level (an empty list) or shared with this address by the
+ * admin in the access list ([access]). The look's own `allowed` list still wins when set.
+ */
+internal fun DownloadedTheme.isAllowedFor(
+    email: String?,
+    themeLevel: Boolean,
+    access: MyAccess? = null,
+): Boolean {
+    if (!themeLevel) return false
+    if (adminOnly && access?.admin != true) return false
+    if (allowed.isNotEmpty()) {
+        val who = email?.trim()?.lowercase() ?: return false
+        return who in allowed
+    }
+    return access?.allowsLook(id) ?: true
 }
 
 /** Remembers the catalogue and the downloaded pictures, so it all works offline. */

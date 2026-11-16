@@ -25,9 +25,12 @@ class ThemeTest {
 
     @Test
     fun aThemeNeedingAccessFallsBackToDark() {
-        val special = ThemePreset.all.first { it.special && !it.adminOnly }
-        assertEquals(special, special.forAccess(true))
-        assertEquals(ThemePreset.DARK, special.forAccess(false))
+        // A picture look that is open to everyone with the theme level (not one shared by hand).
+        val special = ThemePreset.all.first { it.special && !it.adminOnly && it.cardPictures.isEmpty() }
+        val member = MyAccess(level = AccessLevel.THEME, looks = setOf(special.shareId()))
+        assertEquals(special, special.forAccess(member))
+        assertEquals(ThemePreset.DARK, special.forAccess(MyAccess()))
+        assertEquals(ThemePreset.DARK, special.forAccess(member.copy(level = AccessLevel.NONE)))
         assertEquals(ThemePreset.DARK, special.withoutAccess())
         assertEquals(ThemePreset.WHITE, ThemePreset.WHITE.withoutAccess())
     }
@@ -35,16 +38,17 @@ class ThemeTest {
     @Test
     fun moonlitIsOnlyForTheAdmin() {
         assertTrue(ThemePreset.MOONLIT.adminOnly)
-        // Special access alone is not enough; the owner's own sign-in is needed too.
-        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(true, admin = false))
-        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
-        // The admin always counts as having special access, so this is the single check.
-        // Both are needed: the flag on the theme and the owner's sign-in.
-        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(false, admin = true))
-        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
+        val owner = MyAccess(level = AccessLevel.EVERYTHING)
+        // Being on the list is not enough for a look marked admin-only...
+        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(owner))
+        // ...the owner's own sign-in is needed too.
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(owner, admin = true))
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(admin = true)))
+        // An owner with no level at all still has everything.
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(), admin = true))
         // Exactly these two are admin-only, and both also need special access.
         assertEquals(
-            listOf("Moonlit", "Nightfall"),
+            listOf("Moonlit"),
             ThemePreset.all.filter { it.adminOnly }.map { it.label }.sorted(),
         )
         assertTrue(ThemePreset.all.filter { it.adminOnly }.all { it.special })
@@ -61,9 +65,29 @@ class ThemeTest {
             look.cardPictures.keys,
         )
         assertTrue(look.cardPictures.values.all { it != 0 })
-        assertTrue(look.adminOnly)
+        // Shared by hand, look by look, not admin-only any more.
+        assertFalse(look.adminOnly)
+        assertEquals("nightfall", look.shareId())
         // No other look has card pictures, so nothing else can change by accident.
         ThemePreset.all.filter { it != look }.forEach { assertTrue(it.label, it.cardPictures.isEmpty()) }
+    }
+
+    @Test
+    fun anAdvancedLookIsOnlyShownWhenItIsShared() {
+        val look = ThemePreset.NIGHTFALL
+        val advanced = MyAccess(level = AccessLevel.ADVANCED)
+        // The level alone opens the page, not the look inside it.
+        assertTrue(advanced.advanced)
+        assertFalse(advanced.allowsLook(look.shareId()))
+        assertEquals(ThemePreset.DARK, look.forAccess(advanced))
+        val shared = advanced.copy(looks = setOf("nightfall"))
+        assertTrue(shared.allowsLook(look.shareId()))
+        assertEquals(look, look.forAccess(shared))
+        // Anybody above the theme level may be given it; nothing needs the admin.
+        assertEquals(look, look.forAccess(shared.copy(level = AccessLevel.EVERYTHING)))
+        assertFalse(shared.copy(level = AccessLevel.THEME).advanced)
+        // Moonlit is still the owner's own look, whatever is shared.
+        assertTrue(ThemePreset.MOONLIT.adminOnly)
     }
 
     @Test

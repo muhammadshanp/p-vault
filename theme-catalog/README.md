@@ -47,3 +47,11 @@ something newer builds understand; older builds then keep their last copy.
   those addresses. It is not strong protection: the file is public.
 - Deleting an entry removes the look at the next check; anyone using it drops back to Dark.
 - One picture per look, and only pictures — the app does not download video or fonts.
+
+## Shared by hand
+
+A look can also be given to one address at a time from the admin panel, whatever its
+`adminOnly` or `allowed` says. The admin ticks it under **Access per address → Looks shared
+with this address**; the app stores the look's id as `look_<id>` in `access/special`, as
+fingerprints only. In the app the id is the catalogue `id`, or the label in small letters for
+a look built into the app (`nightfall`).

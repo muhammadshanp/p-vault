@@ -148,6 +148,8 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
  */
 @Composable
 fun AdminScreen(
+    /** The catalogue looks the admin can share per address, by id and name. */
+    shareableLooks: List<Pair<String, String>> = emptyList(),
     onExternal: () -> Unit,
     onAdminChanged: () -> Unit,
     onBack: () -> Unit,
@@ -366,6 +368,7 @@ fun AdminScreen(
                     Spacer(Modifier.height(14.dp))
                     SpecialAccessCard(
                         busy = busy,
+                        shareableLooks = shareableLooks,
                         withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
                         onDone = { problem -> if (problem != null) fail(problem) else busy = false },
                     )

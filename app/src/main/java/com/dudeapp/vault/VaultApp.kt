@@ -242,12 +242,19 @@ fun VaultApp(
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     // Picks up special access given or removed by the admin since the last time.
-    var canSuggest by remember { mutableStateOf(AccessStore(context).isMember()) }
+    var canSuggest by remember { mutableStateOf(AccessStore(context).access().has(AccessFeature.SUGGESTIONS)) }
     var suggestionOpen by remember { mutableStateOf(false) }
-    // The picture themes are for special access; the admin always counts.
-    var specialAccess by remember { mutableStateOf(AccessStore(context).isSpecial()) }
+    // What this account may do: its level, its switches and the looks shared with it.
+    var access by remember { mutableStateOf(AccessStore(context).access()) }
+    val specialAccess = access.theme
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
+    // The photos this phone chose for its cards, one per card at most.
+    val cardPhotos = remember { CardPhotoStore(context) }
+    // Read as state, so a card redraws the moment its photo is chosen or removed.
+    val photoFiles by CardPhotoFiles.current
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { cardPhotos.publish() } }
+
     val themeStore = remember { ThemeStore(context) }
     // Looks that arrive from the theme catalogue, without a new app build.
     val catalogue = remember { ThemeCatalogue(context) }
@@ -256,9 +263,9 @@ fun VaultApp(
     var catalogProblem by remember { mutableStateOf<String?>(null) }
 
     // Only the looks this account may use, with their pictures downloaded for offline use.
-    LaunchedEffect(catalogThemes, specialAccess) {
+    LaunchedEffect(catalogThemes, access) {
         val email = GoogleAccountStore(context).email()
-        val mine = catalogThemes.filter { it.isAllowedFor(email, specialAccess) }
+        val mine = catalogThemes.filter { it.isAllowedFor(email, access.theme, access) }
         mine.forEach { catalogue.downloadPicture(it) }
         catalogue.tidy(mine)
     }
@@ -279,12 +286,12 @@ fun VaultApp(
     LaunchedEffect(Unit) { loadCatalogue(lookOnline = true) }
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
-        canSuggest = AccessStore(context).isMember()
-        specialAccess = AccessStore(context).isSpecial()
+        access = AccessStore(context).refresh()
+        canSuggest = access.has(AccessFeature.SUGGESTIONS)
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
-        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess, isAdmin)
+        val allowed = themeStore.load(catalogThemes).forAccess(access, isAdmin)
         if (allowed != theme) onThemeChange(allowed)
     }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
@@ -900,7 +907,7 @@ fun VaultApp(
                 if (ok) GoogleAccountStore(context).clear()
                 if (ok) AccessStore(context).clear()
                 if (ok) canSuggest = false
-                if (ok) specialAccess = false
+                if (ok) access = MyAccess()
                 ok
             }
             if (!cleared) {
@@ -1026,6 +1033,10 @@ fun VaultApp(
         InboxScreen(onBack = { inboxOpen = false })
     } else if (adminOpen) {
         AdminScreen(
+            shareableLooks = (
+                catalogThemes.map { it.id to it.label } +
+                    ThemePreset.all.filter { it.cardPictures.isNotEmpty() }.map { it.shareId() to it.label }
+                ).distinctBy { it.first },
             onExternal = onExternal,
             onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
             onBack = { adminOpen = false },
@@ -1033,18 +1044,32 @@ fun VaultApp(
     } else if (advancedThemesOpen) {
         AdvancedThemesScreen(
             theme = theme,
-            specialAccess = specialAccess,
-            admin = isAdmin,
+            access = access.copy(admin = isAdmin),
+            photos = photoFiles,
+            onPhoto = { kind, uri ->
+                if (uri != null) {
+                    scope.launch {
+                        if (cardPhotos.save(kind, uri)) {
+                            cardPhotos.publish()
+                        } else {
+                            Toast.makeText(context, "Could not save that photo", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            },
+            onClearPhoto = { kind ->
+                cardPhotos.clear(kind)
+                cardPhotos.publish()
+            },
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
-            specialAccess = specialAccess,
-            admin = isAdmin,
+            access = access.copy(admin = isAdmin),
             catalogThemes = catalogThemes.filter {
-                it.isAllowedFor(GoogleAccountStore(context).email(), specialAccess)
+                it.isAllowedFor(GoogleAccountStore(context).email(), access.theme, access)
             },
             refreshing = catalogRefreshing,
             catalogueProblem = catalogProblem,
@@ -1052,7 +1077,7 @@ fun VaultApp(
             onPick = onThemeChange,
             // The advanced looks are the admin's own; everyone else does not see the page.
             onAdvanced = {
-                if (isAdmin) {
+                if (access.copy(admin = isAdmin).advanced) {
                     themesOpen = false
                     advancedThemesOpen = true
                 }
@@ -1065,7 +1090,7 @@ fun VaultApp(
             theme = theme,
             settings = settings,
             update = availableUpdate,
-            specialAccess = specialAccess,
+            access = access,
             onTheme = onThemeChange,
             onThemes = {
                 settingsOpen = false
@@ -1148,7 +1173,7 @@ fun VaultApp(
                     onAdmin = { closeMenu { adminOpen = true } },
                     canSuggest = canSuggest,
                     onSuggest = { closeMenu { suggestionOpen = true } },
-                    canTheme = specialAccess,
+                    canTheme = access.theme,
                     onThemes = { closeMenu { themesOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
@@ -1740,9 +1765,8 @@ fun VaultApp(
                         profileOpen = false
                         // Signing in or out on the sheet can change this.
                         scope.launch {
-                            AccessStore(context).refresh()
-                            canSuggest = AccessStore(context).isMember()
-                            specialAccess = AccessStore(context).isSpecial()
+                            access = AccessStore(context).refresh()
+                            canSuggest = access.has(AccessFeature.SUGGESTIONS)
                         }
                     },
                 )
@@ -2329,7 +2353,8 @@ private fun HomeHero(total: Int) {
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     val shape = RoundedCornerShape(28.dp)
-    val heroPicture = preset.cardPictures[CardPicture.HERO]
+    val heroPhoto = CardPhotoFiles.current.value[CardPicture.HERO]
+    val heroPicture = if (heroPhoto != null) null else preset.cardPictures[CardPicture.HERO]
     val artwork = if (heroPicture != null) {
         remember(heroPicture) {
             BitmapFactory.decodeResource(context.resources, heroPicture)?.asImageBitmap()
@@ -2345,7 +2370,28 @@ private fun HomeHero(total: Int) {
             .clip(shape)
             .background(Brush.linearGradient(colors)),
     ) {
-        if (heroPicture != null && artwork != null) {
+        val ownPhotoArt = heroPhoto?.let { remember(it) { CardPictures.load(context.resources, null, it) } }
+        if (ownPhotoArt != null) {
+            // A photo of the user's own fills the card, cropped; the number and the label stay
+            // where they are, over a wash that keeps them readable.
+            Image(
+                bitmap = ownPhotoArt,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.5f),
+                            0.55f to Color.Black.copy(alpha = 0.15f),
+                            1f to Color.Black.copy(alpha = 0.45f),
+                        ),
+                    ),
+            )
+        } else if (heroPicture != null && artwork != null) {
             // A card picture of its own covers the whole card, cropped to fill, so any
             // picture works whatever its size; the card keeps its size and shape.
             Image(
@@ -2473,12 +2519,22 @@ private fun HomeTile(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(22.dp)
-    val picture = LocalThemePreset.current.cardPictures[kind]
+    val photo = CardPhotoFiles.current.value[kind]
+    // A photo of the user's own is the whole card; the theme's picture sits behind a wash.
+    val ownPhoto = photo != null
+    val picture = if (ownPhoto) null else LocalThemePreset.current.cardPictures[kind]
+    val overPicture = ownPhoto || picture != null
     // Over a picture the name and the count are white, whatever the theme's surface is.
     val onPicture = Color.White
     Column(
         modifier
-            .vaultCard(shape, picture = picture)
+            .vaultCard(
+                shape = shape,
+                picture = picture,
+                file = photo,
+                // Any picture on a tile is the card, with a wash over it for the label.
+                pictureIsCard = overPicture,
+            )
             .tileTint(tint, shape)
             .clickable(onClick = onClick)
             .padding(16.dp),
@@ -2488,15 +2544,15 @@ private fun HomeTile(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = if (picture != null) onPicture else Color.Unspecified,
-            fontWeight = if (picture != null) FontWeight.Bold else null,
+            color = if (overPicture) onPicture else Color.Unspecified,
+            fontWeight = if (overPicture) FontWeight.Bold else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = detail,
-            color = if (picture != null) onPicture.copy(alpha = 0.9f) else TextSoft,
+            color = if (overPicture) onPicture.copy(alpha = 0.9f) else TextSoft,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

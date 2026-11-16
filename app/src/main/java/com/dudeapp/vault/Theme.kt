@@ -353,11 +353,10 @@ class ThemePreset(
 
         /**
          * The first advanced look: a moon over pines behind the screen, and a separate
-         * picture inside every card. Only the admin may use it.
+         * picture inside every card. The admin gives it to an address by hand, one at a time.
          */
         val NIGHTFALL = ThemePreset(
         label = "Nightfall",
-        adminOnly = true,
         dark = true,
         primary = Color(0xFF9F7BFF),
         onPrimary = Color(0xFF14092E),
@@ -433,15 +432,19 @@ class ThemeStore(private val context: Context) {
 
 /** A look that needs access was chosen and that access is gone; go back to Dark. */
 fun ThemePreset.withoutAccess(): ThemePreset =
-    if (special || adminOnly) ThemePreset.DARK else this
+    if (special) ThemePreset.DARK else this
 
 /**
- * The look to show now. [specialAccess] is the admin's list (which always includes the
- * admin), [admin] the owner's own sign-in; an admin-only look needs both.
+ * The look to show now. A picture look needs the theme level from [access], and a look the
+ * admin shares one address at a time needs its id on that address's list. `adminOnly` is a
+ * second lock that predates the list: Moonlit still belongs to the owner alone.
  */
-fun ThemePreset.forAccess(specialAccess: Boolean, admin: Boolean = false): ThemePreset = when {
-    adminOnly && !admin -> ThemePreset.DARK
-    special && !specialAccess -> ThemePreset.DARK
+fun ThemePreset.forAccess(access: MyAccess, admin: Boolean = false): ThemePreset = when {
+    !special -> this
+    admin || access.admin -> this
+    adminOnly -> ThemePreset.DARK
+    !access.theme -> ThemePreset.DARK
+    !access.allowsLook(shareId()) -> ThemePreset.DARK
     else -> this
 }
 
@@ -597,6 +600,7 @@ fun Backdrop() {
 
 /** The active look, for the few places that need more than the colours (backdrop, glow). */
 val LocalThemePreset = compositionLocalOf { ThemePreset.WHITE }
+
 
 /** Every look downloaded from the theme catalogue, so pictures can be found by address. */
 val LocalDownloadedThemes = compositionLocalOf<List<DownloadedTheme>> { emptyList() }

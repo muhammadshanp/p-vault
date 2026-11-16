@@ -91,7 +91,7 @@ fun SettingsScreen(
     theme: ThemePreset,
     settings: AppSettings,
     update: AppUpdate?,
-    specialAccess: Boolean,
+    access: MyAccess,
     onTheme: (ThemePreset) -> Unit,
     onThemes: () -> Unit,
     onSettings: (AppSettings) -> Unit,
@@ -240,7 +240,7 @@ fun SettingsScreen(
                         Column(Modifier.weight(1f)) {
                             Text("More themes", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                             Text(
-                                if (specialAccess) {
+                                if (access.theme) {
                                     "Picture themes: Grand Line, Racing, Shinobi and more."
                                 } else {
                                     "Picture themes are locked. Ask the admin for special access."

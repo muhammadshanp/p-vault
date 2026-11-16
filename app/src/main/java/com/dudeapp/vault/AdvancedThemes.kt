@@ -1,6 +1,10 @@
 package com.dudeapp.vault
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -25,6 +29,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -37,19 +42,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.io.File
 
 /**
  * Advanced themes: the background and the card pictures are two separate choices.
@@ -61,11 +72,27 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun AdvancedThemesScreen(
     theme: ThemePreset,
-    specialAccess: Boolean,
-    admin: Boolean,
+    access: MyAccess,
     onPick: (ThemePreset) -> Unit,
+    /** The photos this phone has chosen, by card. */
+    photos: Map<CardPicture, File> = emptyMap(),
+    /** A photo was picked for one card; null when the picker was closed. */
+    onPhoto: (CardPicture, Uri?) -> Unit = { _, _ -> },
+    onClearPhoto: (CardPicture) -> Unit = {},
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    // The card the picker is open for, if any.
+    var picking by remember { mutableStateOf<CardPicture?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val kind = picking
+        picking = null
+        if (kind != null && uri != null) onPhoto(kind, uri)
+    }
+    fun pick(kind: CardPicture) {
+        picking = kind
+        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = { visible.targetState = false }
     LaunchedEffect(visible.isIdle, visible.currentState) {
@@ -108,15 +135,24 @@ fun AdvancedThemesScreen(
                 ) {
                     item {
                         Text(
-                            "These looks set the background of the app and the picture inside each card separately. " +
-                                "A card picture fills its card, cropped to fit, so any picture size works: the card stays the " +
-                                "same size and its label stays readable.",
+                            "A look sets the screen behind the app and the picture inside each card. " +
+                                "Any picture works at any size: it fills the card, cropped, and the card keeps the " +
+                                "same size as on every other theme, with its name and its count still on it.",
                             color = TextSoft,
                             fontSize = 13.sp,
                         )
                     }
+                    item {
+                        // One photo per card, chosen from this phone.
+                        CardPhotoCard(
+                            photos = photos,
+                            onPick = ::pick,
+                            onClear = onClearPhoto,
+                            enabled = access.theme,
+                        )
+                    }
                     items(advanced, key = { it.label }) { preset ->
-                        val locked = (preset.special && !specialAccess) || (preset.adminOnly && !admin)
+                        val locked = preset.special && (!access.theme || !access.allowsLook(preset.shareId()))
                         AdvancedOption(
                             preset = preset,
                             selected = preset.label == theme.label,
@@ -234,9 +270,7 @@ private fun AdvancedOption(
                 )
                 Text(
                     text = when {
-                        locked && preset.adminOnly -> "Admin only"
-                        locked -> "Special access"
-                        preset.adminOnly -> "Admin · background + card pictures"
+                        locked -> "Ask the admin for this look"
                         else -> "Background + card pictures"
                     },
                     color = preset.onSurfaceVariant,
@@ -271,7 +305,8 @@ private fun CardPreview(preset: ThemePreset, kind: CardPicture, height: androidx
             .border(1.dp, preset.outline, RoundedCornerShape(12.dp)),
     ) {
         if (picture != null) {
-            // The same as on Home: the picture fills the card, a wash keeps the label clear.
+            // The same as on Home: the picture is behind the card's content, and the card
+            // keeps its size and its labels.
             Image(
                 painter = painterResource(picture),
                 contentDescription = null,
@@ -283,12 +318,73 @@ private fun CardPreview(preset: ThemePreset, kind: CardPicture, height: androidx
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.30f),
-                            0.55f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.62f),
+                            0f to Color.Black.copy(alpha = 0.45f),
+                            0.55f to Color.Black.copy(alpha = 0.12f),
+                            1f to Color.Black.copy(alpha = 0.5f),
                         ),
                     ),
             )
         }
     }
+}
+
+/**
+ * One row per card, with the photo this phone chose for it. A chosen photo wins over the
+ * picture the look puts in the card; the card keeps its own size and its own labels.
+ */
+@Composable
+private fun CardPhotoCard(
+    photos: Map<CardPicture, File>,
+    onPick: (CardPicture) -> Unit,
+    onClear: (CardPicture) -> Unit,
+    enabled: Boolean,
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), shape)
+            .padding(16.dp),
+    ) {
+        Text("Photo for each card", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Pick a photo for any card. It sits behind the card's name, not in place of it, " +
+                "and the card stays the same size.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        CardPicture.entries.forEach { kind ->
+            val file = photos[kind]
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(cardPictureName(kind), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        if (file == null) "No photo · the look decides" else "Your photo",
+                        color = TextSoft,
+                        fontSize = 11.sp,
+                    )
+                }
+                if (file != null) {
+                    TextButton(onClick = { onClear(kind) }, enabled = enabled) {
+                        Text("Remove", fontSize = 12.sp)
+                    }
+                }
+                TextButton(onClick = { onPick(kind) }, enabled = enabled) {
+                    Text(if (file == null) "Choose" else "Change", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+/** The name of a card, as it is shown on Home. */
+internal fun cardPictureName(kind: CardPicture): String = when (kind) {
+    CardPicture.HERO -> "The big card on Home"
+    CardPicture.PHOTOS -> "Photos card"
+    CardPicture.PDFS -> "PDFs card"
+    CardPicture.NOTES -> "Notes and chats card"
+    CardPicture.REELS -> "Reels card"
 }
