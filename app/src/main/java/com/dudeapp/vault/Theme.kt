@@ -281,7 +281,7 @@ class ThemeStore(context: Context) {
 }
 
 /** A look that needs special access was chosen and that access is gone; go back to Dark. */
-fun ThemePreset.withoutAccess(): ThemePreset = if (special) ThemePreset.forAccess(false) else this
+fun ThemePreset.withoutAccess(): ThemePreset = if (special) ThemePreset.DARK else this
 
 /** The look to show now, given whether this phone has special access. */
 fun ThemePreset.forAccess(specialAccess: Boolean): ThemePreset =
