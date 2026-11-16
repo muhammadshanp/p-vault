@@ -57,6 +57,12 @@ data class DownloadedTheme(
     val scrim: Float,
     /** Only these addresses may use it; empty means everyone with special access. */
     val allowed: List<String>,
+    /** Only the admin may use it, on top of special access. */
+    val adminOnly: Boolean = false,
+    /** The extras of the "Moonlit" style look: artwork in the hero, glassy, tinted tiles. */
+    val heroArt: Boolean = false,
+    val glass: Boolean = false,
+    val tileTints: Boolean = false,
 ) {
     fun toPreset(): ThemePreset = ThemePreset(
         catalogId = id,
@@ -78,6 +84,10 @@ data class DownloadedTheme(
         gradient = listOf(primary, background),
         glow = primary,
         backdrop = pictureUrl?.let { BackdropStyle.Remote(it, scrim) } ?: BackdropStyle.Plain,
+        heroArt = heroArt,
+        glass = glass,
+        tileTints = tileTints,
+        adminOnly = adminOnly,
     )
 }
 
@@ -127,6 +137,10 @@ private fun themeAt(entry: JSONObject?): DownloadedTheme? {
         pictureUrl = entry.optString("picture").trim().takeIf { it.startsWith("http") },
         scrim = entry.optDouble("scrim", 0.4).toFloat().coerceIn(0.1f, 0.9f),
         allowed = allowed,
+        adminOnly = entry.optBoolean("adminOnly", false),
+        heroArt = entry.optBoolean("heroArt", false),
+        glass = entry.optBoolean("glass", false),
+        tileTints = entry.optBoolean("tileTints", false),
     )
 }
 

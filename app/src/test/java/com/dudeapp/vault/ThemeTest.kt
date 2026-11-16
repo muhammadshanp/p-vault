@@ -25,11 +25,43 @@ class ThemeTest {
 
     @Test
     fun aThemeNeedingAccessFallsBackToDark() {
-        val special = ThemePreset.all.first { it.special }
+        val special = ThemePreset.all.first { it.special && !it.adminOnly }
         assertEquals(special, special.forAccess(true))
         assertEquals(ThemePreset.DARK, special.forAccess(false))
         assertEquals(ThemePreset.DARK, special.withoutAccess())
         assertEquals(ThemePreset.WHITE, ThemePreset.WHITE.withoutAccess())
+    }
+
+    @Test
+    fun moonlitIsOnlyForTheAdmin() {
+        assertTrue(ThemePreset.MOONLIT.adminOnly)
+        // Special access alone is not enough; the owner's own sign-in is needed too.
+        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(true, admin = false))
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
+        // The admin always counts as having special access, so this is the single check.
+        // Both are needed: the flag on the theme and the owner's sign-in.
+        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(false, admin = true))
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
+        // Nothing else is admin-only.
+        ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { assertFalse(it.label, it.adminOnly) }
+    }
+
+    @Test
+    fun onlyTheMoonlitLookIsGlassy() {
+        val glassy = ThemePreset.all.filter { it.glass }
+        assertEquals(listOf(ThemePreset.MOONLIT), glassy)
+        // The extras belong together: glassy cards, tinted tiles and artwork in the hero.
+        assertTrue(ThemePreset.MOONLIT.tileTints)
+        assertTrue(ThemePreset.MOONLIT.heroArt)
+        ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { preset ->
+            assertFalse(preset.label, preset.glass || preset.tileTints || preset.heroArt)
+        }
+    }
+
+    @Test
+    fun moonlitHasItsOwnPicture() {
+        val style = ThemePreset.MOONLIT.backdrop
+        assertTrue(style is BackdropStyle.Picture)
     }
 
     @Test

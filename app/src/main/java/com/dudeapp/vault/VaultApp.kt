@@ -283,7 +283,7 @@ fun VaultApp(
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
-        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess)
+        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess, isAdmin)
         if (allowed != theme) onThemeChange(allowed)
     }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
@@ -1032,6 +1032,7 @@ fun VaultApp(
         ThemesScreen(
             theme = theme,
             specialAccess = specialAccess,
+            admin = isAdmin,
             catalogThemes = catalogThemes.filter {
                 it.isAllowedFor(GoogleAccountStore(context).email(), specialAccess)
             },
@@ -2305,7 +2306,8 @@ private fun HomeHero(total: Int) {
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     val shape = RoundedCornerShape(28.dp)
-    val artwork = themeArtwork(preset)
+    val artwork = if (preset.heroArt) themeArtwork(preset) else null
+    val fadeStart = if (preset.glass) 0.52f else 0.42f
     Box(
         Modifier
             .fillMaxWidth()
@@ -2333,7 +2335,7 @@ private fun HomeHero(total: Int) {
                     .background(
                         Brush.horizontalGradient(
                             0f to colors.first(),
-                            0.42f to colors.first().copy(alpha = 0.55f),
+                            fadeStart to colors.first().copy(alpha = 0.55f),
                             1f to Color.Transparent,
                         ),
                     ),
@@ -2419,9 +2421,11 @@ private fun HomeTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier
-            .vaultCard(RoundedCornerShape(22.dp))
+            .vaultCard(shape)
+            .tileTint(tint, shape)
             .clickable(onClick = onClick)
             .padding(16.dp),
     ) {
