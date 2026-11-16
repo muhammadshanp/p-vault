@@ -15,7 +15,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Delete
@@ -26,6 +25,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Timer
@@ -55,13 +55,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -90,7 +91,9 @@ fun SettingsScreen(
     theme: ThemePreset,
     settings: AppSettings,
     update: AppUpdate?,
+    specialAccess: Boolean,
     onTheme: (ThemePreset) -> Unit,
+    onThemes: () -> Unit,
     onSettings: (AppSettings) -> Unit,
     onUpdate: () -> Unit,
     backupProtected: Boolean,
@@ -208,7 +211,7 @@ fun SettingsScreen(
                             .padding(14.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        ThemePreset.entries.forEach { preset ->
+                        FREE_THEMES.forEach { preset ->
                             ThemeCard(
                                 preset = preset,
                                 selected = preset == theme,
@@ -216,6 +219,41 @@ fun SettingsScreen(
                                 modifier = Modifier.weight(1f),
                             )
                         }
+                    }
+                    // The picture themes live on their own page; it is in the menu for
+                    // people with special access, and reachable from here too.
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(onClick = onThemes)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Palette,
+                            contentDescription = null,
+                            tint = TextSoft,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("More themes", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            Text(
+                                if (specialAccess) {
+                                    "Picture themes: Grand Line, Racing, Shinobi and more."
+                                } else {
+                                    "Picture themes are locked. Ask the admin for special access."
+                                },
+                                color = TextSoft,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = TextSoft,
+                        )
                     }
                 }
 
@@ -479,6 +517,9 @@ fun SettingsScreen(
         )
     }
 }
+
+/** The looks on the Settings page; the rest are on the Themes page. */
+private val FREE_THEMES = listOf(ThemePreset.WHITE, ThemePreset.DARK)
 
 /** A small picture of the theme: page colour, a card, an accent dot. */
 @Composable

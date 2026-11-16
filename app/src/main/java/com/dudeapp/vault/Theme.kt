@@ -1,6 +1,8 @@
 package com.dudeapp.vault
 
 import android.content.Context
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,9 +14,14 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,8 +37,9 @@ val TextSoft: Color
     get() = MaterialTheme.colorScheme.onSurfaceVariant
 
 /**
- * Two presets. The coral accent matches the logo; the light theme uses a deeper coral so
- * white button text stays readable, and errors are a real red instead of the accent.
+ * The looks P Vault can wear. Light and Dark are free; the rest need special access.
+ * The coral accent matches the logo; the light theme uses a deeper coral so white button
+ * text stays readable, and errors are a real red instead of the accent.
  */
 enum class ThemePreset(
     val label: String,
@@ -48,6 +56,13 @@ enum class ThemePreset(
     val onSurfaceVariant: Color,
     val outline: Color,
     val error: Color,
+    /** A look that only people with special access can choose. */
+    val special: Boolean = false,
+    /** The vault card and the home strip; two colours, darker last. */
+    val gradient: List<Color>? = null,
+    /** Tints the shadow behind the floating bar's selected pill. */
+    val glow: Color? = null,
+    val backdrop: BackdropStyle = BackdropStyle.Plain,
 ) {
     WHITE(
         label = "Light",
@@ -81,11 +96,181 @@ enum class ThemePreset(
         outline = Color(0xFF2B2F38),
         error = Color(0xFFFF6B6B),
     ),
+
+    // The looks below need special access. Each keeps a plain background colour for the
+    // screens that are mostly text (settings, dialogs) and adds an accent, a glow for the
+    // vault card and a backdrop (picture and/or gradient) for the home screen, the tab
+    // strips and the floating bar.
+
+    MIDNIGHT(
+        label = "Midnight",
+        dark = true,
+        primary = Color(0xFF7C6BFF),
+        onPrimary = Color(0xFF0A0820),
+        primaryContainer = Color(0xFF241F52),
+        onPrimaryContainer = Color(0xFFCBC2FF),
+        secondary = Color(0xFF5B7BFF),
+        background = Color(0xFF08080F),
+        surface = Color(0xFF12121C),
+        surfaceVariant = Color(0xFF1D1D2A),
+        onBackground = Color(0xFFF1F1F7),
+        onSurfaceVariant = Color(0xFFA0A0B4),
+        outline = Color(0xFF26263A),
+        error = Color(0xFFFF6B6B),
+        special = true,
+        gradient = listOf(Color(0xFF6C4BFF), Color(0xFF1B1038)),
+        glow = Color(0xFF4B33D6),
+        backdrop = BackdropStyle.Picture(R.drawable.bg_animegirl, scrim = 0.45f),
+    ),
+    RACING(
+        label = "Racing",
+        dark = true,
+        primary = Color(0xFFE10600),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFF3A0705),
+        onPrimaryContainer = Color(0xFFFFB3AD),
+        secondary = Color(0xFFFF3B30),
+        background = Color(0xFF050505),
+        surface = Color(0xFF101012),
+        surfaceVariant = Color(0xFF1A1A1D),
+        onBackground = Color(0xFFF4F4F6),
+        onSurfaceVariant = Color(0xFFA2A2AA),
+        outline = Color(0xFF26262B),
+        error = Color(0xFFFF5A4D),
+        special = true,
+        gradient = listOf(Color(0xFFE10600), Color(0xFF1A0100)),
+        glow = Color(0xFFE10600),
+        backdrop = BackdropStyle.Picture(R.drawable.bg_grandprix, scrim = 0.35f),
+    ),
+    GRAND_LINE(
+        label = "Grand Line",
+        dark = true,
+        primary = Color(0xFFFFC53D),
+        onPrimary = Color(0xFF241A00),
+        primaryContainer = Color(0xFF3B2A05),
+        onPrimaryContainer = Color(0xFFFFE1A0),
+        secondary = Color(0xFFE5484D),
+        background = Color(0xFF0B0806),
+        surface = Color(0xFF171210),
+        surfaceVariant = Color(0xFF221B17),
+        onBackground = Color(0xFFF8F2EA),
+        onSurfaceVariant = Color(0xFFAF9F92),
+        outline = Color(0xFF302520),
+        error = Color(0xFFFF6B5E),
+        special = true,
+        gradient = listOf(Color(0xFFE5484D), Color(0xFF2A0A06)),
+        glow = Color(0xFFB3261E),
+        backdrop = BackdropStyle.Picture(R.drawable.bg_strawhat, scrim = 0.4f),
+    ),
+    SHINOBI(
+        label = "Shinobi",
+        dark = true,
+        primary = Color(0xFFFF8A1F),
+        onPrimary = Color(0xFF201000),
+        primaryContainer = Color(0xFF3D2008),
+        onPrimaryContainer = Color(0xFFFFC98A),
+        secondary = Color(0xFF4C7DFF),
+        background = Color(0xFF08090C),
+        surface = Color(0xFF121418),
+        surfaceVariant = Color(0xFF1C1F25),
+        onBackground = Color(0xFFF3F4F7),
+        onSurfaceVariant = Color(0xFF9CA1AC),
+        outline = Color(0xFF272B33),
+        error = Color(0xFFFF6B5E),
+        special = true,
+        gradient = listOf(Color(0xFFFF8A1F), Color(0xFF2A1400)),
+        glow = Color(0xFFC25A00),
+        backdrop = BackdropStyle.Picture(R.drawable.bg_ninja, scrim = 0.4f),
+    ),
+    SAKURA(
+        label = "Sakura",
+        dark = false,
+        primary = Color(0xFFD6336C),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFFFE3EC),
+        onPrimaryContainer = Color(0xFF7A1738),
+        secondary = Color(0xFFB02A5B),
+        background = Color(0xFFFDF5F8),
+        surface = Color(0xFFFFFFFF),
+        surfaceVariant = Color(0xFFF7E8EE),
+        onBackground = Color(0xFF1D1418),
+        onSurfaceVariant = Color(0xFF7A6670),
+        outline = Color(0xFFEFD9E2),
+        error = Color(0xFFC0392B),
+        special = true,
+        gradient = listOf(Color(0xFFF06A9B), Color(0xFFE8457A)),
+        glow = Color(0xFFF2A7C3),
+    ),
+    FOREST(
+        label = "Forest",
+        dark = true,
+        primary = Color(0xFF34C77B),
+        onPrimary = Color(0xFF04180D),
+        primaryContainer = Color(0xFF0E3521),
+        onPrimaryContainer = Color(0xFFB6F2D0),
+        secondary = Color(0xFF7BD389),
+        background = Color(0xFF07100B),
+        surface = Color(0xFF0F1A13),
+        surfaceVariant = Color(0xFF17251B),
+        onBackground = Color(0xFFEFF6F1),
+        onSurfaceVariant = Color(0xFF97AC9D),
+        outline = Color(0xFF1F2E24),
+        error = Color(0xFFFF6B6B),
+        special = true,
+        gradient = listOf(Color(0xFF2FB86F), Color(0xFF0B2A18)),
+        glow = Color(0xFF1E7A47),
+    ),
+    GOLD(
+        label = "Gold",
+        dark = true,
+        primary = Color(0xFFE3B341),
+        onPrimary = Color(0xFF1C1500),
+        primaryContainer = Color(0xFF3A2E08),
+        onPrimaryContainer = Color(0xFFFFE7A3),
+        secondary = Color(0xFFD4A017),
+        background = Color(0xFF0A0A0A),
+        surface = Color(0xFF141414),
+        surfaceVariant = Color(0xFF1E1C17),
+        onBackground = Color(0xFFF6F4EF),
+        onSurfaceVariant = Color(0xFFA9A395),
+        outline = Color(0xFF2A2722),
+        error = Color(0xFFFF6B5E),
+        special = true,
+        gradient = listOf(Color(0xFFD9A83A), Color(0xFF6B4E10)),
+        glow = Color(0xFF8A6A1E),
+    ),
+    OCEAN(
+        label = "Ocean",
+        dark = true,
+        primary = Color(0xFF2EC4D6),
+        onPrimary = Color(0xFF00171A),
+        primaryContainer = Color(0xFF073038),
+        onPrimaryContainer = Color(0xFFA8EEF6),
+        secondary = Color(0xFF3B82F6),
+        background = Color(0xFF050C12),
+        surface = Color(0xFF0E1720),
+        surfaceVariant = Color(0xFF14222E),
+        onBackground = Color(0xFFEEF5F9),
+        onSurfaceVariant = Color(0xFF93A8B6),
+        outline = Color(0xFF1B2A36),
+        error = Color(0xFFFF6B6B),
+        special = true,
+        gradient = listOf(Color(0xFF1C9EC9), Color(0xFF062A45)),
+        glow = Color(0xFF0F6E8C),
+    ),
+}
+
+/** What sits behind the app: a flat colour, a picture, or a picture over a gradient. */
+sealed class BackdropStyle {
+    data object Plain : BackdropStyle()
+
+    class Picture(@DrawableRes val image: Int, val scrim: Float = 0.35f) : BackdropStyle()
 }
 
 class ThemeStore(context: Context) {
     private val prefs = context.getSharedPreferences("dude_theme", Context.MODE_PRIVATE)
 
+    /** The saved look, or Light when there is none or the stored name is unknown. */
     fun load(): ThemePreset =
         runCatching { ThemePreset.valueOf(prefs.getString("preset", "").orEmpty()) }
             .getOrDefault(ThemePreset.WHITE)
@@ -94,6 +279,13 @@ class ThemeStore(context: Context) {
         prefs.edit().putString("preset", preset.name).apply()
     }
 }
+
+/** A look that needs special access was chosen and that access is gone; go back to Dark. */
+fun ThemePreset.withoutAccess(): ThemePreset = if (special) ThemePreset.forAccess(false) else this
+
+/** The look to show now, given whether this phone has special access. */
+fun ThemePreset.forAccess(specialAccess: Boolean): ThemePreset =
+    if (special && !specialAccess) ThemePreset.DARK else this
 
 @Composable
 fun PVaultTheme(
@@ -140,12 +332,14 @@ fun PVaultTheme(
         surfaceContainerLowest = if (preset.dark) preset.background else Color.White,
     )
     MaterialTheme(colorScheme = colors, typography = VaultTypography, shapes = VaultShapes) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = colors.background,
-            contentColor = colors.onBackground,
-        ) {
-            content()
+        CompositionLocalProvider(LocalThemePreset provides preset) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = colors.background,
+                contentColor = colors.onBackground,
+            ) {
+                content()
+            }
         }
     }
 }
@@ -174,12 +368,41 @@ private val VaultShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
-/** A flat app background; colour comes from the active theme. */
+/**
+ * The app background. A plain colour for Light and Dark; a picture behind a dark wash for
+ * the special looks, so text and cards stay readable on top of it.
+ */
 @Composable
 fun Backdrop() {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    )
+    val preset = LocalThemePreset.current
+    when (val style = preset.backdrop) {
+        is BackdropStyle.Plain -> Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        )
+
+        is BackdropStyle.Picture -> Box(Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(style.image),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to preset.background.copy(alpha = style.scrim),
+                            0.45f to preset.background.copy(alpha = style.scrim + 0.18f),
+                            1f to preset.background,
+                        ),
+                    ),
+            )
+        }
+    }
 }
+
+/** The active look, for the few places that need more than the colours (backdrop, glow). */
+val LocalThemePreset = compositionLocalOf { ThemePreset.WHITE }

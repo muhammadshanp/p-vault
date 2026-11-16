@@ -56,7 +56,8 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        theme = themeStore.load()
+        // A special look is only shown while this phone still has special access.
+        theme = themeStore.load().forAccess(AccessStore(this).isSpecial())
         applyNightMode(theme.dark)
         val settings = settingsStore.load()
         needsLockChoice = !settings.lockChoiceMade && !Auth.hasPin(this)
@@ -157,6 +158,12 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         external = false
+        // Special access can be taken away while the app is in the background.
+        val allowed = themeStore.load().forAccess(AccessStore(this).isSpecial())
+        if (allowed != theme) {
+            theme = allowed
+            applyNightMode(allowed.dark)
+        }
         if (needsLockChoice || needsSetup) {
             locked = false
             return
