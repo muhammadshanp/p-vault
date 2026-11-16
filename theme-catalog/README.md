@@ -32,6 +32,9 @@ The app downloads that address when it starts and when **New themes → Check** 
 | `onBackground`, `onSurfaceVariant` | Text and quiet text |
 | `outline`, `error` | Hairlines and error red |
 | `picture`, `scrim` | Optional background picture and how dark it sits |
+| `heroArt` | `true` to put the picture inside the big Home card, on its right side |
+| `glass` | `true` for slightly see-through cards (lets the picture show through) |
+| `tileTints` | `true` to give the four Home tiles a wash of their own colour |
 | `allowed` | Optional list of email addresses. Only those accounts see the look; leave it out for everyone with special access. |
 
 `minVersion` is the lowest P Vault version that can show the file. Raise it only if you use

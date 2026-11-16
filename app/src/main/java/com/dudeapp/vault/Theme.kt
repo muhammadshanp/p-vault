@@ -66,13 +66,19 @@ class ThemePreset(
     /** Tints the shadow behind the floating bar's selected pill. */
     val glow: Color? = null,
     val backdrop: BackdropStyle = BackdropStyle.Plain,
+    /** The picture also sits inside the hero card on Home. */
+    val heroArt: Boolean = false,
+    /** Cards are slightly see-through, so the backdrop shows through them. */
+    val glass: Boolean = false,
+    /** The four Home tiles take a wash of their own colour. */
+    val tileTints: Boolean = false,
 ) {
 
     companion object {
 
         /** Every look inside this build, in the order the theme page shows them. */
         val all: List<ThemePreset>
-            get() = listOf(WHITE, DARK, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
+            get() = listOf(WHITE, DARK, MOONLIT, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
 
         val WHITE = ThemePreset(
         label = "Light",
@@ -310,6 +316,31 @@ class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFF1C9EC9), Color(0xFF062A45)),
         glow = Color(0xFF0F6E8C),
+        )
+
+        /** The look of the reference picture: violet night, glassy cards, artwork in the hero. */
+        val MOONLIT = ThemePreset(
+        label = "Moonlit",
+        dark = true,
+        primary = Color(0xFF8B5CF6),
+        onPrimary = Color(0xFF120B2A),
+        primaryContainer = Color(0xFF2A1B52),
+        onPrimaryContainer = Color(0xFFD5C8FF),
+        secondary = Color(0xFFA78BFA),
+        background = Color(0xFF08060F),
+        surface = Color(0xFF121020),
+        surfaceVariant = Color(0xFF1D1A2E),
+        onBackground = Color(0xFFF2EFFA),
+        onSurfaceVariant = Color(0xFFA79FBF),
+        outline = Color(0xFF2A2540),
+        error = Color(0xFFFF6B6B),
+        special = true,
+        gradient = listOf(Color(0xFF6D28D9), Color(0xFF2A1052)),
+        glow = Color(0xFF7C3AED),
+        backdrop = BackdropStyle.Picture(R.drawable.bg_moonlit, scrim = 0.5f),
+        heroArt = true,
+        glass = true,
+        tileTints = true,
         )
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,7 +50,7 @@ fun accentOf(type: ItemType): Color = when (type) {
 fun Modifier.vaultCard(shape: Shape, marked: Boolean = false): Modifier =
     this
         .clip(shape)
-        .background(MaterialTheme.colorScheme.surface)
+        .background(MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()))
         .border(
             width = if (marked) 2.dp else 1.dp,
             color = if (marked) {
@@ -59,6 +60,28 @@ fun Modifier.vaultCard(shape: Shape, marked: Boolean = false): Modifier =
             },
             shape = shape,
         )
+
+/**
+ * How solid a card is. Only the glassy looks (Moonlit) let the backdrop through; every
+ * other theme keeps fully opaque cards.
+ */
+@Composable
+fun cardAlpha(): Float = if (LocalThemePreset.current.glass) 0.72f else 1f
+
+/** A wash of one of the section colours, for the tinted look; nothing on other themes. */
+@Composable
+fun Modifier.tileTint(tint: Color, shape: Shape): Modifier {
+    if (!LocalThemePreset.current.tileTints) return this
+    return this
+        .clip(shape)
+        .background(
+            Brush.linearGradient(
+                0f to tint.copy(alpha = 0.34f),
+                0.6f to tint.copy(alpha = 0.12f),
+                1f to tint.copy(alpha = 0.04f),
+            ),
+        )
+}
 
 /** A tinted rounded square holding an icon. */
 @Composable

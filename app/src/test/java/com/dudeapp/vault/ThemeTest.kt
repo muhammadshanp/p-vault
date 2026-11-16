@@ -33,6 +33,24 @@ class ThemeTest {
     }
 
     @Test
+    fun onlyTheMoonlitLookIsGlassy() {
+        val glassy = ThemePreset.all.filter { it.glass }
+        assertEquals(listOf(ThemePreset.MOONLIT), glassy)
+        // The extras belong together: glassy cards, tinted tiles and artwork in the hero.
+        assertTrue(ThemePreset.MOONLIT.tileTints)
+        assertTrue(ThemePreset.MOONLIT.heroArt)
+        ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { preset ->
+            assertFalse(preset.label, preset.glass || preset.tileTints || preset.heroArt)
+        }
+    }
+
+    @Test
+    fun moonlitHasItsOwnPicture() {
+        val style = ThemePreset.MOONLIT.backdrop
+        assertTrue(style is BackdropStyle.Picture)
+    }
+
+    @Test
     fun pictureLooksHaveABackdrop() {
         ThemePreset.GRAND_LINE.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
         ThemePreset.RACING.backdrop.let { assertTrue(it is BackdropStyle.Picture) }

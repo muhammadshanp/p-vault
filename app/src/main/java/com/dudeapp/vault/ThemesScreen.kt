@@ -235,6 +235,21 @@ private fun ThemeOption(
                 .background(preset.background),
         ) {
             val style = preset.backdrop
+            if (picture == null && style is BackdropStyle.Picture) {
+                // A look that ships with its own artwork: show that, so the preview looks
+                // like the theme rather than a flat square.
+                Image(
+                    painter = painterResource(style.image),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(preset.background.copy(alpha = style.scrim * 0.6f)),
+                )
+            }
             if (picture != null) {
                 Image(
                     bitmap = picture.asImageBitmap(),
@@ -280,7 +295,9 @@ private fun ThemeOption(
                                 .weight(1f)
                                 .height(24.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(preset.surface)
+                                .background(
+                                    if (preset.glass) preset.surface.copy(alpha = 0.72f) else preset.surface,
+                                )
                                 .border(1.dp, preset.outline, RoundedCornerShape(8.dp)),
                         )
                     }

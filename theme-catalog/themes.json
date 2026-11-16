@@ -18,6 +18,23 @@
       "outline": "#31281B",
       "error": "#FF6B5E",
       "scrim": 0.5
+    },
+    {
+      "id": "moonlit",
+      "label": "Moonlit",
+      "dark": true,
+      "primary": "#8B5CF6",
+      "onPrimary": "#120B2A",
+      "secondary": "#A78BFA",
+      "background": "#08060F",
+      "surface": "#121020",
+      "onBackground": "#F2EFFA",
+      "onSurfaceVariant": "#A79FBF",
+      "outline": "#2A2540",
+      "scrim": 0.5,
+      "heroArt": true,
+      "glass": true,
+      "tileTints": true
     }
   ]
 }
