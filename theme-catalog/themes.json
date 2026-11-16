@@ -1,0 +1,23 @@
+{
+  "minVersion": "0.5.17",
+  "themes": [
+    {
+      "id": "wanted",
+      "label": "Wanted",
+      "dark": true,
+      "primary": "#E2B04A",
+      "onPrimary": "#1B1408",
+      "primaryContainer": "#3A2C10",
+      "onPrimaryContainer": "#F7E0A8",
+      "secondary": "#B8862F",
+      "background": "#14100A",
+      "surface": "#1E1810",
+      "surfaceVariant": "#2A2216",
+      "onBackground": "#F5EBD8",
+      "onSurfaceVariant": "#B3A48A",
+      "outline": "#31281B",
+      "error": "#FF6B5E",
+      "scrim": 0.5
+    }
+  ]
+}
