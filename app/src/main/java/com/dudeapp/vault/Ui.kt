@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.runtime.remember
+import java.io.File
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -54,19 +56,34 @@ fun accentOf(type: ItemType): Color = when (type) {
  * selected. Cards are opaque on every theme, including the picture ones: the picture sits
  * behind the screen and inside the cards, never through them.
  *
- * [picture] is a card image painted inside the card, on its right side, fading into the
- * card colour. It is a separate layer from the screen backdrop, so a look can use both.
+ * [picture] and [file] are a picture behind the card's content: a card image from the app,
+ * or a photo this phone chose. They are a separate layer from the screen backdrop, so a look
+ * can use both. On a transparent card the picture is the card; on any other it sits behind
+ * a wash, and the card keeps its own colour and its own size.
  */
 @Composable
 fun Modifier.vaultCard(
     shape: Shape,
     marked: Boolean = false,
     @DrawableRes picture: Int? = null,
+    file: File? = null,
+    /** True when the picture is the whole card, with the labels on top of it. */
+    pictureIsCard: Boolean = false,
 ): Modifier =
     this
         .clip(shape)
-        .background(MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()))
-        .cardPicture(shape, picture)
+        // A photo of the user's own is the card: the labels sit on it, with a wash to read by.
+        .background(
+            if (pictureIsCard) {
+                Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.15f), 1f to Color.Black.copy(alpha = 0.55f))
+            } else {
+                Brush.verticalGradient(
+                    MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()) to
+                        MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()),
+                )
+            },
+        )
+        .cardPicture(shape, picture, file)
         .border(
             width = if (marked) 2.dp else 1.dp,
             color = if (marked) {
@@ -78,47 +95,64 @@ fun Modifier.vaultCard(
         )
 
 /**
- * The picture inside a card: it covers the whole card, cropped to fill it, so any picture
- * can be used whatever its size. The card keeps its shape, its size and its border, and a
- * soft dark wash keeps the label readable over the picture.
+ * The picture behind a card. It is drawn like a background: it covers the card, cropped to
+ * fill (never stretched), and everything the card already draws — the name, the count, the
+ * icons — stays on top of it. So the card is the same card as on every other theme, with a
+ * picture behind its content.
  *
- * The picture is scaled like ContentScale.Crop: it fills the card without stretching, and
- * the extra is trimmed equally on both sides.
+ * [picture] is a picture built into the app; [file] is a photo this phone chose.
  */
 @Composable
-private fun Modifier.cardPicture(shape: Shape, picture: Int?): Modifier {
-    if (picture == null) return this
+fun Modifier.cardPicture(
+    shape: Shape,
+    @DrawableRes picture: Int? = null,
+    file: File? = null,
+): Modifier {
+    if (picture == null && file == null) return this
     val res = LocalContext.current.resources
-    val isDark = LocalThemePreset.current.dark
-    // Over a picture the label needs help: dark text on light pictures and the reverse.
-    val wash = if (isDark) Color.Black else Color.White
+    val cached = remember(picture, file) { CardPictures.load(res, picture, file) }
+    if (cached == null) return this
     return this.drawWithCache {
-        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
-        val image = BitmapFactory.decodeResource(res, picture, options)?.asImageBitmap()
         onDrawWithContent {
-            drawContent()
-            if (image == null || image.width == 0 || image.height == 0) return@onDrawWithContent
-            val scale = maxOf(size.width / image.width, size.height / image.height)
-            val width = image.width * scale
-            val height = image.height * scale
+            // The picture first, then whatever the card draws, so no label is ever covered.
+            val scale = maxOf(size.width / cached.width, size.height / cached.height)
+            val width = cached.width * scale
+            val height = cached.height * scale
             drawImage(
-                image = image,
+                image = cached,
                 srcOffset = IntOffset.Zero,
-                srcSize = IntSize(image.width, image.height),
+                srcSize = IntSize(cached.width, cached.height),
                 dstOffset = IntOffset(((size.width - width) / 2f).toInt(), ((size.height - height) / 2f).toInt()),
                 dstSize = IntSize(width.toInt() + 1, height.toInt() + 1),
                 filterQuality = FilterQuality.Medium,
             )
-            // A gentle gradient at the bottom and behind the text keeps every label legible,
-            // whichever part of the picture happens to be light.
-            drawRect(
-                brush = Brush.verticalGradient(
-                    0f to wash.copy(alpha = if (isDark) 0.30f else 0.25f),
-                    0.55f to Color.Transparent,
-                    1f to wash.copy(alpha = if (isDark) 0.62f else 0.55f),
-                ),
-            )
+            drawContent()
         }
+    }
+}
+
+/** Reads a card picture once and keeps it while the card is on screen. */
+internal object CardPictures {
+    private val cache = object : LinkedHashMap<String, ImageBitmap?>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap?>?) = size > 12
+    }
+
+    fun load(res: android.content.res.Resources, @DrawableRes picture: Int?, file: File?): ImageBitmap? {
+        val key = when {
+            file != null -> "f:" + file.absolutePath + ":" + file.length()
+            picture != null -> "r:" + picture
+            else -> return null
+        }
+        cache[key]?.let { return it }
+        val bitmap = runCatching {
+            if (file != null) {
+                BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = 2 })
+            } else {
+                BitmapFactory.decodeResource(res, picture!!, BitmapFactory.Options().apply { inSampleSize = 2 })
+            }?.asImageBitmap()
+        }.getOrNull()
+        cache[key] = bitmap
+        return bitmap
     }
 }
 

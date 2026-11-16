@@ -249,6 +249,12 @@ fun VaultApp(
     val specialAccess = access.theme
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
+    // The photos this phone chose for its cards, one per card at most.
+    val cardPhotos = remember { CardPhotoStore(context) }
+    // Read as state, so a card redraws the moment its photo is chosen or removed.
+    val photoFiles by CardPhotoFiles.current
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { cardPhotos.publish() } }
+
     val themeStore = remember { ThemeStore(context) }
     // Looks that arrive from the theme catalogue, without a new app build.
     val catalogue = remember { ThemeCatalogue(context) }
@@ -1039,6 +1045,22 @@ fun VaultApp(
         AdvancedThemesScreen(
             theme = theme,
             access = access.copy(admin = isAdmin),
+            photos = photoFiles,
+            onPhoto = { kind, uri ->
+                if (uri != null) {
+                    scope.launch {
+                        if (cardPhotos.save(kind, uri)) {
+                            cardPhotos.publish()
+                        } else {
+                            Toast.makeText(context, "Could not save that photo", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            },
+            onClearPhoto = { kind ->
+                cardPhotos.clear(kind)
+                cardPhotos.publish()
+            },
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
@@ -2331,7 +2353,8 @@ private fun HomeHero(total: Int) {
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     val shape = RoundedCornerShape(28.dp)
-    val heroPicture = preset.cardPictures[CardPicture.HERO]
+    val heroPhoto = CardPhotoFiles.current.value[CardPicture.HERO]
+    val heroPicture = if (heroPhoto != null) null else preset.cardPictures[CardPicture.HERO]
     val artwork = if (heroPicture != null) {
         remember(heroPicture) {
             BitmapFactory.decodeResource(context.resources, heroPicture)?.asImageBitmap()
@@ -2347,7 +2370,27 @@ private fun HomeHero(total: Int) {
             .clip(shape)
             .background(Brush.linearGradient(colors)),
     ) {
-        if (heroPicture != null && artwork != null) {
+        if (heroPhoto != null) {
+            // A photo of the user's own fills the card, cropped; the number and the label stay
+            // where they are, over a wash that keeps them readable.
+            Image(
+                bitmap = remember(heroPhoto) { CardPictures.load(context.resources, null, heroPhoto) },
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.5f),
+                            0.55f to Color.Black.copy(alpha = 0.15f),
+                            1f to Color.Black.copy(alpha = 0.45f),
+                        ),
+                    ),
+            )
+        } else if (heroPicture != null && artwork != null) {
             // A card picture of its own covers the whole card, cropped to fill, so any
             // picture works whatever its size; the card keeps its size and shape.
             Image(
@@ -2475,12 +2518,21 @@ private fun HomeTile(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(22.dp)
-    val picture = LocalThemePreset.current.cardPictures[kind]
+    val photo = CardPhotoFiles.current.value[kind]
+    // A photo of the user's own is the whole card; the theme's picture sits behind a wash.
+    val ownPhoto = photo != null
+    val picture = if (ownPhoto) null else LocalThemePreset.current.cardPictures[kind]
+    val overPicture = ownPhoto || picture != null
     // Over a picture the name and the count are white, whatever the theme's surface is.
     val onPicture = Color.White
     Column(
         modifier
-            .vaultCard(shape, picture = picture)
+            .vaultCard(
+                shape = shape,
+                picture = picture,
+                file = photo,
+                pictureIsCard = ownPhoto,
+            )
             .tileTint(tint, shape)
             .clickable(onClick = onClick)
             .padding(16.dp),
@@ -2490,15 +2542,15 @@ private fun HomeTile(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = if (picture != null) onPicture else Color.Unspecified,
-            fontWeight = if (picture != null) FontWeight.Bold else null,
+            color = if (overPicture) onPicture else Color.Unspecified,
+            fontWeight = if (overPicture) FontWeight.Bold else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = detail,
-            color = if (picture != null) onPicture.copy(alpha = 0.9f) else TextSoft,
+            color = if (overPicture) onPicture.copy(alpha = 0.9f) else TextSoft,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
