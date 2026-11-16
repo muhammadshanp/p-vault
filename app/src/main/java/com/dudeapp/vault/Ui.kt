@@ -75,11 +75,15 @@ fun Modifier.vaultCard(
         // A photo of the user's own is the card: the labels sit on it, with a wash to read by.
         .background(
             if (pictureIsCard) {
-                Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.15f), 1f to Color.Black.copy(alpha = 0.55f))
+                Brush.verticalGradient(
+                    listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.55f)),
+                )
             } else {
                 Brush.verticalGradient(
-                    MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()) to
+                    listOf(
                         MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()),
+                        MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()),
+                    ),
                 )
             },
         )
@@ -110,8 +114,8 @@ fun Modifier.cardPicture(
 ): Modifier {
     if (picture == null && file == null) return this
     val res = LocalContext.current.resources
-    val cached = remember(picture, file) { CardPictures.load(res, picture, file) }
-    if (cached == null) return this
+    val loaded = remember(picture, file) { CardPictures.load(res, picture, file) }
+    val cached = loaded ?: return this
     return this.drawWithCache {
         onDrawWithContent {
             // The picture first, then whatever the card draws, so no label is ever covered.

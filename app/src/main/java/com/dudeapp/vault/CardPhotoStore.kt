@@ -61,11 +61,11 @@ class CardPhotoStore(private val context: Context) {
 
     fun clearAll() {
         CardPicture.entries.forEach { clear(it) }
-        current.value = emptyMap()
+        CardPhotoFiles.current.value = emptyMap()
     }
 
     /** Reads what is saved and makes it the choice every card sees. */
     fun publish() {
-        current.value = chosen().associateWith { file(it)!! }
+        CardPhotoFiles.current.value = chosen().associateWith { file(it)!! }
     }
 }
