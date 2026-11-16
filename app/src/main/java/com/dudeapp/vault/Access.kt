@@ -152,7 +152,7 @@ data class AccessDocument(
             everything = keep(everything, atLeast(AccessLevel.EVERYTHING)),
             // The parameter keeps its name; the stored map is reached through `this`.
             features = keepGroup(this.features, this.features.keys + features),
-            looks = keepGroup(looks, looks.map { it.trim().lowercase() }.toSet()),
+            looks = keepGroup(this.looks, looks.map { it.trim().lowercase() }.toSet()),
         )
     }
 
