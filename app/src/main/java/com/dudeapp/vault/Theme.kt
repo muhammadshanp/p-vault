@@ -74,13 +74,18 @@ class ThemePreset(
     val glass: Boolean = false,
     /** The four Home tiles take a wash of their own colour. */
     val tileTints: Boolean = false,
+    /**
+     * A picture inside each kind of card, on top of the backdrop picture: a look whose
+     * background and cards are designed separately.
+     */
+    val cardPictures: Map<CardPicture, Int> = emptyMap(),
 ) {
 
     companion object {
 
         /** Every look inside this build, in the order the theme page shows them. */
         val all: List<ThemePreset>
-            get() = listOf(WHITE, DARK, MOONLIT, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
+            get() = listOf(WHITE, DARK, NIGHTFALL, MOONLIT, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
 
         val WHITE = ThemePreset(
         label = "Light",
@@ -345,8 +350,45 @@ class ThemePreset(
         glass = true,
         tileTints = true,
         )
+
+        /**
+         * The first advanced look: a moon over pines behind the screen, and a separate
+         * picture inside every card. Only the admin may use it.
+         */
+        val NIGHTFALL = ThemePreset(
+        label = "Nightfall",
+        adminOnly = true,
+        dark = true,
+        primary = Color(0xFF9F7BFF),
+        onPrimary = Color(0xFF14092E),
+        primaryContainer = Color(0xFF2E1B57),
+        onPrimaryContainer = Color(0xFFDCCFFF),
+        secondary = Color(0xFFB79CFF),
+        background = Color(0xFF09060F),
+        surface = Color(0xFF14101F),
+        surfaceVariant = Color(0xFF1E1830),
+        onBackground = Color(0xFFF3EFFA),
+        onSurfaceVariant = Color(0xFFA9A0C0),
+        outline = Color(0xFF2B2440),
+        error = Color(0xFFFF6B6B),
+        special = true,
+        gradient = listOf(Color(0xFF7C3AED), Color(0xFF3B1069)),
+        glow = Color(0xFF8B5CF6),
+        backdrop = BackdropStyle.Picture(R.drawable.adv_bg, scrim = 0.42f),
+        glass = true,
+        cardPictures = mapOf(
+        CardPicture.HERO to R.drawable.adv_hero,
+        CardPicture.PHOTOS to R.drawable.adv_photos,
+        CardPicture.PDFS to R.drawable.adv_pdfs,
+        CardPicture.NOTES to R.drawable.adv_notes,
+        CardPicture.REELS to R.drawable.adv_reels,
+        ),
+        )
     }
 }
+
+/** The kinds of card that can carry their own picture. */
+enum class CardPicture { HERO, PHOTOS, PDFS, NOTES, REELS }
 
 /** What sits behind the app: a flat colour, a picture, or a picture over a gradient. */
 sealed class BackdropStyle {

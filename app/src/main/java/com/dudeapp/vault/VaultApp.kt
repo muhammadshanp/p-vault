@@ -247,6 +247,7 @@ fun VaultApp(
     // The picture themes are for special access; the admin always counts.
     var specialAccess by remember { mutableStateOf(AccessStore(context).isSpecial()) }
     var themesOpen by remember { mutableStateOf(false) }
+    var advancedThemesOpen by remember { mutableStateOf(false) }
     val themeStore = remember { ThemeStore(context) }
     // Looks that arrive from the theme catalogue, without a new app build.
     val catalogue = remember { ThemeCatalogue(context) }
@@ -1002,7 +1003,8 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen && !themesOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen &&
+            !themesOpen && !advancedThemesOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -1028,6 +1030,14 @@ fun VaultApp(
             onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
             onBack = { adminOpen = false },
         )
+    } else if (advancedThemesOpen) {
+        AdvancedThemesScreen(
+            theme = theme,
+            specialAccess = specialAccess,
+            admin = isAdmin,
+            onPick = onThemeChange,
+            onBack = { advancedThemesOpen = false },
+        )
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
@@ -1040,6 +1050,14 @@ fun VaultApp(
             catalogueProblem = catalogProblem,
             onRefresh = { loadCatalogue(lookOnline = true) },
             onPick = onThemeChange,
+            // The advanced looks are the admin's own; everyone else does not see the page.
+            onAdvanced = {
+                if (isAdmin) {
+                    themesOpen = false
+                    advancedThemesOpen = true
+                }
+            },
+            advancedInUse = theme.cardPictures.isNotEmpty(),
             onBack = { themesOpen = false },
         )
     } else if (settingsOpen) {
@@ -2212,6 +2230,7 @@ private fun HomeContent(
                         title = "Photos",
                         detail = countLabel(images, "photo"),
                         onClick = { onOpenTab(Tab.IMAGES) },
+                        kind = CardPicture.PHOTOS,
                         modifier = Modifier.weight(1f),
                     )
                     HomeTile(
@@ -2220,6 +2239,7 @@ private fun HomeContent(
                         title = "PDFs",
                         detail = countLabel(pdfs, "PDF"),
                         onClick = { onOpenTab(Tab.PDFS) },
+                        kind = CardPicture.PDFS,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2230,6 +2250,7 @@ private fun HomeContent(
                         title = "Notes & chats",
                         detail = "${countLabel(notes, "note")} · ${countLabel(chats.size, "chat")}",
                         onClick = { onOpenTab(Tab.NOTES) },
+                        kind = CardPicture.NOTES,
                         modifier = Modifier.weight(1f),
                     )
                     HomeTile(
@@ -2238,6 +2259,7 @@ private fun HomeContent(
                         title = "Reels",
                         detail = countLabel(reels.size, "reel"),
                         onClick = { onOpenTab(Tab.REELS) },
+                        kind = CardPicture.REELS,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2303,10 +2325,20 @@ private fun HomeContent(
 
 @Composable
 private fun HomeHero(total: Int) {
+    val context = LocalContext.current
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     val shape = RoundedCornerShape(28.dp)
-    val artwork = if (preset.heroArt) themeArtwork(preset) else null
+    val heroPicture = preset.cardPictures[CardPicture.HERO]
+    val artwork = if (heroPicture != null) {
+        remember(heroPicture) {
+            BitmapFactory.decodeResource(context.resources, heroPicture)?.asImageBitmap()
+        }
+    } else if (preset.heroArt) {
+        themeArtwork(preset)
+    } else {
+        null
+    }
     val fadeStart = if (preset.glass) 0.52f else 0.42f
     Box(
         Modifier
@@ -2414,6 +2446,8 @@ private fun themeArtwork(preset: ThemePreset): ImageBitmap? {
 
 @Composable
 private fun HomeTile(
+    /** Which card picture this tile takes on an advanced look. */
+    kind: CardPicture,
     icon: ImageVector,
     tint: Color,
     title: String,
@@ -2422,9 +2456,10 @@ private fun HomeTile(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(22.dp)
+    val picture = LocalThemePreset.current.cardPictures[kind]
     Column(
         modifier
-            .vaultCard(shape)
+            .vaultCard(shape, picture = picture)
             .tileTint(tint, shape)
             .clickable(onClick = onClick)
             .padding(16.dp),

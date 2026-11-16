@@ -1,5 +1,7 @@
 package com.dudeapp.vault
 
+import android.graphics.BitmapFactory
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,12 +19,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -44,13 +52,21 @@ fun accentOf(type: ItemType): Color = when (type) {
 /**
  * The shared card look: a solid surface with a hairline border, or an accent ring when
  * selected. Cards are opaque on every theme, including the picture ones: the picture sits
- * behind the screen and inside the hero card, never through the cards.
+ * behind the screen and inside the cards, never through them.
+ *
+ * [picture] is a card image painted inside the card, on its right side, fading into the
+ * card colour. It is a separate layer from the screen backdrop, so a look can use both.
  */
 @Composable
-fun Modifier.vaultCard(shape: Shape, marked: Boolean = false): Modifier =
+fun Modifier.vaultCard(
+    shape: Shape,
+    marked: Boolean = false,
+    @DrawableRes picture: Int? = null,
+): Modifier =
     this
         .clip(shape)
         .background(MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()))
+        .cardPicture(shape, picture)
         .border(
             width = if (marked) 2.dp else 1.dp,
             color = if (marked) {
@@ -60,6 +76,44 @@ fun Modifier.vaultCard(shape: Shape, marked: Boolean = false): Modifier =
             },
             shape = shape,
         )
+
+/** The picture inside a card, on its right, fading into the card colour on the left. */
+@Composable
+private fun Modifier.cardPicture(shape: Shape, picture: Int?): Modifier {
+    if (picture == null) return this
+    val background = MaterialTheme.colorScheme.surface
+    val res = LocalContext.current.resources
+    return this.drawWithCache {
+        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+        val image = BitmapFactory.decodeResource(res, picture, options)?.asImageBitmap()
+        onDrawWithContent {
+            drawContent()
+            if (image == null || image.width == 0 || image.height == 0) return@onDrawWithContent
+            // Fill the right 72% of the card, cropped like ContentScale.Crop.
+            val targetLeft = size.width * 0.28f
+            val targetWidth = size.width - targetLeft
+            val scale = maxOf(targetWidth / image.width, size.height / image.height)
+            val width = image.width * scale
+            val height = image.height * scale
+            drawImage(
+                image = image,
+                srcOffset = IntOffset.Zero,
+                srcSize = IntSize(image.width, image.height),
+                dstOffset = IntOffset((size.width - width).toInt(), ((size.height - height) / 2f).toInt()),
+                dstSize = IntSize(width.toInt(), height.toInt()),
+                filterQuality = FilterQuality.Medium,
+            )
+            // Blend the picture into the card colour on its left edge.
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    0.22f to background,
+                    0.55f to background.copy(alpha = 0.45f),
+                    0.88f to Color.Transparent,
+                ),
+            )
+        }
+    }
+}
 
 /**
  * How solid a card is. Only the glassy looks (Moonlit) let the backdrop through; every
