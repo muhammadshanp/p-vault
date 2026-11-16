@@ -128,11 +128,9 @@ fun Modifier.cardPicture(
                 // name and the count sit, and lighter in the middle so the photo shows.
                 drawRect(
                     brush = Brush.verticalGradient(
-                        listOf(
-                            0f to Color.Black.copy(alpha = 0.45f),
-                            0.55f to Color.Black.copy(alpha = 0.12f),
-                            1f to Color.Black.copy(alpha = 0.5f),
-                        ),
+                        0f to Color.Black.copy(alpha = 0.45f),
+                        0.55f to Color.Black.copy(alpha = 0.12f),
+                        1f to Color.Black.copy(alpha = 0.5f),
                     ),
                 )
             }
