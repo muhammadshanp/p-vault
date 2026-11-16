@@ -27,7 +27,7 @@ class ThemeTest {
     fun aThemeNeedingAccessFallsBackToDark() {
         // A picture look that is open to everyone with the theme level (not one shared by hand).
         val special = ThemePreset.all.first { it.special && !it.adminOnly && it.cardPictures.isEmpty() }
-        val member = MyAccess(level = AccessLevel.THEME)
+        val member = MyAccess(level = AccessLevel.THEME, looks = setOf(special.shareId()))
         assertEquals(special, special.forAccess(member))
         assertEquals(ThemePreset.DARK, special.forAccess(MyAccess()))
         assertEquals(ThemePreset.DARK, special.forAccess(member.copy(level = AccessLevel.NONE)))
