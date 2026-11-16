@@ -150,8 +150,8 @@ data class AccessDocument(
             theme = keep(theme, atLeast(AccessLevel.THEME)),
             advanced = keep(advanced, atLeast(AccessLevel.ADVANCED)),
             everything = keep(everything, atLeast(AccessLevel.EVERYTHING)),
-            // The parameter keeps its name; the stored map is reached through `this`.
-            features = keepGroup(this.features, this.features.keys + features),
+            // Only what is passed stays: the stored map is reached through `this`.
+            features = keepGroup(this.features, features.filter { level.member }.toSet()),
             looks = keepGroup(this.looks, looks.map { it.trim().lowercase() }.toSet()),
         )
     }
