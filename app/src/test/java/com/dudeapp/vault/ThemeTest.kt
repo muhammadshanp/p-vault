@@ -42,8 +42,12 @@ class ThemeTest {
         // Both are needed: the flag on the theme and the owner's sign-in.
         assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(false, admin = true))
         assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
-        // Nothing else is admin-only.
-        ThemePreset.all.filter { !it.adminOnly }.forEach { assertTrue(it.label, it.special) }
+        // Exactly these two are admin-only, and both also need special access.
+        assertEquals(
+            listOf("Moonlit", "Nightfall"),
+            ThemePreset.all.filter { it.adminOnly }.map { it.label }.sorted(),
+        )
+        assertTrue(ThemePreset.all.filter { it.adminOnly }.all { it.special })
     }
 
     @Test
