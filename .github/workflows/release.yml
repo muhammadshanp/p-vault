@@ -61,6 +61,29 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Checked before the build: a wrong key used to cost five minutes and then a
+      # fingerprint error. Now it stops in seconds and names the problem.
+      - name: Check the signing key
+        if: steps.version.outputs.state != 'false'
+        run: |
+          store="$HOME/.android/debug.keystore"
+          actual=$(stat -c %s "$store" || echo 0)
+          if [ "$actual" -lt 1000 ]; then
+            echo "::error::DEBUG_KEYSTORE_BASE64 decoded to only $actual bytes, so it is not a keystore. Copy the whole file again."
+            exit 1
+          fi
+          if ! keytool -list -v -keystore "$store" -storepass android > /tmp/key.txt 2>&1; then
+            echo "::error::The secret decodes to a file Java cannot open as a keystore (password 'android'). Send the last lines of this log."
+            tail -n 6 /tmp/key.txt
+            exit 1
+          fi
+          found=$(grep -m1 'SHA256:' /tmp/key.txt | sed 's/.*SHA256: //; s/[[:space:]]*$//' | tr -d ':' | tr 'A-F' 'a-f')
+          echo "Keystore certificate SHA-256: $found"
+          if [ "$found" != "$EXPECTED_CERT" ]; then
+            echo "::error::This keystore is not the one that signed the installed P Vault. Its fingerprint is $found, expected $EXPECTED_CERT. Replace DEBUG_KEYSTORE_BASE64 with the PC's debug.keystore."
+            exit 1
+          fi
+
       - name: Build and test
         if: steps.version.outputs.state != 'false'
         run: |
