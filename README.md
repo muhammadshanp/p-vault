@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.22** — **Advanced themes** page (menu → Theme → Advanced), where the background of the app and the picture inside each card are separate choices. First look: **Nightfall** (admin only) — moon over pines behind the screen, and its own artwork inside the big Home card and each Library tile.
 - **0.5.21** — A new look, **Moonlit**, for the admin only: violet night sky with a moon over pine trees, glassy cards, tinted Home tiles and the artwork inside the big Home card. Other people with special access do not see it. Its extras are theme settings (`glass`, `tileTints`, `heroArt`), so a catalogue theme can ask for them too.
 - **0.5.20** — Cards are solid again on every theme (0.5.19 made them see-through, which broke the normal look). On a picture theme the artwork now sits inside the big Home card, on its right side, fading into the card colour; the picture stays behind the screen.
 - **0.5.19** — The picture themes now show through the cards: on Home each card carries a wash of its own colour and a faint icon, and the background picture stays visible further down the screen instead of being flattened to black.
@@ -196,4 +197,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.21 (versionCode 51).
+`com.dudeapp.vault` — version 0.5.22 (versionCode 52).

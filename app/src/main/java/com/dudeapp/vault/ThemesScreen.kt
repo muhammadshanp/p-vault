@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
@@ -72,6 +73,10 @@ fun ThemesScreen(
     specialAccess: Boolean,
     /** The owner's own sign-in; a few looks are admin-only. */
     admin: Boolean = false,
+    /** Opens the advanced page, where background and card pictures are chosen. */
+    onAdvanced: () -> Unit = {},
+    /** The advanced look in use, if any, so the entry can say so. */
+    advancedInUse: Boolean = false,
     /** The looks from the catalogue, already filtered to the ones this account may use. */
     catalogThemes: List<DownloadedTheme>,
     /** True while the catalogue is being fetched. */
@@ -135,6 +140,62 @@ fun ThemesScreen(
                                     fontSize = 13.sp,
                                 )
                             }
+                            // Backgrounds and card pictures, kept apart, on their own page.
+                            Spacer(Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (advancedInUse) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                                    },
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable(onClick = onAdvanced),
+                            ) {
+                                Row(
+                                    Modifier.padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("Advanced", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                            if (advancedInUse) {
+                                                Spacer(Modifier.width(8.dp))
+                                                Box(
+                                                    Modifier
+                                                        .clip(CircleShape)
+                                                        .background(MaterialTheme.colorScheme.primary)
+                                                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                                                ) {
+                                                    Text(
+                                                        "In use",
+                                                        color = MaterialTheme.colorScheme.onPrimary,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            "Background and card pictures, chosen separately.",
+                                            color = TextSoft,
+                                            fontSize = 12.sp,
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = TextSoft,
+                                    )
+                                }
+                            }
+
                             Spacer(Modifier.height(10.dp))
                             // New looks arrive here without a new app build.
                             Surface(

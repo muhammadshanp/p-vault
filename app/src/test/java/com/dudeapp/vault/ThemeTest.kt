@@ -47,14 +47,30 @@ class ThemeTest {
     }
 
     @Test
+    fun nightfallKeepsBackgroundAndCardsApart() {
+        val look = ThemePreset.NIGHTFALL
+        // A background behind the screen...
+        assertTrue(look.backdrop is BackdropStyle.Picture)
+        // ...and a different picture inside every card.
+        assertEquals(
+            CardPicture.entries.toSet(),
+            look.cardPictures.keys,
+        )
+        assertTrue(look.cardPictures.values.all { it != 0 })
+        assertTrue(look.adminOnly)
+        // No other look has card pictures, so nothing else can change by accident.
+        ThemePreset.all.filter { it != look }.forEach { assertTrue(it.label, it.cardPictures.isEmpty()) }
+    }
+
+    @Test
     fun onlyTheMoonlitLookIsGlassy() {
-        val glassy = ThemePreset.all.filter { it.glass }
-        assertEquals(listOf(ThemePreset.MOONLIT), glassy)
+        val glassy = ThemePreset.all.filter { it.glass }.map { it.label }.sorted()
+        assertEquals(listOf("Moonlit", "Nightfall"), glassy)
         // The extras belong together: glassy cards, tinted tiles and artwork in the hero.
         assertTrue(ThemePreset.MOONLIT.tileTints)
         assertTrue(ThemePreset.MOONLIT.heroArt)
-        ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { preset ->
-            assertFalse(preset.label, preset.glass || preset.tileTints || preset.heroArt)
+        ThemePreset.all.filter { !it.glass }.forEach { preset ->
+            assertFalse(preset.label, preset.tileTints || preset.heroArt)
         }
     }
 
