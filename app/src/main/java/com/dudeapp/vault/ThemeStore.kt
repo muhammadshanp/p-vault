@@ -212,9 +212,8 @@ object ThemePictures {
     private val cache = mutableMapOf<String, Bitmap>()
 
     fun get(file: File): Bitmap? = synchronized(cache) {
-        cache.getOrPut(file.absolutePath + ":" + file.length()) {
-            BitmapFactory.decodeFile(file.absolutePath) ?: return null
-        }
+        val key = file.absolutePath + ":" + file.length()
+        cache[key] ?: BitmapFactory.decodeFile(file.absolutePath)?.also { cache[key] = it }
     }
 }
 

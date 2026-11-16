@@ -325,7 +325,7 @@ sealed class BackdropStyle {
     class Remote(val url: String, val scrim: Float = 0.4f) : BackdropStyle()
 }
 
-class ThemeStore(context: Context) {
+class ThemeStore(private val context: Context) {
     private val prefs = context.getSharedPreferences("dude_theme", Context.MODE_PRIVATE)
 
     /**
@@ -336,13 +336,12 @@ class ThemeStore(context: Context) {
         val stored = prefs.getString("preset", "").orEmpty()
         val fromCatalogue = prefs.getString("downloaded", "").orEmpty()
         if (fromCatalogue.isNotEmpty()) {
-            // Gone from the catalogue, or no longer allowed for this account: fall back,
-            // but remember nothing, so the next open can pick the look up again.
+            // Gone from the catalogue, or no longer allowed for this account: fall back
+            // to Dark, but keep the id, so the look returns if it comes back.
             val remote = downloaded.firstOrNull { it.id == fromCatalogue }?.toPreset()
-            if (remote != null && AccessStore(context).isSpecial()) remote else ThemePreset.DARK
-        } else {
-            ThemePreset.all.firstOrNull { it.label == stored } ?: ThemePreset.WHITE
+            return if (remote != null && AccessStore(context).isSpecial()) remote else ThemePreset.DARK
         }
+        return ThemePreset.all.firstOrNull { it.label == stored } ?: ThemePreset.WHITE
     }
 
     fun save(preset: ThemePreset) {
