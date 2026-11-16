@@ -72,7 +72,7 @@ private fun lockedFor(preset: ThemePreset, specialAccess: Boolean, admin: Boolea
 fun ThemesScreen(
     theme: ThemePreset,
     specialAccess: Boolean,
-    /** The owner's own sign-in; a few looks are admin-only. */
+    /** The owner's own sign-in; some looks and the Advanced page are admin-only. */
     admin: Boolean = false,
     /** Opens the advanced page, where background and card pictures are chosen. */
     onAdvanced: () -> Unit = {},
@@ -142,45 +142,46 @@ fun ThemesScreen(
                                 )
                             }
                             // Backgrounds and card pictures, kept apart, on their own page.
-                            Spacer(Modifier.height(10.dp))
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (advancedInUse) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
-                                    },
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .clickable(onClick = onAdvanced),
-                            ) {
-                                Row(
-                                    Modifier.padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                            if (admin) {
+                                Spacer(Modifier.height(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (advancedInUse) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                                        },
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .clickable(onClick = onAdvanced),
                                 ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("Advanced", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                            if (advancedInUse) {
-                                                Spacer(Modifier.width(8.dp))
-                                                Box(
-                                                    Modifier
-                                                        .clip(CircleShape)
-                                                        .background(MaterialTheme.colorScheme.primary)
-                                                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                                                ) {
-                                                    Text(
-                                                        "In use",
-                                                        color = MaterialTheme.colorScheme.onPrimary,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                    )
-                                                }
+                                    Row(
+                                        Modifier.padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("Advanced", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                                if (advancedInUse) {
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Box(
+                                                        Modifier
+                                                            .clip(CircleShape)
+                                                            .background(MaterialTheme.colorScheme.primary)
+                                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                                    ) {
+                                                        Text(
+                                                            "In use",
+                                                            color = MaterialTheme.colorScheme.onPrimary,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                        )
+                            }
                                             }
                                         }
                                         Text(

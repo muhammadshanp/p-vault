@@ -1050,9 +1050,12 @@ fun VaultApp(
             catalogueProblem = catalogProblem,
             onRefresh = { loadCatalogue(lookOnline = true) },
             onPick = onThemeChange,
+            // The advanced looks are the admin's own; everyone else does not see the page.
             onAdvanced = {
-                themesOpen = false
-                advancedThemesOpen = true
+                if (isAdmin) {
+                    themesOpen = false
+                    advancedThemesOpen = true
+                }
             },
             advancedInUse = theme.cardPictures.isNotEmpty(),
             onBack = { themesOpen = false },
