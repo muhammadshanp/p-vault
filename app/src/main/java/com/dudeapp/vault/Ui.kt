@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -81,9 +82,10 @@ fun Modifier.vaultCard(
 private fun Modifier.cardPicture(shape: Shape, picture: Int?): Modifier {
     if (picture == null) return this
     val background = MaterialTheme.colorScheme.surface
+    val res = LocalContext.current.resources
     return this.drawWithCache {
         val options = BitmapFactory.Options().apply { inSampleSize = 2 }
-        val image = BitmapFactory.decodeResource(resources, picture, options)?.asImageBitmap()
+        val image = BitmapFactory.decodeResource(res, picture, options)?.asImageBitmap()
         onDrawWithContent {
             drawContent()
             if (image == null || image.width == 0 || image.height == 0) return@onDrawWithContent
