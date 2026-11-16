@@ -93,7 +93,7 @@ fun BundlesScreen(
             bundleId = building!!,
             theme = themes.firstOrNull { it.id == editing },
             onDone = {
-                store.publish()
+                Bundles.publish(store)
                 building = null
                 editing = null
             },
@@ -114,7 +114,7 @@ fun BundlesScreen(
             onBack = { openBundle = null },
             onApply = { theme ->
                 Bundles.applied.value = theme
-                store.publish()
+                Bundles.publish(store)
                 onApplied()
             },
             onNewTheme = {
@@ -487,7 +487,16 @@ private fun ThemeSwatch(theme: OwnTheme, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(14.dp)
     val background = remember(theme.background) {
         theme.background?.let { file ->
-            android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmapThumb()
+            runCatching {
+                val full = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                val small = android.graphics.Bitmap.createScaledBitmap(
+                    full,
+                    (full.width / 4).coerceAtLeast(1),
+                    (full.height / 4).coerceAtLeast(1),
+                    true,
+                )
+                androidx.compose.ui.graphics.asImageBitmap(small)
+            }.getOrNull()
         }
     }
     Box(
@@ -521,16 +530,6 @@ private fun ThemeSwatch(theme: OwnTheme, modifier: Modifier = Modifier) {
         }
     }
 }
-
-private fun android.graphics.Bitmap.asImageBitmapThumb() =
-    androidx.compose.ui.graphics.asImageBitmap(
-        android.graphics.Bitmap.createScaledBitmap(
-            this,
-            (width / 4).coerceAtLeast(1),
-            (height / 4).coerceAtLeast(1),
-            true,
-        ),
-    )
 
 /**
  * The builder: a name, a background photo, and a photo for each card. Everything is optional
