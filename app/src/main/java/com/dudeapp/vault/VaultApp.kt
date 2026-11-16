@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
@@ -13,6 +14,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -114,6 +117,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -2206,7 +2211,6 @@ private fun HomeContent(
                         title = "Photos",
                         detail = countLabel(images, "photo"),
                         onClick = { onOpenTab(Tab.IMAGES) },
-                        ghost = Icons.Outlined.Image,
                         modifier = Modifier.weight(1f),
                     )
                     HomeTile(
@@ -2215,7 +2219,6 @@ private fun HomeContent(
                         title = "PDFs",
                         detail = countLabel(pdfs, "PDF"),
                         onClick = { onOpenTab(Tab.PDFS) },
-                        ghost = Icons.Outlined.PictureAsPdf,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2226,7 +2229,6 @@ private fun HomeContent(
                         title = "Notes & chats",
                         detail = "${countLabel(notes, "note")} · ${countLabel(chats.size, "chat")}",
                         onClick = { onOpenTab(Tab.NOTES) },
-                        ghost = Icons.Outlined.ChatBubbleOutline,
                         modifier = Modifier.weight(1f),
                     )
                     HomeTile(
@@ -2235,7 +2237,6 @@ private fun HomeContent(
                         title = "Reels",
                         detail = countLabel(reels.size, "reel"),
                         onClick = { onOpenTab(Tab.REELS) },
-                        ghost = Icons.Outlined.PlayCircle,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2303,46 +2304,109 @@ private fun HomeContent(
 private fun HomeHero(total: Int) {
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
-    Column(
+    val shape = RoundedCornerShape(28.dp)
+    val artwork = themeArtwork(preset)
+    Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(colors))
-            .padding(horizontal = 22.dp, vertical = 20.dp),
+            .clip(shape)
+            .background(Brush.linearGradient(colors)),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Outlined.Lock,
+        // On a picture theme the artwork sits inside the card, on its right side, fading
+        // into the card's colour so the number and the label stay on clean background.
+        if (artwork != null) {
+            Image(
+                bitmap = artwork,
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(16.dp),
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.CenterEnd,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.62f)
+                    .align(Alignment.CenterEnd),
             )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "PRIVATE VAULT",
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.2.sp,
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.62f)
+                    .align(Alignment.CenterEnd)
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to colors.first(),
+                            0.42f to colors.first().copy(alpha = 0.55f),
+                            1f to Color.Transparent,
+                        ),
+                    ),
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to colors.first().copy(alpha = 0.65f),
+                            0.5f to Color.Transparent,
+                        ),
+                    ),
             )
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = total.toString(),
-            color = Color.White,
-            fontSize = 44.sp,
-            lineHeight = 48.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = if (total == 1) {
-                "item kept safe on this device"
-            } else {
-                "items kept safe on this device"
-            },
-            color = Color.White.copy(alpha = 0.92f),
-            fontSize = 14.sp,
-        )
+        Column(Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "PRIVATE VAULT",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.2.sp,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = total.toString(),
+                color = Color.White,
+                fontSize = 44.sp,
+                lineHeight = 48.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = if (total == 1) {
+                    "item kept safe on this device"
+                } else {
+                    "items kept safe on this device"
+                },
+                color = Color.White.copy(alpha = 0.92f),
+                fontSize = 14.sp,
+            )
+        }
+    }
+}
+
+/**
+ * The picture a theme wants inside its hero card, or null for Light, Dark and the colour
+ * looks. A build-in picture is read as a bitmap once; a downloaded one comes from the
+ * theme catalogue's files.
+ */
+@Composable
+private fun themeArtwork(preset: ThemePreset): ImageBitmap? {
+    val context = LocalContext.current
+    val downloaded = LocalDownloadedThemes.current
+    return when (val style = preset.backdrop) {
+        is BackdropStyle.Remote -> {
+            val theme = downloaded.firstOrNull { it.pictureUrl == style.url }
+            val file = theme?.let { ThemeCatalogue(context).picture(it) }
+            file?.let { ThemePictures.get(it)?.asImageBitmap() }
+        }
+        is BackdropStyle.Picture -> remember(style.image) {
+            BitmapFactory.decodeResource(context.resources, style.image)?.asImageBitmap()
+        }
+        BackdropStyle.Plain -> null
     }
 }
 
@@ -2354,61 +2418,38 @@ private fun HomeTile(
     detail: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** A faint, oversized icon in the corner, like the artwork on the theme pictures. */
-    ghost: ImageVector? = null,
 ) {
-    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier
-            .vaultCard(shape)
-            .accentWash(tint, strength = 0.8f, shape = shape)
+            .vaultCard(RoundedCornerShape(22.dp))
             .clickable(onClick = onClick)
             .padding(16.dp),
     ) {
-        Column(Modifier.weight(1f, fill = false)) {
-            IconBadge(icon = icon, tint = tint)
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = detail,
-                color = TextSoft,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (ghost != null) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(34.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                Icon(
-                    imageVector = ghost,
-                    contentDescription = null,
-                    tint = tint.copy(alpha = 0.22f),
-                    modifier = Modifier.size(44.dp),
-                )
-            }
-        }
+        IconBadge(icon = icon, tint = tint)
+        Spacer(Modifier.height(14.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = detail,
+            color = TextSoft,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
 @Composable
 private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            .vaultCard(shape)
-            .accentWash(accentOf(item.type), strength = 0.35f, shape = shape)
+            .vaultCard(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
