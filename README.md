@@ -11,7 +11,6 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 ## What's new
 
 - **0.5.17** — The Theme page has a **New themes** button: looks published to the theme catalogue appear without a new app build, with their pictures downloaded once and kept for offline use. A look can also be limited to chosen addresses. The catalogue file and its format are in `theme-catalog/`.
-- **0.5.17** — The Theme page has a **New themes** button: looks published to the theme catalogue appear without a new app build, with their pictures downloaded once and kept for offline use. A look can also be limited to chosen addresses.
 - **0.5.16** — A **Theme** page for people with special access: Grand Line, Racing, Shinobi, Midnight (anime), Sakura, Minimal, Neon, Forest, Gold and Ocean, each with its own colours, vault card and background picture. Light and Dark stay free for everyone.
 - **0.5.15** — People with special access can send a suggestion to the admin from the menu, with a screenshot or a short video (up to 10 MB). The admin reads them in the admin panel; each is deleted after 2 days.
 - **0.5.14** — Hold a photo, PDF or note to start selecting several, like a gallery. Optional "Sign in with Google" on the profile sheet; it fills in your name and picture. The admin can give special access to chosen Google addresses from the admin panel.
