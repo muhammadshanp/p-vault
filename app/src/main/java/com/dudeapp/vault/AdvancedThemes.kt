@@ -109,7 +109,8 @@ fun AdvancedThemesScreen(
                     item {
                         Text(
                             "These looks set the background of the app and the picture inside each card separately. " +
-                                "Pick one and the cards keep their own artwork, whatever is behind them.",
+                                "A card picture fills its card, cropped to fit, so any picture size works: the card stays the " +
+                                "same size and its label stays readable.",
                             color = TextSoft,
                             fontSize = 13.sp,
                         )
@@ -270,23 +271,21 @@ private fun CardPreview(preset: ThemePreset, kind: CardPicture, height: androidx
             .border(1.dp, preset.outline, RoundedCornerShape(12.dp)),
     ) {
         if (picture != null) {
+            // The same as on Home: the picture fills the card, a wash keeps the label clear.
             Image(
                 painter = painterResource(picture),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                alignment = Alignment.CenterEnd,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 24.dp),
+                modifier = Modifier.fillMaxSize(),
             )
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.horizontalGradient(
-                            0f to preset.surface,
-                            0.45f to preset.surface.copy(alpha = 0.4f),
-                            0.8f to Color.Transparent,
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.30f),
+                            0.55f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.62f),
                         ),
                     ),
             )

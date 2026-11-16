@@ -2339,16 +2339,34 @@ private fun HomeHero(total: Int) {
     } else {
         null
     }
-    val fadeStart = if (preset.glass) 0.52f else 0.42f
     Box(
         Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(Brush.linearGradient(colors)),
     ) {
-        // On a picture theme the artwork sits inside the card, on its right side, fading
-        // into the card's colour so the number and the label stay on clean background.
-        if (artwork != null) {
+        if (heroPicture != null && artwork != null) {
+            // A card picture of its own covers the whole card, cropped to fill, so any
+            // picture works whatever its size; the card keeps its size and shape.
+            Image(
+                bitmap = artwork,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to Color.Black.copy(alpha = 0.62f),
+                            0.45f to Color.Black.copy(alpha = 0.32f),
+                            1f to Color.Transparent,
+                        ),
+                    ),
+            )
+        } else if (artwork != null) {
+            // A theme picture (not a card picture) keeps the right-side treatment.
             Image(
                 bitmap = artwork,
                 contentDescription = null,
@@ -2367,7 +2385,7 @@ private fun HomeHero(total: Int) {
                     .background(
                         Brush.horizontalGradient(
                             0f to colors.first(),
-                            fadeStart to colors.first().copy(alpha = 0.55f),
+                            0.45f to colors.first().copy(alpha = 0.55f),
                             1f to Color.Transparent,
                         ),
                     ),
@@ -2446,7 +2464,6 @@ private fun themeArtwork(preset: ThemePreset): ImageBitmap? {
 
 @Composable
 private fun HomeTile(
-    /** Which card picture this tile takes on an advanced look. */
     kind: CardPicture,
     icon: ImageVector,
     tint: Color,
@@ -2457,6 +2474,8 @@ private fun HomeTile(
 ) {
     val shape = RoundedCornerShape(22.dp)
     val picture = LocalThemePreset.current.cardPictures[kind]
+    // Over a picture the name and the count are white, whatever the theme's surface is.
+    val onPicture = Color.White
     Column(
         modifier
             .vaultCard(shape, picture = picture)
@@ -2469,13 +2488,15 @@ private fun HomeTile(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            color = if (picture != null) onPicture else Color.Unspecified,
+            fontWeight = if (picture != null) FontWeight.Bold else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = detail,
-            color = TextSoft,
+            color = if (picture != null) onPicture.copy(alpha = 0.9f) else TextSoft,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
