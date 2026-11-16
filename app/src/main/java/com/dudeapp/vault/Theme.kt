@@ -435,16 +435,16 @@ fun ThemePreset.withoutAccess(): ThemePreset =
     if (special) ThemePreset.DARK else this
 
 /**
- * The look to show now. A picture look needs the theme level from [access], and a look that
- * was shared with this address needs its id on that address's list. `adminOnly` is left from
- * the older rule: an admin-only look belongs to the admin, and the admin always passes.
+ * The look to show now. A picture look needs the theme level from [access], and a look the
+ * admin shares one address at a time needs its id on that address's list. `adminOnly` is a
+ * second lock that predates the list: Moonlit still belongs to the owner alone.
  */
 fun ThemePreset.forAccess(access: MyAccess, admin: Boolean = false): ThemePreset = when {
     !special -> this
     admin || access.admin -> this
     adminOnly -> ThemePreset.DARK
     !access.theme -> ThemePreset.DARK
-    !access.allowsLook(catalogId) -> ThemePreset.DARK
+    !access.allowsLook(shareId()) -> ThemePreset.DARK
     else -> this
 }
 
