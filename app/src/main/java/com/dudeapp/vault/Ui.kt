@@ -77,38 +77,45 @@ fun Modifier.vaultCard(
             shape = shape,
         )
 
-/** The picture inside a card, on its right, fading into the card colour on the left. */
+/**
+ * The picture inside a card: it covers the whole card, cropped to fill it, so any picture
+ * can be used whatever its size. The card keeps its shape, its size and its border, and a
+ * soft dark wash keeps the label readable over the picture.
+ *
+ * The picture is scaled like ContentScale.Crop: it fills the card without stretching, and
+ * the extra is trimmed equally on both sides.
+ */
 @Composable
 private fun Modifier.cardPicture(shape: Shape, picture: Int?): Modifier {
     if (picture == null) return this
-    val background = MaterialTheme.colorScheme.surface
     val res = LocalContext.current.resources
+    val isDark = LocalThemePreset.current.dark
+    // Over a picture the label needs help: dark text on light pictures and the reverse.
+    val wash = if (isDark) Color.Black else Color.White
     return this.drawWithCache {
         val options = BitmapFactory.Options().apply { inSampleSize = 2 }
         val image = BitmapFactory.decodeResource(res, picture, options)?.asImageBitmap()
         onDrawWithContent {
             drawContent()
             if (image == null || image.width == 0 || image.height == 0) return@onDrawWithContent
-            // Fill the right 72% of the card, cropped like ContentScale.Crop.
-            val targetLeft = size.width * 0.28f
-            val targetWidth = size.width - targetLeft
-            val scale = maxOf(targetWidth / image.width, size.height / image.height)
+            val scale = maxOf(size.width / image.width, size.height / image.height)
             val width = image.width * scale
             val height = image.height * scale
             drawImage(
                 image = image,
                 srcOffset = IntOffset.Zero,
                 srcSize = IntSize(image.width, image.height),
-                dstOffset = IntOffset((size.width - width).toInt(), ((size.height - height) / 2f).toInt()),
-                dstSize = IntSize(width.toInt(), height.toInt()),
+                dstOffset = IntOffset(((size.width - width) / 2f).toInt(), ((size.height - height) / 2f).toInt()),
+                dstSize = IntSize(width.toInt() + 1, height.toInt() + 1),
                 filterQuality = FilterQuality.Medium,
             )
-            // Blend the picture into the card colour on its left edge.
+            // A gentle gradient at the bottom and behind the text keeps every label legible,
+            // whichever part of the picture happens to be light.
             drawRect(
-                brush = Brush.horizontalGradient(
-                    0.22f to background,
-                    0.55f to background.copy(alpha = 0.45f),
-                    0.88f to Color.Transparent,
+                brush = Brush.verticalGradient(
+                    0f to wash.copy(alpha = if (isDark) 0.30f else 0.25f),
+                    0.55f to Color.Transparent,
+                    1f to wash.copy(alpha = if (isDark) 0.62f else 0.55f),
                 ),
             )
         }
