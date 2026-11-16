@@ -2532,7 +2532,8 @@ private fun HomeTile(
                 shape = shape,
                 picture = picture,
                 file = photo,
-                pictureIsCard = ownPhoto,
+                // Any picture on a tile is the card, with a wash over it for the label.
+                pictureIsCard = overPicture,
             )
             .tileTint(tint, shape)
             .clickable(onClick = onClick)
