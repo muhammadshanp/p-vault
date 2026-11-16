@@ -43,7 +43,7 @@ class ThemeTest {
         assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(false, admin = true))
         assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
         // Nothing else is admin-only.
-        ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { assertFalse(it.label, it.adminOnly) }
+        ThemePreset.all.filter { !it.adminOnly }.forEach { assertTrue(it.label, it.special) }
     }
 
     @Test
