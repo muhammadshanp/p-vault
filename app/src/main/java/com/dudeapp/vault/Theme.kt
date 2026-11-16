@@ -61,6 +61,8 @@ class ThemePreset(
     val special: Boolean = false,
     /** Set when the look came from the theme catalogue, not from this build. */
     val catalogId: String? = null,
+    /** A look only the admin may use, on top of special access. */
+    val adminOnly: Boolean = false,
     /** The vault card and the home strip; two colours, darker last. */
     val gradient: List<Color>? = null,
     /** Tints the shadow behind the floating bar's selected pill. */
@@ -321,6 +323,7 @@ class ThemePreset(
         /** The look of the reference picture: violet night, glassy cards, artwork in the hero. */
         val MOONLIT = ThemePreset(
         label = "Moonlit",
+        adminOnly = true,
         dark = true,
         primary = Color(0xFF8B5CF6),
         onPrimary = Color(0xFF120B2A),
@@ -386,12 +389,19 @@ class ThemeStore(private val context: Context) {
     }
 }
 
-/** A look that needs special access was chosen and that access is gone; go back to Dark. */
-fun ThemePreset.withoutAccess(): ThemePreset = if (special) ThemePreset.DARK else this
+/** A look that needs access was chosen and that access is gone; go back to Dark. */
+fun ThemePreset.withoutAccess(): ThemePreset =
+    if (special || adminOnly) ThemePreset.DARK else this
 
-/** The look to show now, given whether this phone has special access. */
-fun ThemePreset.forAccess(specialAccess: Boolean): ThemePreset =
-    if (special && !specialAccess) ThemePreset.DARK else this
+/**
+ * The look to show now. [specialAccess] is the admin's list, [admin] the owner's own
+ * sign-in; an admin-only look needs the second even when the first is granted.
+ */
+fun ThemePreset.forAccess(specialAccess: Boolean, admin: Boolean = false): ThemePreset = when {
+    adminOnly && !admin -> ThemePreset.DARK
+    special && !specialAccess -> ThemePreset.DARK
+    else -> this
+}
 
 @Composable
 fun PVaultTheme(

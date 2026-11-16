@@ -32,6 +32,7 @@
       "onSurfaceVariant": "#A79FBF",
       "outline": "#2A2540",
       "scrim": 0.5,
+      "adminOnly": true,
       "heroArt": true,
       "glass": true,
       "tileTints": true

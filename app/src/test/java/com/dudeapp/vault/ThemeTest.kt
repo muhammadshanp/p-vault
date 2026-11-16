@@ -33,6 +33,18 @@ class ThemeTest {
     }
 
     @Test
+    fun moonlitIsOnlyForTheAdmin() {
+        assertTrue(ThemePreset.MOONLIT.adminOnly)
+        // Special access alone is not enough; the owner's own sign-in is needed too.
+        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(true, admin = false))
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
+        // The admin always counts as having special access, so this is the single check.
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(false, admin = true))
+        // Nothing else is admin-only.
+        ThemePreset.all.filter { it != ThemePreset.MOONLIT }.forEach { assertFalse(it.label, it.adminOnly) }
+    }
+
+    @Test
     fun onlyTheMoonlitLookIsGlassy() {
         val glassy = ThemePreset.all.filter { it.glass }
         assertEquals(listOf(ThemePreset.MOONLIT), glassy)

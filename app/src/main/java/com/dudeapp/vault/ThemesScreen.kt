@@ -58,6 +58,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/** A look is offered only when this account has both special access and, if needed, admin. */
+private fun lockedFor(preset: ThemePreset, specialAccess: Boolean, admin: Boolean): Boolean =
+    (preset.special && !specialAccess) || (preset.adminOnly && !admin)
+
 /**
  * The look of the app: Light and Dark for everyone, and the picture looks for people with
  * special access. Each card is a small preview of that look.
@@ -66,6 +70,8 @@ import androidx.compose.ui.unit.sp
 fun ThemesScreen(
     theme: ThemePreset,
     specialAccess: Boolean,
+    /** The owner's own sign-in; a few looks are admin-only. */
+    admin: Boolean = false,
     /** The looks from the catalogue, already filtered to the ones this account may use. */
     catalogThemes: List<DownloadedTheme>,
     /** True while the catalogue is being fetched. */
@@ -172,9 +178,9 @@ fun ThemesScreen(
                         ThemeOption(
                             preset = preset,
                             selected = preset == theme,
-                            locked = preset.special && !specialAccess,
+                            locked = lockedFor(preset, specialAccess, admin),
                             onClick = {
-                                if (!(preset.special && !specialAccess)) {
+                                if (!lockedFor(preset, specialAccess, admin)) {
                                     onPick(preset)
                                     close()
                                 }
@@ -187,7 +193,7 @@ fun ThemesScreen(
                             preset = preset,
                             picture = themePicture(downloaded),
                             selected = preset.label == theme.label && preset.background == theme.background,
-                            locked = !specialAccess,
+                            locked = lockedFor(preset, specialAccess, admin),
                             badge = "New",
                             onClick = {
                                 if (specialAccess) {
@@ -363,8 +369,10 @@ private fun ThemeOption(
                 )
                 Text(
                     text = when {
+                        locked && preset.adminOnly -> "Admin only"
                         locked -> "Special access"
                         badge != null -> "New · special"
+                        preset.adminOnly -> "Admin theme"
                         preset.special -> "Special theme"
                         else -> "Everyone"
                     },

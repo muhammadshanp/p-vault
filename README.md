@@ -10,7 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
-- **0.5.21** — A new special look, **Moonlit**: violet night sky with a moon over pine trees, glassy cards, tinted Home tiles and the artwork inside the big Home card. Its extras are theme settings (`glass`, `tileTints`, `heroArt`), so a catalogue theme can ask for them too.
+- **0.5.21** — A new look, **Moonlit**, for the admin only: violet night sky with a moon over pine trees, glassy cards, tinted Home tiles and the artwork inside the big Home card. Other people with special access do not see it. Its extras are theme settings (`glass`, `tileTints`, `heroArt`), so a catalogue theme can ask for them too.
 - **0.5.20** — Cards are solid again on every theme (0.5.19 made them see-through, which broke the normal look). On a picture theme the artwork now sits inside the big Home card, on its right side, fading into the card colour; the picture stays behind the screen.
 - **0.5.19** — The picture themes now show through the cards: on Home each card carries a wash of its own colour and a faint icon, and the background picture stays visible further down the screen instead of being flattened to black.
 - **0.5.18** — A small release to prove the automatic publishing works: bumping the version and merging is all it takes. No feature changes.

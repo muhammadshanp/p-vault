@@ -283,7 +283,7 @@ fun VaultApp(
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
-        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess)
+        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess, isAdmin)
         if (allowed != theme) onThemeChange(allowed)
     }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
@@ -1032,6 +1032,7 @@ fun VaultApp(
         ThemesScreen(
             theme = theme,
             specialAccess = specialAccess,
+            admin = isAdmin,
             catalogThemes = catalogThemes.filter {
                 it.isAllowedFor(GoogleAccountStore(context).email(), specialAccess)
             },
