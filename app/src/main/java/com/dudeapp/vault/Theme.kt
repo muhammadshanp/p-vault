@@ -353,11 +353,10 @@ class ThemePreset(
 
         /**
          * The first advanced look: a moon over pines behind the screen, and a separate
-         * picture inside every card. Only the admin may use it.
+         * picture inside every card. The admin gives it to an address by hand, one at a time.
          */
         val NIGHTFALL = ThemePreset(
         label = "Nightfall",
-        adminOnly = true,
         dark = true,
         primary = Color(0xFF9F7BFF),
         onPrimary = Color(0xFF14092E),

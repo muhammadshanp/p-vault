@@ -115,7 +115,7 @@ fun AdvancedThemesScreen(
                         )
                     }
                     items(advanced, key = { it.label }) { preset ->
-                        val locked = preset.special && !access.theme
+                        val locked = preset.special && (!access.theme || !access.allowsLook(preset.shareId()))
                         AdvancedOption(
                             preset = preset,
                             selected = preset.label == theme.label,
@@ -233,7 +233,7 @@ private fun AdvancedOption(
                 )
                 Text(
                     text = when {
-                        locked -> "Ask the admin for access"
+                        locked -> "Ask the admin for this look"
                         else -> "Background + card pictures"
                     },
                     color = preset.onSurfaceVariant,

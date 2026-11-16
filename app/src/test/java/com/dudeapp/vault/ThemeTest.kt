@@ -47,7 +47,7 @@ class ThemeTest {
         assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(), admin = true))
         // Exactly these two are admin-only, and both also need special access.
         assertEquals(
-            listOf("Moonlit", "Nightfall"),
+            listOf("Moonlit"),
             ThemePreset.all.filter { it.adminOnly }.map { it.label }.sorted(),
         )
         assertTrue(ThemePreset.all.filter { it.adminOnly }.all { it.special })
@@ -64,9 +64,29 @@ class ThemeTest {
             look.cardPictures.keys,
         )
         assertTrue(look.cardPictures.values.all { it != 0 })
-        assertTrue(look.adminOnly)
+        // Shared by hand, look by look, not admin-only any more.
+        assertFalse(look.adminOnly)
+        assertEquals("nightfall", look.shareId())
         // No other look has card pictures, so nothing else can change by accident.
         ThemePreset.all.filter { it != look }.forEach { assertTrue(it.label, it.cardPictures.isEmpty()) }
+    }
+
+    @Test
+    fun anAdvancedLookIsOnlyShownWhenItIsShared() {
+        val look = ThemePreset.NIGHTFALL
+        val advanced = MyAccess(level = AccessLevel.ADVANCED)
+        // The level alone opens the page, not the look inside it.
+        assertTrue(advanced.advanced)
+        assertFalse(advanced.allowsLook(look.shareId()))
+        assertEquals(ThemePreset.DARK, look.forAccess(advanced))
+        val shared = advanced.copy(looks = setOf("nightfall"))
+        assertTrue(shared.allowsLook(look.shareId()))
+        assertEquals(look, look.forAccess(shared))
+        // Anybody above the theme level may be given it; nothing needs the admin.
+        assertEquals(look, look.forAccess(shared.copy(level = AccessLevel.EVERYTHING)))
+        assertFalse(shared.copy(level = AccessLevel.THEME).advanced)
+        // Moonlit is still the owner's own look, whatever is shared.
+        assertTrue(ThemePreset.MOONLIT.adminOnly)
     }
 
     @Test

@@ -1027,7 +1027,10 @@ fun VaultApp(
         InboxScreen(onBack = { inboxOpen = false })
     } else if (adminOpen) {
         AdminScreen(
-            shareableLooks = catalogThemes.map { it.id to it.label },
+            shareableLooks = (
+                catalogThemes.map { it.id to it.label } +
+                    ThemePreset.all.filter { it.cardPictures.isNotEmpty() }.map { it.shareId() to it.label }
+                ).distinctBy { it.first },
             onExternal = onExternal,
             onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
             onBack = { adminOpen = false },

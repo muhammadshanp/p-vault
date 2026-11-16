@@ -100,6 +100,12 @@ enum class AccessFeature(val label: String, val detail: String) {
     }
 }
 
+/**
+ * The id a look is shared under: the catalogue id, or its label for a look built into the
+ * app. It is what the admin ticks in the access list.
+ */
+fun ThemePreset.shareId(): String = catalogId ?: label.trim().lowercase()
+
 /** The field a shared look is stored under, e.g. `look_nightfall`. */
 internal fun lookField(lookId: String): String = "look_" + lookId.trim().lowercase()
 internal fun featureField(feature: AccessFeature): String = "f_" + feature.key
