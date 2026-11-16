@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -28,6 +29,9 @@ class MainActivity : FragmentActivity() {
     private val themeStore by lazy { ThemeStore(this) }
     private val settingsStore by lazy { SettingsStore(this) }
     private var theme by mutableStateOf(ThemePreset.WHITE)
+    // The looks that came from the theme catalogue, kept here so a picture can be found
+    // from the backdrop.
+    private var catalogThemes by mutableStateOf<List<DownloadedTheme>>(emptyList())
     // shortcut: backgrounding the app while a picker is open keeps it unlocked on return.
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,8 +60,10 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        // A special look is only shown while this phone still has special access.
-        theme = themeStore.load().forAccess(AccessStore(this).isSpecial())
+        // A special look is only shown while this phone still has special access. A look
+        // from the catalogue is rebuilt from the stored copy, never from a build-in theme.
+        catalogThemes = ThemeCatalogue(this).cached()
+        theme = themeStore.load(catalogThemes).forAccess(AccessStore(this).isSpecial())
         applyNightMode(theme.dark)
         val settings = settingsStore.load()
         needsLockChoice = !settings.lockChoiceMade && !Auth.hasPin(this)
@@ -74,6 +80,7 @@ class MainActivity : FragmentActivity() {
                 controller.isAppearanceLightNavigationBars = !dark
                 onDispose { }
             }
+            CompositionLocalProvider(LocalDownloadedThemes provides catalogThemes) {
             PVaultTheme(theme) {
                 when {
                     needsLockChoice -> LockChoiceScreen(
@@ -126,6 +133,7 @@ class MainActivity : FragmentActivity() {
                     )
                 }
             }
+            }
         }
     }
 
@@ -159,7 +167,7 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         external = false
         // Special access can be taken away while the app is in the background.
-        val allowed = themeStore.load().forAccess(AccessStore(this).isSpecial())
+        val allowed = themeStore.load(catalogThemes).forAccess(AccessStore(this).isSpecial())
         if (allowed != theme) {
             theme = allowed
             applyNightMode(allowed.dark)

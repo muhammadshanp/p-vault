@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -302,19 +303,38 @@ enum class ThemePreset(
 sealed class BackdropStyle {
     data object Plain : BackdropStyle()
 
+    /** A picture that ships inside the app. */
     class Picture(@DrawableRes val image: Int, val scrim: Float = 0.35f) : BackdropStyle()
+
+    /** A picture downloaded from the theme catalogue and kept in the app's files. */
+    class Remote(val url: String, val scrim: Float = 0.4f) : BackdropStyle()
 }
 
 class ThemeStore(context: Context) {
     private val prefs = context.getSharedPreferences("dude_theme", Context.MODE_PRIVATE)
 
-    /** The saved look, or Light when there is none or the stored name is unknown. */
-    fun load(): ThemePreset =
-        runCatching { ThemePreset.valueOf(prefs.getString("preset", "").orEmpty()) }
-            .getOrDefault(ThemePreset.WHITE)
+    /**
+     * The saved look, or Light when there is none or the stored name is unknown. A look
+     * from the catalogue is rebuilt from [downloaded], because it is not a build-in name.
+     */
+    fun load(downloaded: List<DownloadedTheme> = emptyList()): ThemePreset {
+        val stored = prefs.getString("preset", "").orEmpty()
+        val fromCatalogue = prefs.getString("downloaded", "").orEmpty()
+        if (fromCatalogue.isNotEmpty()) {
+            return downloaded.firstOrNull { it.id == fromCatalogue }?.toPreset() ?: ThemePreset.WHITE
+        }
+        return runCatching { ThemePreset.valueOf(stored) }.getOrDefault(ThemePreset.WHITE)
+    }
 
     fun save(preset: ThemePreset) {
-        prefs.edit().putString("preset", preset.name).apply()
+        // A catalogue look is remembered by its id in the catalogue, not by its name.
+        val id = (preset.backdrop as? BackdropStyle.Remote)
+            ?.let { style -> style.url.substringAfterLast('/').substringBefore('.') }
+            .orEmpty()
+        prefs.edit()
+            .putString("preset", if (id.isEmpty()) preset.name else "")
+            .putString("downloaded", id)
+            .apply()
     }
 }
 
@@ -413,12 +433,28 @@ private val VaultShapes = Shapes(
 @Composable
 fun Backdrop() {
     val preset = LocalThemePreset.current
+    val downloadedThemes = LocalDownloadedThemes.current
+    val context = LocalContext.current
     when (val style = preset.backdrop) {
         is BackdropStyle.Plain -> Box(
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         )
+
+        is BackdropStyle.Remote -> {
+            val theme = downloadedThemes.firstOrNull { it.pictureUrl == style.url }
+            val file = theme?.let { ThemeCatalogue(context).picture(it) }
+            if (file != null) {
+                RemoteBackdrop(picture = file, scrimColor = preset.background, scrim = style.scrim)
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                )
+            }
+        }
 
         is BackdropStyle.Picture -> Box(Modifier.fillMaxSize()) {
             Image(
@@ -444,3 +480,6 @@ fun Backdrop() {
 
 /** The active look, for the few places that need more than the colours (backdrop, glow). */
 val LocalThemePreset = compositionLocalOf { ThemePreset.WHITE }
+
+/** Every look downloaded from the theme catalogue, so pictures can be found by address. */
+val LocalDownloadedThemes = compositionLocalOf<List<DownloadedTheme>> { emptyList() }
