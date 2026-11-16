@@ -121,20 +121,24 @@ class BundleStore(private val context: Context) {
     /** A fresh id for a new theme. */
     fun newThemeId(): String = UUID.randomUUID().toString()
 
-    private fun read(): Pair<List<ThemeBundle>, List<OwnTheme>> = runCatching {
+    /** The array under [name] in a JSON object, or an empty list when it is missing or wrong. */
+private fun JSONObject.array(name: String): List<Any> =
+    optJSONArray(name)?.let { list -> (0 until list.length()).mapNotNull { list.opt(it) } }.orEmpty()
+
+private fun read(): Pair<List<ThemeBundle>, List<OwnTheme>> = runCatching<Pair<List<ThemeBundle>, List<OwnTheme>>> {
         val root = JSONObject(prefs.getString("data", "{}").orEmpty())
-        val bundles = root.optJSONArray("bundles").orEmpty().mapNotNull { raw ->
+        val bundles = root.array("bundles").mapNotNull { raw ->
             val item = raw as? JSONObject ?: return@mapNotNull null
             ThemeBundle(
                 id = item.optString("id").takeIf { it.isNotEmpty() } ?: return@mapNotNull null,
                 name = item.optString("name"),
-                themeIds = item.optJSONArray("themes").orEmpty().mapNotNull { it as? String },
+                themeIds = item.array("themes").mapNotNull { it as? String },
             )
         }
-        val themes = root.optJSONArray("themes").orEmpty().mapNotNull { raw ->
+        val themes = root.array("themes").mapNotNull { raw ->
             val item = raw as? JSONObject ?: return@mapNotNull null
             val id = item.optString("id").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-            val cards = item.optJSONObject("cards").orEmpty()
+            val cards = item.optJSONObject("cards") ?: JSONObject()
             OwnTheme(
                 id = id,
                 name = item.optString("name"),
