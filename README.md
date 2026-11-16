@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.24** — Access is now per address: each Google address gets Theme, Theme + Advanced, or Everything, plus its own switches (Give suggestion) and its own shared looks. The Advanced page is no longer admin-only: it opens for the addresses the admin allows.
 - **0.5.23** — A card picture in an advanced theme now fills its card, cropped to fit, so any picture size works; the card keeps its size and the label stays readable over a soft wash.
 - **0.5.22** — **Advanced themes** page (menu → Theme → Advanced), where the background of the app and the picture inside each card are separate choices. First look: **Nightfall** (admin only) — moon over pines behind the screen, and its own artwork inside the big Home card and each Library tile.
 - **0.5.21** — A new look, **Moonlit**, for the admin only: violet night sky with a moon over pine trees, glassy cards, tinted Home tiles and the artwork inside the big Home card. Other people with special access do not see it. Its extras are theme settings (`glass`, `tileTints`, `heroArt`), so a catalogue theme can ask for them too.
@@ -198,4 +199,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.23 (versionCode 53).
+`com.dudeapp.vault` — version 0.5.24 (versionCode 54).

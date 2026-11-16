@@ -61,8 +61,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun AdvancedThemesScreen(
     theme: ThemePreset,
-    specialAccess: Boolean,
-    admin: Boolean,
+    access: MyAccess,
     onPick: (ThemePreset) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -116,7 +115,7 @@ fun AdvancedThemesScreen(
                         )
                     }
                     items(advanced, key = { it.label }) { preset ->
-                        val locked = (preset.special && !specialAccess) || (preset.adminOnly && !admin)
+                        val locked = preset.special && !access.theme
                         AdvancedOption(
                             preset = preset,
                             selected = preset.label == theme.label,
@@ -234,9 +233,7 @@ private fun AdvancedOption(
                 )
                 Text(
                     text = when {
-                        locked && preset.adminOnly -> "Admin only"
-                        locked -> "Special access"
-                        preset.adminOnly -> "Admin · background + card pictures"
+                        locked -> "Ask the admin for access"
                         else -> "Background + card pictures"
                     },
                     color = preset.onSurfaceVariant,

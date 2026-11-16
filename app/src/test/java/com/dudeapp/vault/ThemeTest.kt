@@ -26,8 +26,10 @@ class ThemeTest {
     @Test
     fun aThemeNeedingAccessFallsBackToDark() {
         val special = ThemePreset.all.first { it.special && !it.adminOnly }
-        assertEquals(special, special.forAccess(true))
-        assertEquals(ThemePreset.DARK, special.forAccess(false))
+        val member = MyAccess(level = AccessLevel.THEME)
+        assertEquals(special, special.forAccess(member))
+        assertEquals(ThemePreset.DARK, special.forAccess(MyAccess()))
+        assertEquals(ThemePreset.DARK, special.forAccess(member.copy(level = AccessLevel.NONE)))
         assertEquals(ThemePreset.DARK, special.withoutAccess())
         assertEquals(ThemePreset.WHITE, ThemePreset.WHITE.withoutAccess())
     }
@@ -35,13 +37,14 @@ class ThemeTest {
     @Test
     fun moonlitIsOnlyForTheAdmin() {
         assertTrue(ThemePreset.MOONLIT.adminOnly)
-        // Special access alone is not enough; the owner's own sign-in is needed too.
-        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(true, admin = false))
-        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
-        // The admin always counts as having special access, so this is the single check.
-        // Both are needed: the flag on the theme and the owner's sign-in.
-        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(false, admin = true))
-        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(true, admin = true))
+        val owner = MyAccess(level = AccessLevel.EVERYTHING)
+        // Being on the list is not enough for a look marked admin-only...
+        assertEquals(ThemePreset.DARK, ThemePreset.MOONLIT.forAccess(owner))
+        // ...the owner's own sign-in is needed too.
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(owner, admin = true))
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(admin = true)))
+        // An owner with no level at all still has everything.
+        assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(), admin = true))
         // Exactly these two are admin-only, and both also need special access.
         assertEquals(
             listOf("Moonlit", "Nightfall"),

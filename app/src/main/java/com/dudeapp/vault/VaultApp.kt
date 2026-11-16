@@ -242,10 +242,11 @@ fun VaultApp(
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     // Picks up special access given or removed by the admin since the last time.
-    var canSuggest by remember { mutableStateOf(AccessStore(context).isMember()) }
+    var canSuggest by remember { mutableStateOf(AccessStore(context).access().has(AccessFeature.SUGGESTIONS)) }
     var suggestionOpen by remember { mutableStateOf(false) }
-    // The picture themes are for special access; the admin always counts.
-    var specialAccess by remember { mutableStateOf(AccessStore(context).isSpecial()) }
+    // What this account may do: its level, its switches and the looks shared with it.
+    var access by remember { mutableStateOf(AccessStore(context).access()) }
+    val specialAccess = access.theme
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
     val themeStore = remember { ThemeStore(context) }
@@ -256,9 +257,9 @@ fun VaultApp(
     var catalogProblem by remember { mutableStateOf<String?>(null) }
 
     // Only the looks this account may use, with their pictures downloaded for offline use.
-    LaunchedEffect(catalogThemes, specialAccess) {
+    LaunchedEffect(catalogThemes, access) {
         val email = GoogleAccountStore(context).email()
-        val mine = catalogThemes.filter { it.isAllowedFor(email, specialAccess) }
+        val mine = catalogThemes.filter { it.isAllowedFor(email, access.theme, access) }
         mine.forEach { catalogue.downloadPicture(it) }
         catalogue.tidy(mine)
     }
@@ -279,12 +280,12 @@ fun VaultApp(
     LaunchedEffect(Unit) { loadCatalogue(lookOnline = true) }
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
-        canSuggest = AccessStore(context).isMember()
-        specialAccess = AccessStore(context).isSpecial()
+        access = AccessStore(context).refresh()
+        canSuggest = access.has(AccessFeature.SUGGESTIONS)
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
-        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess, isAdmin)
+        val allowed = themeStore.load(catalogThemes).forAccess(access, isAdmin)
         if (allowed != theme) onThemeChange(allowed)
     }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
@@ -900,7 +901,7 @@ fun VaultApp(
                 if (ok) GoogleAccountStore(context).clear()
                 if (ok) AccessStore(context).clear()
                 if (ok) canSuggest = false
-                if (ok) specialAccess = false
+                if (ok) access = MyAccess()
                 ok
             }
             if (!cleared) {
@@ -1026,6 +1027,7 @@ fun VaultApp(
         InboxScreen(onBack = { inboxOpen = false })
     } else if (adminOpen) {
         AdminScreen(
+            shareableLooks = catalogThemes.map { it.id to it.label },
             onExternal = onExternal,
             onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
             onBack = { adminOpen = false },
@@ -1033,18 +1035,16 @@ fun VaultApp(
     } else if (advancedThemesOpen) {
         AdvancedThemesScreen(
             theme = theme,
-            specialAccess = specialAccess,
-            admin = isAdmin,
+            access = access.copy(admin = isAdmin),
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
-            specialAccess = specialAccess,
-            admin = isAdmin,
+            access = access.copy(admin = isAdmin),
             catalogThemes = catalogThemes.filter {
-                it.isAllowedFor(GoogleAccountStore(context).email(), specialAccess)
+                it.isAllowedFor(GoogleAccountStore(context).email(), access.theme, access)
             },
             refreshing = catalogRefreshing,
             catalogueProblem = catalogProblem,
@@ -1052,7 +1052,7 @@ fun VaultApp(
             onPick = onThemeChange,
             // The advanced looks are the admin's own; everyone else does not see the page.
             onAdvanced = {
-                if (isAdmin) {
+                if (access.copy(admin = isAdmin).advanced) {
                     themesOpen = false
                     advancedThemesOpen = true
                 }
@@ -1065,7 +1065,7 @@ fun VaultApp(
             theme = theme,
             settings = settings,
             update = availableUpdate,
-            specialAccess = specialAccess,
+            access = access,
             onTheme = onThemeChange,
             onThemes = {
                 settingsOpen = false
@@ -1148,7 +1148,7 @@ fun VaultApp(
                     onAdmin = { closeMenu { adminOpen = true } },
                     canSuggest = canSuggest,
                     onSuggest = { closeMenu { suggestionOpen = true } },
-                    canTheme = specialAccess,
+                    canTheme = access.theme,
                     onThemes = { closeMenu { themesOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
@@ -1740,9 +1740,8 @@ fun VaultApp(
                         profileOpen = false
                         // Signing in or out on the sheet can change this.
                         scope.launch {
-                            AccessStore(context).refresh()
-                            canSuggest = AccessStore(context).isMember()
-                            specialAccess = AccessStore(context).isSpecial()
+                            access = AccessStore(context).refresh()
+                            canSuggest = access.has(AccessFeature.SUGGESTIONS)
                         }
                     },
                 )

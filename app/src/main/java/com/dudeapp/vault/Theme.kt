@@ -433,15 +433,19 @@ class ThemeStore(private val context: Context) {
 
 /** A look that needs access was chosen and that access is gone; go back to Dark. */
 fun ThemePreset.withoutAccess(): ThemePreset =
-    if (special || adminOnly) ThemePreset.DARK else this
+    if (special) ThemePreset.DARK else this
 
 /**
- * The look to show now. [specialAccess] is the admin's list (which always includes the
- * admin), [admin] the owner's own sign-in; an admin-only look needs both.
+ * The look to show now. A picture look needs the theme level from [access], and a look that
+ * was shared with this address needs its id on that address's list. `adminOnly` is left from
+ * the older rule: an admin-only look belongs to the admin, and the admin always passes.
  */
-fun ThemePreset.forAccess(specialAccess: Boolean, admin: Boolean = false): ThemePreset = when {
-    adminOnly && !admin -> ThemePreset.DARK
-    special && !specialAccess -> ThemePreset.DARK
+fun ThemePreset.forAccess(access: MyAccess, admin: Boolean = false): ThemePreset = when {
+    !special -> this
+    admin || access.admin -> this
+    adminOnly -> ThemePreset.DARK
+    !access.theme -> ThemePreset.DARK
+    !access.allowsLook(catalogId) -> ThemePreset.DARK
     else -> this
 }
 
