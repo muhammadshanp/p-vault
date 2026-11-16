@@ -2370,11 +2370,12 @@ private fun HomeHero(total: Int) {
             .clip(shape)
             .background(Brush.linearGradient(colors)),
     ) {
-        if (heroPhoto != null) {
+        val ownPhotoArt = heroPhoto?.let { remember(it) { CardPictures.load(context.resources, null, it) } }
+        if (ownPhotoArt != null) {
             // A photo of the user's own fills the card, cropped; the number and the label stay
             // where they are, over a wash that keeps them readable.
             Image(
-                bitmap = remember(heroPhoto) { CardPictures.load(context.resources, null, heroPhoto) },
+                bitmap = ownPhotoArt,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
