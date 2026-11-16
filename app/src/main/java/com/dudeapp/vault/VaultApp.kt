@@ -2401,6 +2401,7 @@ private fun HomeTile(
     }
 }
 
+@Composable
 private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
     Row(
