@@ -68,19 +68,17 @@ fun cardAlpha(): Float =
 
 /** A wash of the theme's accent over a card, strongest at the top left corner. */
 @Composable
-fun accentWash(accent: Color, strength: Float = 0.5f, shape: Shape): Modifier {
+fun Modifier.accentWash(accent: Color, strength: Float = 0.5f, shape: Shape): Modifier {
     if (LocalThemePreset.current.backdrop is BackdropStyle.Plain) return this
-    return this.then(
-        Modifier
-            .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    0f to accent.copy(alpha = 0.35f * strength),
-                    0.55f to accent.copy(alpha = 0.10f * strength),
-                    1f to Color.Transparent,
-                ),
+    return this
+        .clip(shape)
+        .background(
+            Brush.linearGradient(
+                0f to accent.copy(alpha = 0.35f * strength),
+                0.55f to accent.copy(alpha = 0.10f * strength),
+                1f to Color.Transparent,
             ),
-    )
+        )
 }
 
 /** A tinted rounded square holding an icon. */
