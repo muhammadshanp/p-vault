@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.20** — Cards are solid again on every theme (0.5.19 made them see-through, which broke the normal look). On a picture theme the artwork now sits inside the big Home card, on its right side, fading into the card colour; the picture stays behind the screen.
 - **0.5.19** — The picture themes now show through the cards: on Home each card carries a wash of its own colour and a faint icon, and the background picture stays visible further down the screen instead of being flattened to black.
 - **0.5.18** — A small release to prove the automatic publishing works: bumping the version and merging is all it takes. No feature changes.
 - **0.5.17** — The Theme page has a **New themes** button: looks published to the theme catalogue appear without a new app build, with their pictures downloaded once and kept for offline use. A look can also be limited to chosen addresses. The catalogue file and its format are in `theme-catalog/`.
@@ -194,4 +195,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.19 (versionCode 49).
+`com.dudeapp.vault` — version 0.5.20 (versionCode 50).

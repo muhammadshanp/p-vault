@@ -38,8 +38,8 @@ android {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 49
-        versionName = "0.5.19"
+        versionCode = 50
+        versionName = "0.5.20"
     }
 
     buildTypes {
