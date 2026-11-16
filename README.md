@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.18** — A small release to prove the automatic publishing works: bumping the version and merging is all it takes. No feature changes.
 - **0.5.17** — The Theme page has a **New themes** button: looks published to the theme catalogue appear without a new app build, with their pictures downloaded once and kept for offline use. A look can also be limited to chosen addresses. The catalogue file and its format are in `theme-catalog/`.
 - **0.5.16** — A **Theme** page for people with special access: Grand Line, Racing, Shinobi, Midnight (anime), Sakura, Minimal, Neon, Forest, Gold and Ocean, each with its own colours, vault card and background picture. Light and Dark stay free for everyone.
 - **0.5.15** — People with special access can send a suggestion to the admin from the menu, with a screenshot or a short video (up to 10 MB). The admin reads them in the admin panel; each is deleted after 2 days.
@@ -192,4 +193,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.17 (versionCode 47).
+`com.dudeapp.vault` — version 0.5.18 (versionCode 48).
