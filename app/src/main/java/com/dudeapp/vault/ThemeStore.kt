@@ -59,6 +59,7 @@ data class DownloadedTheme(
     val allowed: List<String>,
 ) {
     fun toPreset(): ThemePreset = ThemePreset(
+        catalogId = id,
         label = label,
         dark = dark,
         primary = primary,

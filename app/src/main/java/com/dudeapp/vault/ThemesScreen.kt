@@ -168,7 +168,7 @@ fun ThemesScreen(
                             }
                         }
                     }
-                    items(ThemePreset.entries) { preset ->
+                    items(ThemePreset.all) { preset ->
                         ThemeOption(
                             preset = preset,
                             selected = preset == theme,

@@ -42,7 +42,7 @@ val TextSoft: Color
  * The coral accent matches the logo; the light theme uses a deeper coral so white button
  * text stays readable, and errors are a real red instead of the accent.
  */
-enum class ThemePreset(
+class ThemePreset(
     val label: String,
     val dark: Boolean,
     val primary: Color,
@@ -59,13 +59,22 @@ enum class ThemePreset(
     val error: Color,
     /** A look that only people with special access can choose. */
     val special: Boolean = false,
+    /** Set when the look came from the theme catalogue, not from this build. */
+    val catalogId: String? = null,
     /** The vault card and the home strip; two colours, darker last. */
     val gradient: List<Color>? = null,
     /** Tints the shadow behind the floating bar's selected pill. */
     val glow: Color? = null,
     val backdrop: BackdropStyle = BackdropStyle.Plain,
 ) {
-    WHITE(
+
+    companion object {
+
+        /** Every look inside this build, in the order the theme page shows them. */
+        val all: List<ThemePreset>
+            get() = listOf(WHITE, DARK, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
+
+        val WHITE = ThemePreset(
         label = "Light",
         dark = false,
         primary = Color(0xFFD9512A),
@@ -80,8 +89,9 @@ enum class ThemePreset(
         onSurfaceVariant = Color(0xFF5B616E),
         outline = Color(0xFFE1E4EA),
         error = Color(0xFFC62828),
-    ),
-    DARK(
+        )
+
+        val DARK = ThemePreset(
         label = "Dark",
         dark = true,
         primary = Color(0xFFFF7A4D),
@@ -96,14 +106,9 @@ enum class ThemePreset(
         onSurfaceVariant = Color(0xFF9EA4B0),
         outline = Color(0xFF2B2F38),
         error = Color(0xFFFF6B6B),
-    ),
+        )
 
-    // The looks below need special access. Each keeps a plain background colour for the
-    // screens that are mostly text (settings, dialogs) and adds an accent, a glow for the
-    // vault card and a backdrop (picture and/or gradient) for the home screen, the tab
-    // strips and the floating bar.
-
-    MIDNIGHT(
+        val MIDNIGHT = ThemePreset(
         label = "Midnight",
         dark = true,
         primary = Color(0xFF7C6BFF),
@@ -122,8 +127,9 @@ enum class ThemePreset(
         gradient = listOf(Color(0xFF6C4BFF), Color(0xFF1B1038)),
         glow = Color(0xFF4B33D6),
         backdrop = BackdropStyle.Picture(R.drawable.bg_animegirl, scrim = 0.45f),
-    ),
-    RACING(
+        )
+
+        val RACING = ThemePreset(
         label = "Racing",
         dark = true,
         primary = Color(0xFFE10600),
@@ -142,8 +148,9 @@ enum class ThemePreset(
         gradient = listOf(Color(0xFFE10600), Color(0xFF1A0100)),
         glow = Color(0xFFE10600),
         backdrop = BackdropStyle.Picture(R.drawable.bg_grandprix, scrim = 0.35f),
-    ),
-    GRAND_LINE(
+        )
+
+        val GRAND_LINE = ThemePreset(
         label = "Grand Line",
         dark = true,
         primary = Color(0xFFFFC53D),
@@ -162,8 +169,9 @@ enum class ThemePreset(
         gradient = listOf(Color(0xFFE5484D), Color(0xFF2A0A06)),
         glow = Color(0xFFB3261E),
         backdrop = BackdropStyle.Picture(R.drawable.bg_strawhat, scrim = 0.4f),
-    ),
-    SHINOBI(
+        )
+
+        val SHINOBI = ThemePreset(
         label = "Shinobi",
         dark = true,
         primary = Color(0xFFFF8A1F),
@@ -182,8 +190,9 @@ enum class ThemePreset(
         gradient = listOf(Color(0xFFFF8A1F), Color(0xFF2A1400)),
         glow = Color(0xFFC25A00),
         backdrop = BackdropStyle.Picture(R.drawable.bg_ninja, scrim = 0.4f),
-    ),
-    SAKURA(
+        )
+
+        val SAKURA = ThemePreset(
         label = "Sakura",
         dark = false,
         primary = Color(0xFFD6336C),
@@ -201,8 +210,9 @@ enum class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFFF06A9B), Color(0xFFE8457A)),
         glow = Color(0xFFF2A7C3),
-    ),
-    FOREST(
+        )
+
+        val FOREST = ThemePreset(
         label = "Forest",
         dark = true,
         primary = Color(0xFF34C77B),
@@ -220,8 +230,9 @@ enum class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFF2FB86F), Color(0xFF0B2A18)),
         glow = Color(0xFF1E7A47),
-    ),
-    GOLD(
+        )
+
+        val GOLD = ThemePreset(
         label = "Gold",
         dark = true,
         primary = Color(0xFFE3B341),
@@ -239,8 +250,9 @@ enum class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFFD9A83A), Color(0xFF6B4E10)),
         glow = Color(0xFF8A6A1E),
-    ),
-    MINIMAL(
+        )
+
+        val MINIMAL = ThemePreset(
         label = "Minimal",
         dark = false,
         primary = Color(0xFF141414),
@@ -258,8 +270,9 @@ enum class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFF2B2B2B), Color(0xFF0E0E0E)),
         glow = Color(0xFF9E9E9E),
-    ),
-    NEON(
+        )
+
+        val NEON = ThemePreset(
         label = "Neon",
         dark = true,
         primary = Color(0xFF00E5FF),
@@ -277,8 +290,9 @@ enum class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFFFF2BD6), Color(0xFF1B0B3A)),
         glow = Color(0xFFCE00AE),
-    ),
-    OCEAN(
+        )
+
+        val OCEAN = ThemePreset(
         label = "Ocean",
         dark = true,
         primary = Color(0xFF2EC4D6),
@@ -296,7 +310,8 @@ enum class ThemePreset(
         special = true,
         gradient = listOf(Color(0xFF1C9EC9), Color(0xFF062A45)),
         glow = Color(0xFF0F6E8C),
-    ),
+        )
+    }
 }
 
 /** What sits behind the app: a flat colour, a picture, or a picture over a gradient. */
@@ -321,18 +336,21 @@ class ThemeStore(context: Context) {
         val stored = prefs.getString("preset", "").orEmpty()
         val fromCatalogue = prefs.getString("downloaded", "").orEmpty()
         if (fromCatalogue.isNotEmpty()) {
-            return downloaded.firstOrNull { it.id == fromCatalogue }?.toPreset() ?: ThemePreset.WHITE
+            // Gone from the catalogue, or no longer allowed for this account: fall back,
+            // but remember nothing, so the next open can pick the look up again.
+            val remote = downloaded.firstOrNull { it.id == fromCatalogue }?.toPreset()
+            if (remote != null && AccessStore(context).isSpecial()) remote else ThemePreset.DARK
+        } else {
+            ThemePreset.all.firstOrNull { it.label == stored } ?: ThemePreset.WHITE
         }
-        return runCatching { ThemePreset.valueOf(stored) }.getOrDefault(ThemePreset.WHITE)
     }
 
     fun save(preset: ThemePreset) {
-        // A catalogue look is remembered by its id in the catalogue, not by its name.
-        val id = (preset.backdrop as? BackdropStyle.Remote)
-            ?.let { style -> style.url.substringAfterLast('/').substringBefore('.') }
-            .orEmpty()
+        // A catalogue look is remembered by its id in the catalogue, not by its name,
+        // so a theme that changes colour later still comes back.
+        val id = preset.catalogId.orEmpty()
         prefs.edit()
-            .putString("preset", if (id.isEmpty()) preset.name else "")
+            .putString("preset", if (id.isEmpty()) preset.label else "")
             .putString("downloaded", id)
             .apply()
     }
