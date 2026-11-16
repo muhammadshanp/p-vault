@@ -55,10 +55,12 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
@@ -235,7 +237,20 @@ fun VaultApp(
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     // Picks up special access given or removed by the admin since the last time.
-    LaunchedEffect(Unit) { AccessStore(context).refresh() }
+    var canSuggest by remember { mutableStateOf(AccessStore(context).isMember()) }
+    var suggestionOpen by remember { mutableStateOf(false) }
+    // The picture themes are for special access; the admin always counts.
+    var specialAccess by remember { mutableStateOf(AccessStore(context).isSpecial()) }
+    var themesOpen by remember { mutableStateOf(false) }
+    val themeStore = remember { ThemeStore(context) }
+    LaunchedEffect(Unit) {
+        AccessStore(context).refresh()
+        canSuggest = AccessStore(context).isMember()
+        specialAccess = AccessStore(context).isSpecial()
+        // The chosen look may need a permission this phone no longer has.
+        val allowed = themeStore.load().forAccess(specialAccess)
+        if (allowed != theme) onThemeChange(allowed)
+    }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
@@ -848,6 +863,8 @@ fun VaultApp(
                 if (ok) profileStore.clear()
                 if (ok) GoogleAccountStore(context).clear()
                 if (ok) AccessStore(context).clear()
+                if (ok) canSuggest = false
+                if (ok) specialAccess = false
                 ok
             }
             if (!cleared) {
@@ -950,7 +967,7 @@ fun VaultApp(
     val detail = open
     val chatDetail = openChat
     BackHandler(
-        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen &&
+        enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen && !themesOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -976,12 +993,24 @@ fun VaultApp(
             onAdminChanged = { isAdmin = AdminStore(context).isAdmin() },
             onBack = { adminOpen = false },
         )
+    } else if (themesOpen) {
+        ThemesScreen(
+            theme = theme,
+            specialAccess = specialAccess,
+            onPick = onThemeChange,
+            onBack = { themesOpen = false },
+        )
     } else if (settingsOpen) {
         SettingsScreen(
             theme = theme,
             settings = settings,
             update = availableUpdate,
+            specialAccess = specialAccess,
             onTheme = onThemeChange,
+            onThemes = {
+                settingsOpen = false
+                themesOpen = true
+            },
             onSettings = { next ->
                 val autoWasOff = !settings.autoBackup
                 settings = next
@@ -1057,6 +1086,10 @@ fun VaultApp(
                     onSettings = { closeMenu { settingsOpen = true } },
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
+                    canSuggest = canSuggest,
+                    onSuggest = { closeMenu { suggestionOpen = true } },
+                    canTheme = specialAccess,
+                    onThemes = { closeMenu { themesOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1643,7 +1676,26 @@ fun VaultApp(
                             driveStore.markPending()
                         }
                     },
-                    onDismiss = { profileOpen = false },
+                    onDismiss = {
+                        profileOpen = false
+                        // Signing in or out on the sheet can change this.
+                        scope.launch {
+                            AccessStore(context).refresh()
+                            canSuggest = AccessStore(context).isMember()
+                            specialAccess = AccessStore(context).isSpecial()
+                        }
+                    },
+                )
+            }
+
+            if (suggestionOpen) {
+                SuggestionDialog(
+                    onExternal = onExternal,
+                    onSent = {
+                        suggestionOpen = false
+                        Toast.makeText(context, "Suggestion sent. Thank you.", Toast.LENGTH_LONG).show()
+                    },
+                    onDismiss = { suggestionOpen = false },
                 )
             }
 
@@ -2209,13 +2261,13 @@ private fun HomeContent(
 
 @Composable
 private fun HomeHero(total: Int) {
+    val preset = LocalThemePreset.current
+    val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.linearGradient(listOf(Color(0xFFF0703F), Color(0xFFB9391A))),
-            )
+            .background(Brush.linearGradient(colors))
             .padding(horizontal = 22.dp, vertical = 20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2456,6 +2508,10 @@ private fun MenuDrawer(
     onSettings: () -> Unit,
     isAdmin: Boolean,
     onAdmin: () -> Unit,
+    canSuggest: Boolean,
+    onSuggest: () -> Unit,
+    canTheme: Boolean,
+    onThemes: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -2484,6 +2540,9 @@ private fun MenuDrawer(
         Spacer(Modifier.height(10.dp))
         MenuDrawerItem(Icons.Outlined.Person, "Profile", onProfile)
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
+        if (canTheme) {
+            MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
+        }
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
             icon = Icons.Outlined.SystemUpdateAlt,
@@ -2491,6 +2550,9 @@ private fun MenuDrawer(
             onClick = onCheckUpdates,
             highlight = updateReady,
         )
+        if (canSuggest) {
+            MenuDrawerItem(Icons.Outlined.Lightbulb, "Give suggestion", onSuggest)
+        }
         MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
         if (isAdmin) {
             MenuDrawerItem(Icons.Outlined.AdminPanelSettings, "Admin panel", onAdmin)

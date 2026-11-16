@@ -6,4 +6,6 @@
     <files-path name="vault" path="vault/" />
     <!-- The camera app writes a new photo here; P Vault then moves it into the vault. -->
     <cache-path name="camera" path="camera/" />
+    <!-- A video attached to a suggestion, opened by the admin in a player app. -->
+    <cache-path name="suggestions" path="suggestions/" />
 </paths>

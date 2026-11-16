@@ -357,6 +357,13 @@ fun AdminScreen(
                         }
                     }
                     Spacer(Modifier.height(14.dp))
+                    SuggestionsCard(
+                        busy = busy,
+                        withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
+                        onExternal = onExternal,
+                        onDone = { problem -> if (problem != null) fail(problem) else busy = false },
+                    )
+                    Spacer(Modifier.height(14.dp))
                     SpecialAccessCard(
                         busy = busy,
                         withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },

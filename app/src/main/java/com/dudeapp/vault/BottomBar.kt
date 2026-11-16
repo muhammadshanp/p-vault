@@ -120,6 +120,8 @@ fun BottomBar(
     val systemInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val capsule = CircleShape
     val accent = MaterialTheme.colorScheme.primary
+    // Some looks give the moving pill a coloured halo instead of the plain accent.
+    val halo = LocalThemePreset.current.glow ?: accent
     var rowWidth by remember { mutableIntStateOf(0) }
     Box(
         modifier
@@ -134,7 +136,7 @@ fun BottomBar(
                 ambientColor = Color.Black.copy(alpha = 0.35f),
                 spotColor = Color.Black.copy(alpha = 0.35f),
             )
-            .background(MaterialTheme.colorScheme.surface, capsule)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = if (LocalThemePreset.current.backdrop is BackdropStyle.Plain) 1f else 0.92f), capsule)
             .padding(horizontal = 8.dp),
     ) {
         // The glowing pill, behind the icons. Its shadow is tinted with its own colour.
@@ -147,7 +149,7 @@ fun BottomBar(
                         IntOffset((slot * position() + (slot - PillWidth.toPx()) / 2f).roundToInt(), 0)
                     }
                     .size(width = PillWidth, height = 44.dp)
-                    .shadow(elevation = 12.dp, shape = CircleShape, ambientColor = accent, spotColor = accent)
+                    .shadow(elevation = 12.dp, shape = CircleShape, ambientColor = halo, spotColor = halo)
                     .background(accent, CircleShape),
             )
         }
