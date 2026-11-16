@@ -2528,6 +2528,9 @@ private fun themeArtwork(preset: ThemePreset): ImageBitmap? {
         is BackdropStyle.Picture -> remember(style.image) {
             BitmapFactory.decodeResource(context.resources, style.image)?.asImageBitmap()
         }
+        // A theme made on this phone carries its photos with it, so its backdrop is not an
+        // artwork source here; the card photos come from LocalThemeCards instead.
+        is BackdropStyle.LocalFile -> null
         BackdropStyle.Plain -> null
     }
 }

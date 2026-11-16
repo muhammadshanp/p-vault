@@ -485,19 +485,8 @@ private fun ThemeRow(
 @Composable
 private fun ThemeSwatch(theme: OwnTheme, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(14.dp)
-    val background = remember(theme.background) {
-        theme.background?.let { file ->
-            runCatching {
-                val full = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                val small = android.graphics.Bitmap.createScaledBitmap(
-                    full,
-                    (full.width / 4).coerceAtLeast(1),
-                    (full.height / 4).coerceAtLeast(1),
-                    true,
-                )
-                androidx.compose.ui.graphics.asImageBitmap(small)
-            }.getOrNull()
-        }
+    val background: androidx.compose.ui.graphics.ImageBitmap? = remember(theme.background) {
+        theme.background?.let { file -> readThumbnail(file) }
     }
     Box(
         modifier
@@ -683,3 +672,15 @@ fun OwnTheme.toPreset(base: ThemePreset = ThemePreset.NIGHTFALL): ThemePreset = 
     cardPictures = emptyMap(),
     catalogId = null,
 )
+
+/** A small copy of a photo, for the little preview in a bundle row. */
+private fun readThumbnail(file: File): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeFile(file.absolutePath, bounds)
+    val sample = maxOf(1, minOf(bounds.outWidth, bounds.outHeight) / 120)
+    val bitmap = android.graphics.BitmapFactory.decodeFile(
+        file.absolutePath,
+        android.graphics.BitmapFactory.Options().apply { inSampleSize = sample },
+    )
+    bitmap?.let { androidx.compose.ui.graphics.asImageBitmap(it) }
+}.getOrNull()
