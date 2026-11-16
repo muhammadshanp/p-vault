@@ -9,6 +9,31 @@ android {
     namespace = "com.dudeapp.vault"
     compileSdk = 35
 
+    /**
+     * The key every P Vault release is signed with, so updates install over the old app.
+     *
+     * It is read from a file named by PV_KEYSTORE, falling back to the usual debug
+     * keystore on this PC. Naming the file directly matters on a build server: the
+     * Android plugin's own "debug" config quietly makes up a brand-new key there when it
+     * does not like what it finds, which produced a different fingerprint on every run.
+     */
+    signingConfigs {
+        create("releaseKey") {
+            val keyFile = file(
+                System.getenv("PV_KEYSTORE")
+                    ?: "${System.getProperty("user.home")}/.android/debug.keystore",
+            )
+            // When there is no keystore (a plain test build), leave this config empty and
+            // fall back below; failing the build here would break every test run.
+            if (keyFile.exists()) {
+                storeFile = keyFile
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
@@ -20,9 +45,12 @@ android {
     buildTypes {
         release {
             // Releases are optimised (non-debuggable) builds, which run Compose far more
-            // smoothly than debug builds. They keep the debug signing key because every
-            // earlier P Vault was signed with it, and updates must match that key.
-            signingConfig = signingConfigs.getByName("debug")
+            // smoothly than debug builds. They are signed with the key named above.
+            signingConfig = if (signingConfigs.getByName("releaseKey").storeFile != null) {
+                signingConfigs.getByName("releaseKey")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

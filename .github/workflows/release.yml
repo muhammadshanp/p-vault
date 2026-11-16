@@ -52,8 +52,17 @@ jobs:
             echo "::error::The DEBUG_KEYSTORE_BASE64 secret is not set. Add it under Settings > Secrets and variables > Actions, then run this workflow again."
             exit 1
           fi
-          mkdir -p "$HOME/.android"
-          echo "$KEYSTORE" | tr -d ' \r\n' | base64 -d > "$HOME/.android/debug.keystore"
+          # A neutral path, handed to Gradle as PV_KEYSTORE. It is deliberately not the
+          # plugin's own ~/.android/debug.keystore, which the build server regenerates.
+          target="$RUNNER_TEMP/pv-signing.keystore"
+          echo "$KEYSTORE" | tr -d ' \r\n' | base64 -d > "$target"
+          bytes=$(stat -c %s "$target")
+          if [ "$bytes" -lt 1000 ]; then
+            echo "::error::DEBUG_KEYSTORE_BASE64 decoded to only $bytes bytes, so it is not a keystore. Copy the whole file again."
+            exit 1
+          fi
+          echo "PV_KEYSTORE=$target" >> "$GITHUB_ENV"
+          echo "Keystore ready at $target ($bytes bytes)."
 
       - uses: actions/setup-java@v4
         if: steps.version.outputs.state != 'false'
@@ -66,7 +75,7 @@ jobs:
       - name: Check the signing key
         if: steps.version.outputs.state != 'false'
         run: |
-          store="$HOME/.android/debug.keystore"
+          store="$PV_KEYSTORE"
           actual=$(stat -c %s "$store" || echo 0)
           if [ "$actual" -lt 1000 ]; then
             echo "::error::DEBUG_KEYSTORE_BASE64 decoded to only $actual bytes, so it is not a keystore. Copy the whole file again."
@@ -90,6 +99,26 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease testReleaseUnitTest
           cp app/build/outputs/apk/release/app-release.apk P-Vault.apk
+
+      # Belt and braces: if the APK somehow came out with another key, sign it here with
+      # the keystore that was checked above, rather than publishing something that cannot
+      # update an installed P Vault.
+      - name: Make sure the APK carries the original key
+        if: steps.version.outputs.state != 'false'
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          actual=$("$apksigner" verify --print-certs P-Vault.apk | grep -oP 'certificate SHA-256 digest: \K[0-9a-f]+' | head -1)
+          if [ "$actual" = "$EXPECTED_CERT" ]; then
+            echo "Built and signed with the original key."
+            exit 0
+          fi
+          echo "Built APK has $actual; re-signing with the checked keystore."
+          zipalign=$(ls "$ANDROID_HOME"/build-tools/*/zipalign | sort -V | tail -1)
+          "$zipalign" -f 4 P-Vault.apk P-Vault-aligned.apk
+          "$apksigner" sign --ks "$PV_KEYSTORE" --ks-key-alias androiddebugkey \
+            --ks-pass pass:android --key-pass pass:android \
+            --out P-Vault-resigned.apk P-Vault-aligned.apk
+          mv P-Vault-resigned.apk P-Vault.apk
 
       - name: Check the APK is signed with the original key
         if: steps.version.outputs.state != 'false'
