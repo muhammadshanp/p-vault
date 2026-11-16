@@ -150,8 +150,7 @@ data class AccessDocument(
             theme = keep(theme, atLeast(AccessLevel.THEME)),
             advanced = keep(advanced, atLeast(AccessLevel.ADVANCED)),
             everything = keep(everything, atLeast(AccessLevel.EVERYTHING)),
-            features = keepGroup(features, features.keys.filter { it in features && it in features }.toSet() +
-                AccessFeature.entries.filter { it in features }.toSet()),
+            features = keepGroup(features, features.keys + AccessFeature.entries.filter { it in features }.toSet()),
             looks = keepGroup(looks, looks.map { it.trim().lowercase() }.toSet()),
         )
     }

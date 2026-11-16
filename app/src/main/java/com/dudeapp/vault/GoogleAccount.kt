@@ -152,7 +152,7 @@ fun GoogleAccountSection(
                 email = user.email
                 busy = false
                 onSignedIn(user)
-                special = access.refresh()
+                special = access.refresh().theme
             }
         }
     }
