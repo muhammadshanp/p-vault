@@ -63,6 +63,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -249,6 +251,12 @@ fun VaultApp(
     val specialAccess = access.theme
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
+    var bundlesOpen by remember { mutableStateOf(false) }
+    var assistantOpen by remember { mutableStateOf(false) }
+    // A theme made on this phone, if one is being worn.
+    val ownTheme = Bundles.applied.value
+    val bundlesStore = remember { BundleStore(context) }
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { Bundles.publish(bundlesStore) } }
     // The photos this phone chose for its cards, one per card at most.
     val cardPhotos = remember { CardPhotoStore(context) }
     // Read as state, so a card redraws the moment its photo is chosen or removed.
@@ -1011,7 +1019,7 @@ fun VaultApp(
     val chatDetail = openChat
     BackHandler(
         enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen &&
-            !themesOpen && !advancedThemesOpen &&
+            !themesOpen && !advancedThemesOpen && !bundlesOpen && !assistantOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -1029,7 +1037,18 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (inboxOpen) {
+    if (assistantOpen) {
+        AssistantScreen(
+            onOpenItem = { assistantOpen = false; open = it },
+            onBack = { assistantOpen = false },
+        )
+    } else if (bundlesOpen) {
+        BundlesScreen(
+            canEdit = access.copy(admin = isAdmin).advanced,
+            onApplied = { bundlesOpen = false },
+            onBack = { bundlesOpen = false },
+        )
+    } else if (inboxOpen) {
         InboxScreen(onBack = { inboxOpen = false })
     } else if (adminOpen) {
         AdminScreen(
@@ -1061,6 +1080,7 @@ fun VaultApp(
                 cardPhotos.clear(kind)
                 cardPhotos.publish()
             },
+            onBundles = { advancedThemesOpen = false; bundlesOpen = true },
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
@@ -1174,6 +1194,10 @@ fun VaultApp(
                     canSuggest = canSuggest,
                     onSuggest = { closeMenu { suggestionOpen = true } },
                     canTheme = access.theme,
+                    canBundles = access.copy(admin = isAdmin).advanced,
+                    canAssistant = access.copy(admin = isAdmin).has(AccessFeature.ASSISTANT),
+                    onBundles = { bundlesOpen = true },
+                    onAssistant = { assistantOpen = true },
                     onThemes = { closeMenu { themesOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
@@ -2353,7 +2377,7 @@ private fun HomeHero(total: Int) {
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     val shape = RoundedCornerShape(28.dp)
-    val heroPhoto = CardPhotoFiles.current.value[CardPicture.HERO]
+    val heroPhoto = LocalThemeCards.current[CardPicture.HERO] ?: CardPhotoFiles.current.value[CardPicture.HERO]
     val heroPicture = if (heroPhoto != null) null else preset.cardPictures[CardPicture.HERO]
     val artwork = if (heroPicture != null) {
         remember(heroPicture) {
@@ -2519,7 +2543,8 @@ private fun HomeTile(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(22.dp)
-    val photo = CardPhotoFiles.current.value[kind]
+    // A theme made on this phone first, then a photo chosen for this card on its own.
+    val photo = LocalThemeCards.current[kind] ?: CardPhotoFiles.current.value[kind]
     // A photo of the user's own is the whole card; the theme's picture sits behind a wash.
     val ownPhoto = photo != null
     val picture = if (ownPhoto) null else LocalThemePreset.current.cardPictures[kind]

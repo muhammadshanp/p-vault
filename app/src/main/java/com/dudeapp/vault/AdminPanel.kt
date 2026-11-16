@@ -9,6 +9,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -165,6 +169,8 @@ fun AdminScreen(
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var confirmOpen by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf(AdminPage.MESSAGE) }
+    val adminPages = listOf(AdminPage.MESSAGE, AdminPage.PEOPLE, AdminPage.ACCOUNT)
     // What to do with the Google pass once it arrives.
     var afterToken by remember { mutableStateOf<((String) -> Unit)?>(null) }
 
@@ -310,68 +316,45 @@ fun AdminScreen(
                         }
                     }
                 } else {
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Send a notification", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "It goes to everyone who has P Vault 0.5.6 or newer, even when the app is closed.",
-                                color = TextSoft,
-                                fontSize = 12.sp,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            OutlinedTextField(
-                                value = title,
-                                onValueChange = {
-                                    title = it.take(65)
-                                    error = null
-                                },
-                                label = { Text("Title") },
-                                singleLine = true,
-                                enabled = !busy,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = body,
-                                onValueChange = {
-                                    body = it.take(240)
-                                    error = null
-                                },
-                                label = { Text("Message") },
-                                minLines = 3,
-                                maxLines = 6,
-                                enabled = !busy,
-                                modifier = Modifier.fillMaxWidth(),
+                    Spacer(Modifier.height(6.dp))
+                    AdminPages(pages = adminPages, selected = page, onSelect = { page = it })
+                    Spacer(Modifier.height(12.dp))
+                    when (page) {
+                        AdminPage.PEOPLE -> {
+                            SpecialAccessCard(
+                                busy = busy,
+                                shareableLooks = shareableLooks,
+                                withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
+                                onDone = { problem -> if (problem != null) fail(problem) else busy = false },
                             )
                             Spacer(Modifier.height(14.dp))
-                            Button(
-                                onClick = { confirmOpen = true },
-                                enabled = !busy && title.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(if (busy) "Sending…" else "Send to all users")
-                            }
+                            SuggestionsCard(
+                                busy = busy,
+                                withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
+                                onExternal = onExternal,
+                                onDone = { problem -> if (problem != null) fail(problem) else busy = false },
+                            )
                         }
+                        AdminPage.MESSAGE -> AdminMessageCard(
+                            busy = busy,
+                            title = title,
+                            body = body,
+                            onTitle = { title = it.take(60); error = null },
+                            onBody = { body = it.take(240); error = null },
+                            onSend = { confirmOpen = true },
+                        )
+                        AdminPage.ACCOUNT -> AdminAccountCard(
+                            email = email,
+                            busy = busy,
+                            onSignOut = {
+                                admin.clear()
+                                signedIn = false
+                                email = null
+                                error = null
+                                onAdminChanged()
+                            },
+                        )
                     }
-                    Spacer(Modifier.height(14.dp))
-                    SuggestionsCard(
-                        busy = busy,
-                        withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
-                        onExternal = onExternal,
-                        onDone = { problem -> if (problem != null) fail(problem) else busy = false },
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    SpecialAccessCard(
-                        busy = busy,
-                        shareableLooks = shareableLooks,
-                        withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
-                        onDone = { problem -> if (problem != null) fail(problem) else busy = false },
-                    )
                     Spacer(Modifier.height(14.dp))
                     Text(
                         "Signed in as ${email.orEmpty()}",
@@ -379,21 +362,7 @@ fun AdminScreen(
                         fontSize = 12.sp,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
-                    TextButton(
-                        onClick = {
-                            admin.clear()
-                            signedIn = false
-                            email = null
-                            error = null
-                            onAdminChanged()
-                        },
-                        enabled = !busy,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    ) {
-                        Text("Sign out")
-                    }
                 }
-
                 val message = error
                 if (message != null) {
                     Spacer(Modifier.height(12.dp))
@@ -424,5 +393,136 @@ fun AdminScreen(
             },
             dismissButton = { TextButton(onClick = { confirmOpen = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/** The parts of the admin panel, each on its own page. */
+enum class AdminPage(val label: String) {
+    MESSAGE("Message"),
+    PEOPLE("People"),
+    ACCOUNT("Account"),
+}
+
+/** The page tabs: two columns, so a thumb reaches every one. */
+@Composable
+private fun AdminPages(
+    pages: List<AdminPage>,
+    selected: AdminPage,
+    onSelect: (AdminPage) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        pages.forEach { page ->
+            val active = page == selected
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                border = BorderStroke(
+                    1.dp,
+                    if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { onSelect(page) },
+            ) {
+                Text(
+                    page.label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = 9.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Sending one notification to everybody who has the app. */
+@Composable
+private fun AdminMessageCard(
+    busy: Boolean,
+    title: String,
+    body: String,
+    onTitle: (String) -> Unit,
+    onBody: (String) -> Unit,
+    onSend: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Send a notification", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "It goes to everyone who has P Vault 0.5.6 or newer, even when the app is closed.",
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = title,
+                onValueChange = onTitle,
+                label = { Text("Title") },
+                singleLine = true,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = body,
+                onValueChange = onBody,
+                label = { Text("Message") },
+                minLines = 3,
+                maxLines = 6,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(14.dp))
+            Button(
+                onClick = onSend,
+                enabled = !busy && title.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (busy) "Sending…" else "Send to all users")
+            }
+        }
+    }
+}
+
+/** Whose sign-in this is, and how to leave it. */
+@Composable
+private fun AdminAccountCard(
+    email: String?,
+    busy: Boolean,
+    onSignOut: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("This admin sign-in", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                email.orEmpty().ifBlank { "No address" },
+                color = TextSoft,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "The panel is open while this account is signed in. Signing out leaves the phone " +
+                    "without the panel until an admin signs in again; nothing else changes.",
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onSignOut, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text("Sign out")
+            }
+        }
     }
 }

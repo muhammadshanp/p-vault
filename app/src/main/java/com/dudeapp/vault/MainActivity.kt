@@ -81,7 +81,11 @@ class MainActivity : FragmentActivity() {
                 onDispose { }
             }
             CompositionLocalProvider(LocalDownloadedThemes provides catalogThemes) {
-            PVaultTheme(theme) {
+            // A theme made on this phone replaces the chosen look, backdrop and cards and all.
+            val ownTheme = Bundles.applied.value
+            val ownPreset = ownTheme?.toPreset(theme) ?: theme
+            PVaultTheme(ownPreset) {
+                CompositionLocalProvider(LocalThemeCards provides ownTheme?.cards.orEmpty()) {
                 when {
                     needsLockChoice -> LockChoiceScreen(
                         onEnable = {
@@ -132,6 +136,7 @@ class MainActivity : FragmentActivity() {
                         },
                     )
                 }
+            }
             }
             }
         }

@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,7 +44,7 @@ val TextSoft: Color
  * The coral accent matches the logo; the light theme uses a deeper coral so white button
  * text stays readable, and errors are a real red instead of the accent.
  */
-class ThemePreset(
+data class ThemePreset(
     val label: String,
     val dark: Boolean,
     val primary: Color,
@@ -398,6 +400,9 @@ sealed class BackdropStyle {
 
     /** A picture downloaded from the theme catalogue and kept in the app's files. */
     class Remote(val url: String, val scrim: Float = 0.4f) : BackdropStyle()
+
+    /** A photo this phone chose for a theme of its own. */
+    class LocalFile(val file: java.io.File, val scrim: Float = 0.4f) : BackdropStyle()
 }
 
 class ThemeStore(private val context: Context) {
@@ -576,6 +581,35 @@ fun Backdrop() {
             }
         }
 
+        is BackdropStyle.LocalFile -> Box(Modifier.fillMaxSize()) {
+            val picture = remember(style.file) {
+                android.graphics.BitmapFactory.decodeFile(style.file.absolutePath)
+                    ?.let { android.graphics.Bitmap.createScaledBitmap(it, it.width / 2, it.height / 2, true) }
+                    ?.asImageBitmap()
+            }
+            if (picture != null) {
+                Image(
+                    bitmap = picture,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to preset.background.copy(alpha = style.scrim),
+                            0.45f to preset.background.copy(alpha = style.scrim + 0.18f),
+                            1f to preset.background,
+                        ),
+                    ),
+            )
+        }
+
         is BackdropStyle.Picture -> Box(Modifier.fillMaxSize()) {
             Image(
                 painter = painterResource(style.image),
@@ -597,6 +631,13 @@ fun Backdrop() {
         }
     }
 }
+
+/**
+ * The card photos of a theme made on this phone, provided to every card the same way the
+ * chosen card photos are. A theme from the catalogue uses resources instead, which need no
+ * provider.
+ */
+val LocalThemeCards = compositionLocalOf<Map<CardPicture, java.io.File>> { emptyMap() }
 
 /** The active look, for the few places that need more than the colours (backdrop, glow). */
 val LocalThemePreset = compositionLocalOf { ThemePreset.WHITE }

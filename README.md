@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.26** — Bundles: make your own themes on the phone (a background photo and a photo for each card) and group them into named bundles; one theme can sit in several. The admin panel is now three pages — Message, People, Account — and there is an Assistant page, off unless the admin gives the Assistant switch to an address.
 - **0.5.25** — Every card is the same size on every theme, and a card picture is now a background behind the card's own label instead of a replacement for the card. The Advanced page lets you pick a photo for each card — the big Home card and the four Library tiles — and the card keeps its size, its name and its count.
 - **0.5.24** — Access is now per address. Each Google address gets a level — No access, Theme, Theme + Advanced, or Everything — plus each switch (Give suggestion) and each look that is shared by hand. The Advanced page opens for the addresses you allow, and Nightfall is shared per address instead of being admin-only. Moonlit stays the owner's.
 - **0.5.23** — A card picture in an advanced theme now fills its card, cropped to fit, so any picture size works; the card keeps its size and the label stays readable over a soft wash.
@@ -200,4 +201,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.25 (versionCode 55).
+`com.dudeapp.vault` — version 0.5.26 (versionCode 56).
