@@ -243,12 +243,42 @@ fun VaultApp(
     var specialAccess by remember { mutableStateOf(AccessStore(context).isSpecial()) }
     var themesOpen by remember { mutableStateOf(false) }
     val themeStore = remember { ThemeStore(context) }
+    // Looks that arrive from the theme catalogue, without a new app build.
+    val catalogue = remember { ThemeCatalogue(context) }
+    var catalogThemes by remember { mutableStateOf<List<DownloadedTheme>>(emptyList()) }
+    var catalogRefreshing by remember { mutableStateOf(false) }
+    var catalogProblem by remember { mutableStateOf<String?>(null) }
+
+    // Only the looks this account may use, with their pictures downloaded for offline use.
+    LaunchedEffect(catalogThemes, specialAccess) {
+        val email = GoogleAccountStore(context).email()
+        val mine = catalogThemes.filter { it.isAllowedFor(email, specialAccess) }
+        mine.forEach { catalogue.downloadPicture(it) }
+        catalogue.tidy(mine)
+    }
+
+    fun loadCatalogue(lookOnline: Boolean) {
+        if (lookOnline) catalogRefreshing = true
+        scope.launch {
+            val fetched = if (lookOnline) catalogue.refresh() else null
+            if (lookOnline && fetched == null) {
+                catalogProblem = "No connection. Showing the looks already on this phone."
+            } else {
+                catalogProblem = null
+            }
+            catalogThemes = fetched ?: catalogue.cached()
+            catalogRefreshing = false
+        }
+    }
+    LaunchedEffect(Unit) { loadCatalogue(lookOnline = true) }
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
         canSuggest = AccessStore(context).isMember()
         specialAccess = AccessStore(context).isSpecial()
-        // The chosen look may need a permission this phone no longer has.
-        val allowed = themeStore.load().forAccess(specialAccess)
+        // The chosen look may need a permission this phone no longer has, and a look from
+        // the catalogue is only known once its copy has been read.
+        catalogThemes = catalogue.cached()
+        val allowed = themeStore.load(catalogThemes).forAccess(specialAccess)
         if (allowed != theme) onThemeChange(allowed)
     }
     var reminderNeverBackedUp by remember { mutableStateOf(false) }
@@ -997,6 +1027,12 @@ fun VaultApp(
         ThemesScreen(
             theme = theme,
             specialAccess = specialAccess,
+            catalogThemes = catalogThemes.filter {
+                it.isAllowedFor(GoogleAccountStore(context).email(), specialAccess)
+            },
+            refreshing = catalogRefreshing,
+            catalogueProblem = catalogProblem,
+            onRefresh = { loadCatalogue(lookOnline = true) },
             onPick = onThemeChange,
             onBack = { themesOpen = false },
         )

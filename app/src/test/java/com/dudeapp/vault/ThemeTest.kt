@@ -11,21 +11,21 @@ class ThemeTest {
     fun onlyLightAndDarkAreFree() {
         assertEquals(
             listOf(ThemePreset.WHITE, ThemePreset.DARK),
-            ThemePreset.entries.filter { !it.special },
+            ThemePreset.all.filter { !it.special },
         )
-        assertTrue(ThemePreset.entries.count { it.special } >= 4)
+        assertTrue(ThemePreset.all.count { it.special } >= 4)
     }
 
     @Test
     fun everySpecialLookHasAGradient() {
-        ThemePreset.entries.filter { it.special }.forEach { preset ->
+        ThemePreset.all.filter { it.special }.forEach { preset ->
             assertEquals(2, preset.gradient?.size)
         }
     }
 
     @Test
     fun aThemeNeedingAccessFallsBackToDark() {
-        val special = ThemePreset.entries.first { it.special }
+        val special = ThemePreset.all.first { it.special }
         assertEquals(special, special.forAccess(true))
         assertEquals(ThemePreset.DARK, special.forAccess(false))
         assertEquals(ThemePreset.DARK, special.withoutAccess())
@@ -44,7 +44,7 @@ class ThemeTest {
     @Test
     fun textStaysReadableOnEveryTheme() {
         // Dark looks need light text and the other way round; a mix means white-on-white.
-        ThemePreset.entries.forEach { preset ->
+        ThemePreset.all.forEach { preset ->
             val background = preset.background.luminance()
             val text = preset.onBackground.luminance()
             if (preset.dark) {

@@ -1,5 +1,6 @@
 package com.dudeapp.vault
 
+import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -10,6 +11,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +40,9 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -47,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +66,12 @@ import androidx.compose.ui.unit.sp
 fun ThemesScreen(
     theme: ThemePreset,
     specialAccess: Boolean,
+    /** The looks from the catalogue, already filtered to the ones this account may use. */
+    catalogThemes: List<DownloadedTheme>,
+    /** True while the catalogue is being fetched. */
+    refreshing: Boolean,
+    catalogueProblem: String?,
+    onRefresh: () -> Unit,
     onPick: (ThemePreset) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -118,15 +129,68 @@ fun ThemesScreen(
                                     fontSize = 13.sp,
                                 )
                             }
+                            Spacer(Modifier.height(10.dp))
+                            // New looks arrive here without a new app build.
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(
+                                    Modifier.padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("New themes", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            catalogueProblem
+                                                ?: if (refreshing) {
+                                                    "Checking for new themes…"
+                                                } else {
+                                                    "Look for new looks. Nothing leaves your phone but the request."
+                                                },
+                                            color = if (catalogueProblem != null) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                TextSoft
+                                            },
+                                            fontSize = 12.sp,
+                                        )
+                                    }
+                                    TextButton(onClick = onRefresh, enabled = !refreshing) {
+                                        Text(if (refreshing) "Checking…" else "Check")
+                                    }
+                                }
+                            }
                         }
                     }
-                    items(ThemePreset.entries) { preset ->
+                    items(ThemePreset.all) { preset ->
                         ThemeOption(
                             preset = preset,
                             selected = preset == theme,
                             locked = preset.special && !specialAccess,
                             onClick = {
                                 if (!(preset.special && !specialAccess)) {
+                                    onPick(preset)
+                                    close()
+                                }
+                            },
+                        )
+                    }
+                    items(catalogThemes, key = { "store:" + it.id }) { downloaded ->
+                        val preset = downloaded.toPreset()
+                        ThemeOption(
+                            preset = preset,
+                            picture = themePicture(downloaded),
+                            selected = preset.label == theme.label && preset.background == theme.background,
+                            locked = !specialAccess,
+                            badge = "New",
+                            onClick = {
+                                if (specialAccess) {
                                     onPick(preset)
                                     close()
                                 }
@@ -145,6 +209,9 @@ private fun ThemeOption(
     selected: Boolean,
     locked: Boolean,
     onClick: () -> Unit,
+    /** A downloaded picture, when the look came from the catalogue. */
+    picture: Bitmap? = null,
+    badge: String? = null,
 ) {
     val shape = RoundedCornerShape(22.dp)
     val ring = when {
@@ -168,7 +235,21 @@ private fun ThemeOption(
                 .background(preset.background),
         ) {
             val style = preset.backdrop
-            if (style is BackdropStyle.Picture) {
+            if (picture != null) {
+                Image(
+                    bitmap = picture.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(preset.background.copy(alpha = (style as? BackdropStyle.Remote)?.scrim ?: 0.4f)),
+                )
+            } else if (style is BackdropStyle.Remote) {
+                Box(Modifier.fillMaxSize().background(preset.background))
+            } else if (style is BackdropStyle.Picture) {
                 Image(
                     painter = painterResource(style.image),
                     contentDescription = null,
@@ -223,6 +304,20 @@ private fun ThemeOption(
                         .background(preset.primary),
                 )
             }
+            if (badge != null && !locked) {
+                Text(
+                    text = badge,
+                    color = preset.onPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clip(CircleShape)
+                        .background(preset.primary)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
             if (locked) {
                 Box(
                     Modifier
@@ -252,6 +347,7 @@ private fun ThemeOption(
                 Text(
                     text = when {
                         locked -> "Special access"
+                        badge != null -> "New · special"
                         preset.special -> "Special theme"
                         else -> "Everyone"
                     },
