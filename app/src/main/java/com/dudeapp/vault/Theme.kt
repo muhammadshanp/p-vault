@@ -462,8 +462,25 @@ fun Backdrop() {
         is BackdropStyle.Remote -> {
             val theme = downloadedThemes.firstOrNull { it.pictureUrl == style.url }
             val file = theme?.let { ThemeCatalogue(context).picture(it) }
+            // Only the top of the picture is washed out, so the hero card and the section
+            // rows below it can be read; further down the cards are dark enough already.
             if (file != null) {
-                RemoteBackdrop(picture = file, scrimColor = preset.background, scrim = style.scrim)
+                Box(Modifier.fillMaxSize()) {
+                    RemoteBackdrop(picture = file, scrimColor = Color.Transparent, scrim = 0f)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to preset.background.copy(alpha = style.scrim + 0.15f),
+                                    0.32f to preset.background.copy(alpha = style.scrim * 0.6f),
+                                    0.55f to preset.background.copy(alpha = 0.25f),
+                                    0.75f to preset.background.copy(alpha = 0.45f),
+                                    1f to preset.background.copy(alpha = 0.7f),
+                                ),
+                            ),
+                    )
+                }
             } else {
                 Box(
                     Modifier

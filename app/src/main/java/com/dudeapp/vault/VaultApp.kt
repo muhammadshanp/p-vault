@@ -2206,6 +2206,7 @@ private fun HomeContent(
                         title = "Photos",
                         detail = countLabel(images, "photo"),
                         onClick = { onOpenTab(Tab.IMAGES) },
+                        ghost = Icons.Outlined.Image,
                         modifier = Modifier.weight(1f),
                     )
                     HomeTile(
@@ -2214,6 +2215,7 @@ private fun HomeContent(
                         title = "PDFs",
                         detail = countLabel(pdfs, "PDF"),
                         onClick = { onOpenTab(Tab.PDFS) },
+                        ghost = Icons.Outlined.PictureAsPdf,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2224,6 +2226,7 @@ private fun HomeContent(
                         title = "Notes & chats",
                         detail = "${countLabel(notes, "note")} · ${countLabel(chats.size, "chat")}",
                         onClick = { onOpenTab(Tab.NOTES) },
+                        ghost = Icons.Outlined.ChatBubbleOutline,
                         modifier = Modifier.weight(1f),
                     )
                     HomeTile(
@@ -2232,6 +2235,7 @@ private fun HomeContent(
                         title = "Reels",
                         detail = countLabel(reels.size, "reel"),
                         onClick = { onOpenTab(Tab.REELS) },
+                        ghost = Icons.Outlined.PlayCircle,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -2350,38 +2354,61 @@ private fun HomeTile(
     detail: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** A faint, oversized icon in the corner, like the artwork on the theme pictures. */
+    ghost: ImageVector? = null,
 ) {
+    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier
-            .vaultCard(RoundedCornerShape(22.dp))
+            .vaultCard(shape)
+            .accentWash(tint, strength = 0.8f, shape = shape)
             .clickable(onClick = onClick)
             .padding(16.dp),
     ) {
-        IconBadge(icon = icon, tint = tint)
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = detail,
-            color = TextSoft,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(Modifier.weight(1f, fill = false)) {
+            IconBadge(icon = icon, tint = tint)
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = detail,
+                color = TextSoft,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (ghost != null) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(34.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(
+                    imageVector = ghost,
+                    contentDescription = null,
+                    tint = tint.copy(alpha = 0.22f),
+                    modifier = Modifier.size(44.dp),
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun HomeRecentRow(item: VaultItem, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            .vaultCard(RoundedCornerShape(20.dp))
+            .vaultCard(shape)
+            .accentWash(accentOf(item.type), strength = 0.35f, shape = shape)
             .clickable(onClick = onClick)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
