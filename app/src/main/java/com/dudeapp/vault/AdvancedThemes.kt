@@ -319,7 +319,7 @@ private fun CardPreview(preset: ThemePreset, kind: CardPicture, height: androidx
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.Black.copy(alpha = 0.45f),
+                                0f to Color.Black.copy(alpha = 0.45f),
                                 0.55f to Color.Black.copy(alpha = 0.12f),
                                 1f to Color.Black.copy(alpha = 0.5f),
                             ),
