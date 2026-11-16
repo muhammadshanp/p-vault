@@ -73,22 +73,12 @@ fun Modifier.vaultCard(
 ): Modifier =
     this
         .clip(shape)
-        // A photo of the user's own is the card: the labels sit on it, with a wash to read by.
+        // A photo of the user's own is the card, so the surface steps aside for it; the wash
+        // that keeps the labels readable is drawn over the photo, in cardPicture().
         .background(
-            if (pictureIsCard) {
-                Brush.verticalGradient(
-                    listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.55f)),
-                )
-            } else {
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()),
-                        MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha()),
-                    ),
-                )
-            },
+            MaterialTheme.colorScheme.surface.copy(alpha = if (pictureIsCard) 0f else cardAlpha()),
         )
-        .cardPicture(shape, picture, file)
+        .cardPicture(shape, picture, file, wash = pictureIsCard)
         .border(
             width = if (marked) 2.dp else 1.dp,
             color = if (marked) {
@@ -112,6 +102,8 @@ fun Modifier.cardPicture(
     shape: Shape,
     @DrawableRes picture: Int? = null,
     file: File? = null,
+    /** True when the picture is the card: a dark wash is drawn over it, under the labels. */
+    wash: Boolean = false,
 ): Modifier {
     if (picture == null && file == null) return this
     val res = LocalContext.current.resources
@@ -131,6 +123,19 @@ fun Modifier.cardPicture(
                 dstSize = IntSize(width.toInt() + 1, height.toInt() + 1),
                 filterQuality = FilterQuality.Medium,
             )
+            if (wash) {
+                // Over the photo, under the labels: dark at the top and bottom, where the
+                // name and the count sit, and lighter in the middle so the photo shows.
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.45f),
+                            0.55f to Color.Black.copy(alpha = 0.12f),
+                            1f to Color.Black.copy(alpha = 0.5f),
+                        ),
+                    ),
+                )
+            }
             drawContent()
         }
     }
