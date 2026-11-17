@@ -62,8 +62,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -249,7 +247,6 @@ fun VaultApp(
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
     var bundlesOpen by remember { mutableStateOf(false) }
-    var assistantOpen by remember { mutableStateOf(false) }
     // A theme made on this phone, if one is being worn.
     val ownTheme = Bundles.applied.value
     val bundlesStore = remember { BundleStore(context) }
@@ -1014,7 +1011,7 @@ fun VaultApp(
     val chatDetail = openChat
     BackHandler(
         enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen &&
-            !themesOpen && !advancedThemesOpen && !bundlesOpen && !assistantOpen &&
+            !themesOpen && !advancedThemesOpen && !bundlesOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -1032,18 +1029,7 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (assistantOpen) {
-        SupportScreen(
-            onExternal = onExternal,
-            onBack = { assistantOpen = false },
-        )
-    } else if (bundlesOpen) {
-        BundlesScreen(
-            canEdit = access.copy(admin = isAdmin).advanced && settings.advancedMode,
-            onApplied = { bundlesOpen = false },
-            onBack = { bundlesOpen = false },
-        )
-    } else if (inboxOpen) {
+    if (inboxOpen) {
         InboxScreen(onBack = { inboxOpen = false })
     } else if (adminOpen) {
         AdminScreen(
@@ -1075,7 +1061,8 @@ fun VaultApp(
                 cardPhotos.clear(kind)
                 cardPhotos.publish()
             },
-            onBundles = { advancedThemesOpen = false; bundlesOpen = true },
+            bundlesOpen = bundlesOpen,
+            onBundles = { bundlesOpen = it },
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
@@ -1190,10 +1177,6 @@ fun VaultApp(
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
                     canTheme = access.theme,
-                    canBundles = access.copy(admin = isAdmin).advanced && settings.advancedMode,
-                    canAssistant = access.copy(admin = isAdmin).has(AccessFeature.SUPPORT),
-                    onBundles = { bundlesOpen = true },
-                    onAssistant = { assistantOpen = true },
                     onThemes = { closeMenu { themesOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
@@ -2741,10 +2724,6 @@ private fun MenuDrawer(
     isAdmin: Boolean,
     onAdmin: () -> Unit,
     canTheme: Boolean,
-    canBundles: Boolean,
-    canAssistant: Boolean,
-    onBundles: () -> Unit,
-    onAssistant: () -> Unit,
     onThemes: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
@@ -2776,12 +2755,6 @@ private fun MenuDrawer(
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
         if (canTheme) {
             MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
-        }
-        if (canBundles) {
-            MenuDrawerItem(Icons.Outlined.Collections, "Bundles", onBundles)
-        }
-        if (canAssistant) {
-            MenuDrawerItem(Icons.Outlined.SupportAgent, "Support", onAssistant)
         }
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(

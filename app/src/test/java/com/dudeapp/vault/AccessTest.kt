@@ -27,7 +27,7 @@ class AccessTest {
     fun commitWritesTheLevelsOfEveryAddress() {
         val people = listOf(
             AccessPerson("a@b.co", AccessLevel.THEME),
-            AccessPerson("c@d.co", AccessLevel.ADVANCED, features = setOf(AccessFeature.SUPPORT), looks = setOf("nightfall")),
+            AccessPerson("c@d.co", AccessLevel.ADVANCED, looks = setOf("nightfall")),
         )
         val writes = JSONObject(accessCommitJson(people)).getJSONArray("writes")
         assertEquals(2, writes.length())
@@ -42,7 +42,8 @@ class AccessTest {
         assertEquals(AccessLevel.THEME, document.level(emailHash("a@b.co")))
         assertEquals(AccessLevel.ADVANCED, document.level(emailHash("c@d.co")))
         assertEquals(AccessLevel.NONE, document.level(emailHash("e@f.co")))
-        assertEquals(setOf(AccessFeature.SUPPORT), document.featuresOf(emailHash("c@d.co")))
+        // No switches are given here; the list of switches is empty for now.
+        assertEquals(emptySet<AccessFeature>(), document.featuresOf(emailHash("c@d.co")))
         assertEquals(setOf("nightfall"), document.looksOf(emailHash("c@d.co"), AccessLevel.ADVANCED))
         // The theme level alone does not reach the advanced page.
         assertTrue(document.level(emailHash("a@b.co")).allows(AccessLevel.THEME))
@@ -54,7 +55,6 @@ class AccessTest {
         val given = AccessDocument().with(
             emailHash("a@b.co"),
             AccessLevel.ADVANCED,
-            features = setOf(AccessFeature.SUPPORT),
             looks = setOf("nightfall"),
         )
         assertTrue(emailHash("a@b.co") in given.advanced)
@@ -85,12 +85,13 @@ class AccessTest {
         assertTrue(admin.theme)
         assertTrue(admin.advanced)
         assertTrue(admin.allowsLook("anything"))
-        assertTrue(admin.has(AccessFeature.SUPPORT))
+        // With no switches in the model there is nothing to grant, and nothing to check.
+        AccessFeature.entries.firstOrNull()?.let { assertTrue(admin.has(it)) }
         val plain = MyAccess(level = AccessLevel.THEME)
         assertTrue(plain.theme)
         assertFalse(plain.advanced)
         assertFalse(plain.allowsLook("nightfall"))
         assertTrue(plain.allowsLook(null))
-        assertFalse(plain.has(AccessFeature.SUPPORT))
+        AccessFeature.entries.firstOrNull()?.let { assertFalse(plain.has(it)) }
     }
 }

@@ -79,8 +79,9 @@ fun AdvancedThemesScreen(
     /** A photo was picked for one card; null when the picker was closed. */
     onPhoto: (CardPicture, Uri?) -> Unit = { _, _ -> },
     onClearPhoto: (CardPicture) -> Unit = {},
-    /** Opens the bundles page, where themes made on this phone live. */
-    onBundles: () -> Unit = {},
+    /** True while the bundles are open; the page shows them instead of the looks. */
+    bundlesOpen: Boolean = false,
+    onBundles: (Boolean) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -145,7 +146,16 @@ fun AdvancedThemesScreen(
                         )
                     }
                     item {
-                        BundlesEntry(onClick = onBundles)
+                        BundlesEntry(open = bundlesOpen, onClick = { onBundles(!bundlesOpen) })
+                    }
+                    if (bundlesOpen) {
+                        // The bundles live here, on the Advanced page, not in the menu.
+                        item {
+                            BundlesSection(
+                                canEdit = access.advanced,
+                                onApplied = close,
+                            )
+                        }
                     }
                     item {
                         // One photo per card, chosen from this phone.
@@ -394,11 +404,11 @@ internal fun cardPictureName(kind: CardPicture): String = when (kind) {
     CardPicture.REELS -> "Reels card"
 }
 
-/** The way through to the bundles, on the Advanced page. */
+/** The way into the bundles, inside the Advanced page itself. */
 @Composable
-private fun BundlesEntry(onClick: () -> Unit) {
+private fun BundlesEntry(open: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(24.dp)
-    Column(
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
@@ -406,12 +416,24 @@ private fun BundlesEntry(onClick: () -> Unit) {
             .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), shape)
             .clickable(onClick = onClick)
             .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Your bundles", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (open) "Hide your bundles" else "Your bundles",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Group the themes you make into named sets. A theme can sit in more than one bundle.",
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+        }
         Text(
-            "Group the themes you make into named sets. A theme can sit in more than one bundle.",
-            color = TextSoft,
-            fontSize = 12.sp,
+            if (open) "▲" else "▼",
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 14.sp,
         )
     }
 }
