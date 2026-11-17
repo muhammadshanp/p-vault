@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,7 +76,11 @@ fun ThemesScreen(
     access: MyAccess = MyAccess(),
     /** Opens the advanced page, where background and card pictures are chosen. */
     onAdvanced: () -> Unit = {},
-    /** The advanced look in use, if any, so the entry can say so. */
+    /** True while advanced mode is on; the row is a switch, not a door, when it is off. */
+    advancedOn: Boolean = true,
+    /** Turns advanced mode on or off right here. */
+    onAdvancedChange: (Boolean) -> Unit = {},
+    /** Something advanced is in use, so the row can say so. */
     advancedInUse: Boolean = false,
     /** The looks from the catalogue, already filtered to the ones this account may use. */
     catalogThemes: List<DownloadedTheme>,
@@ -155,7 +160,7 @@ fun ThemesScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(20.dp))
-                                    .clickable(onClick = onAdvanced),
+                                    .clickable(enabled = advancedOn, onClick = onAdvanced),
                             ) {
                                 Row(
                                     Modifier.padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
@@ -182,16 +187,29 @@ fun ThemesScreen(
                                             }
                                         }
                                         Text(
-                                            "Background and card pictures, chosen separately.",
+                                            if (advancedOn) {
+                                                "On · backgrounds, your own themes and bundles."
+                                            } else {
+                                                "Off · the Advanced page is hidden."
+                                            },
                                             color = TextSoft,
                                             fontSize = 12.sp,
                                         )
                                     }
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = TextSoft,
+                                    Switch(
+                                        checked = advancedOn,
+                                        onCheckedChange = onAdvancedChange,
                                     )
+                                    if (advancedOn) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = "Open Advanced",
+                                            tint = TextSoft,
+                                            modifier = Modifier
+                                                .padding(start = 2.dp)
+                                                .clickable(onClick = onAdvanced),
+                                        )
+                                    }
                                 }
                             }
                             }

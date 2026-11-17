@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.32** — Advanced mode has its switch on the Theme page itself, next to the Advanced row, so it can be turned on and off where the page lives; turning it off closes the pages it hides.
 - **0.5.31** — Photos and PDFs can be shown as cards or as a list (Settings → Photos and PDFs). The Advanced page now lists only the themes you made, with a way through to the bundles. Bundles can be renamed, deleted and filled in one go from inside the bundle, and the Theme page is split into Light and Dark / Picture looks / Downloaded.
 - **0.5.30** — The whole background is one choice in Advanced: the theme's own background, or one image of your own. Picking one replaces the other, and the theme then supplies only the colours. Card photos stay separate, behind each card's own label.
 - **0.5.29** — Bundles now live inside the Advanced page (no menu item), and the Support page is removed everywhere, with the suggestion channel it used.
@@ -206,4 +207,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.31 (versionCode 61).
+`com.dudeapp.vault` — version 0.5.32 (versionCode 62).

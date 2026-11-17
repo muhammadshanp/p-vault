@@ -1088,9 +1088,18 @@ fun VaultApp(
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
-            // With advanced mode off the Theme page is the ordinary list: no Advanced entry.
-            access = access.copy(admin = isAdmin).let {
-                if (settings.advancedMode) it else it.copy(level = AccessLevel.THEME)
+            access = access.copy(admin = isAdmin),
+            // The switch is on the Theme page itself, so advanced mode is turned on and off
+            // where the Advanced page lives.
+            advancedOn = settings.advancedMode,
+            onAdvancedChange = { on ->
+                settings = settings.copy(advancedMode = on)
+                settingsStore.save(settings)
+                if (!on) {
+                    // Leaving also closes the pages the switch hides.
+                    advancedThemesOpen = false
+                    bundlesOpen = false
+                }
             },
             catalogThemes = catalogThemes.filter {
                 it.isAllowedFor(GoogleAccountStore(context).email(), access.theme, access)
@@ -1101,12 +1110,12 @@ fun VaultApp(
             onPick = onThemeChange,
             // The advanced looks are the admin's own; everyone else does not see the page.
             onAdvanced = {
-                if (access.copy(admin = isAdmin).advanced) {
+                if (access.copy(admin = isAdmin).advanced && settings.advancedMode) {
                     themesOpen = false
                     advancedThemesOpen = true
                 }
             },
-            advancedInUse = theme.cardPictures.isNotEmpty(),
+            advancedInUse = Bundles.applied.value != null || CardPhotoFiles.background.value != null,
             onBack = { themesOpen = false },
         )
     } else if (settingsOpen) {
