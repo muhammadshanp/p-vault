@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,9 +30,6 @@ class MainActivity : FragmentActivity() {
     private val themeStore by lazy { ThemeStore(this) }
     private val settingsStore by lazy { SettingsStore(this) }
     private var theme by mutableStateOf(ThemePreset.WHITE)
-    // Advanced mode as it was when the app started: off means the plain look is used, whatever
-    // advanced look was worn before.
-    private var advancedOn by mutableStateOf(true)
     // The looks that came from the theme catalogue, kept here so a picture can be found
     // from the backdrop.
     private var catalogThemes by mutableStateOf<List<DownloadedTheme>>(emptyList())
@@ -71,7 +69,6 @@ class MainActivity : FragmentActivity() {
         val settings = settingsStore.load()
         // Advanced mode off means no advanced look, whatever was worn before.
         val bundleStore = BundleStore(this)
-        advancedOn = settings.advancedMode
         Bundles.advancedOn.value = settings.advancedMode
         Bundles.applied.value =
             if (settings.advancedMode) bundleStore.appliedId()?.let(bundleStore::theme) else null
@@ -93,9 +90,11 @@ class MainActivity : FragmentActivity() {
             }
             CompositionLocalProvider(LocalDownloadedThemes provides catalogThemes) {
             // A theme made on this phone replaces the chosen look, backdrop and cards and all,
-            // but only while advanced mode is on.
-            val ownTheme = if (advancedOn) Bundles.applied.value else null
+            // but only while advanced mode is on. Read as state, so flipping the switch
+            // re-themes the whole window there and then, with no restart.
+            val ownTheme = if (Bundles.advancedOn.value) Bundles.applied.value else null
             val ownPreset = ownTheme?.toPreset(theme) ?: theme
+            LaunchedEffect(ownPreset.dark) { applyNightMode(ownPreset.dark) }
             PVaultTheme(ownPreset) {
                 CompositionLocalProvider(LocalThemeCards provides ownTheme?.cards.orEmpty()) {
                 when {

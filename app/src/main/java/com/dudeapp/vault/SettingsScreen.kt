@@ -286,7 +286,7 @@ fun SettingsScreen(
                             subtitle = if (settings.advancedMode) {
                                 "The Advanced page and bundles are in the Theme page."
                             } else {
-                                "Hidden: Theme shows the ordinary looks only."
+                                "Hidden: the theme's own background and cards are used."
                             },
                             trailing = {
                                 OnOffSwitch(

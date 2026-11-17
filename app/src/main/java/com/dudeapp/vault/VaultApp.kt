@@ -1139,8 +1139,15 @@ fun VaultApp(
             },
             onSettings = { next ->
                 val autoWasOff = !settings.autoBackup
+                val advancedChanged = next.advancedMode != settings.advancedMode
                 settings = next
                 settingsStore.save(next)
+                // The switch here and the one on the Theme page are the same setting, so
+                // advanced off sets the advanced look aside from either place.
+                if (advancedChanged) {
+                    Bundles.advancedOn.value = next.advancedMode
+                    cardPhotos.publish()
+                }
                 if (next.appLock && !Auth.hasPin(context)) onPinSetup()
                 if (autoWasOff && next.autoBackup && driveStore.hasPending()) {
                     autoBackupTick += 1
