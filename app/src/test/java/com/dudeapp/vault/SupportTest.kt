@@ -48,7 +48,10 @@ class SupportTest {
         assertTrue(plain.theme)
         assertFalse(plain.advanced)
         val advancedLook = ThemePreset.NIGHTFALL
-        // Without the advanced level the shared look is out of reach, photos or not.
-        assertEquals(ThemePreset.DARK, advancedLook.forAccess(plain.copy(looks = setOf("nightfall"))))
+        // The look was shared with this address, so the theme level still reaches it; what the
+        // switch controls is the Advanced page, which needs the advanced level.
+        assertEquals(advancedLook, advancedLook.forAccess(plain))
+        // Once the look is not shared with it, it falls back to Dark.
+        assertEquals(ThemePreset.DARK, advancedLook.forAccess(plain.copy(looks = emptySet())))
     }
 }
