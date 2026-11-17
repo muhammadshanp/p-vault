@@ -190,7 +190,8 @@ fun ThemesScreen(
                                             if (advancedOn) {
                                                 "On · backgrounds, your own themes and bundles."
                                             } else {
-                                                "Off · the Advanced page is hidden."
+                                                "Off · the theme's own background and cards, " +
+                                                    "your photos and bundles are set aside."
                                             },
                                             color = TextSoft,
                                             fontSize = 12.sp,

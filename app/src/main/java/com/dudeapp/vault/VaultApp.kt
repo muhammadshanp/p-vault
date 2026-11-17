@@ -247,8 +247,8 @@ fun VaultApp(
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
     var bundlesOpen by remember { mutableStateOf(false) }
-    // A theme made on this phone, if one is being worn.
-    val ownTheme = Bundles.applied.value
+    // A theme made on this phone, if one is being worn. Advanced off means none is.
+    val ownTheme = Bundles.worn
     val bundlesStore = remember { BundleStore(context) }
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { Bundles.publish(bundlesStore) } }
     // The photos this phone chose for its cards, one per card at most.
@@ -299,6 +299,10 @@ fun VaultApp(
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
     var settings by remember { mutableStateOf(settingsStore.load()) }
+    // With advanced mode off no card photo is shown at all, so the cards go back to the
+    // pictures the chosen theme gives them.
+    val advancedPhotos: Map<CardPicture, File> =
+        if (settings.advancedMode) photoFiles else emptyMap()
     var settingsOpen by remember { mutableStateOf(false) }
 
     fun presentUpdate(latest: AppUpdate) {
@@ -1045,7 +1049,7 @@ fun VaultApp(
         AdvancedThemesScreen(
             theme = theme,
             access = access.copy(admin = isAdmin),
-            photos = photoFiles,
+            photos = advancedPhotos,
             onPhoto = { kind, uri ->
                 if (uri != null) {
                     scope.launch {
@@ -1095,6 +1099,10 @@ fun VaultApp(
             onAdvancedChange = { on ->
                 settings = settings.copy(advancedMode = on)
                 settingsStore.save(settings)
+                // Advanced off switches the advanced things themselves off, not just their
+                // screens: the theme's own background and cards come back for the whole app.
+                Bundles.advancedOn.value = on
+                cardPhotos.publish()
                 if (!on) {
                     // Leaving also closes the pages the switch hides.
                     advancedThemesOpen = false
@@ -1115,7 +1123,7 @@ fun VaultApp(
                     advancedThemesOpen = true
                 }
             },
-            advancedInUse = Bundles.applied.value != null || CardPhotoFiles.background.value != null,
+            advancedInUse = Bundles.applied.value != null || CardPhotoFiles.current.value.isNotEmpty() || CardPhotoFiles.background.value != null,
             onBack = { themesOpen = false },
         )
     } else if (settingsOpen) {

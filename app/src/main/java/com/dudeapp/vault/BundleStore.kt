@@ -38,7 +38,12 @@ data class ThemeBundle(
  * offline. Nothing leaves the phone.
  */
 class BundleStore(private val context: Context) {
+    private companion object {
+        const val APPLIED = "applied"
+    }
+
     private val prefs = context.getSharedPreferences("dude_bundles", Context.MODE_PRIVATE)
+    private val settings = context.getSharedPreferences("dude_settings", Context.MODE_PRIVATE)
 
     private val themeDir: File
         get() = File(context.filesDir, "own_themes").apply { mkdirs() }
@@ -48,6 +53,18 @@ class BundleStore(private val context: Context) {
     fun themes(): List<OwnTheme> = read().second
 
     fun theme(id: String): OwnTheme? = themes().firstOrNull { it.id == id }
+
+    /**
+     * The theme this phone was wearing when it was last used. Kept even while advanced mode is
+     * off, so turning advanced back on puts the look back exactly as it was.
+     */
+    fun appliedId(): String? = prefs.getString(APPLIED, null)
+
+    fun setApplied(id: String?) {
+        prefs.edit().apply {
+            if (id == null) remove(APPLIED) else putString(APPLIED, id)
+        }.apply()
+    }
 
     /** A new, empty bundle. */
     fun addBundle(name: String): ThemeBundle {
@@ -193,8 +210,19 @@ private fun read(): Pair<List<ThemeBundle>, List<OwnTheme>> = runCatching<Pair<L
 object Bundles {
     val current = mutableStateOf<Pair<List<ThemeBundle>, List<OwnTheme>>>(emptyList<ThemeBundle>() to emptyList())
 
-    /** The theme in use on this phone, so the whole app can show it. */
+    /**
+     * The theme in use on this phone, so the whole app can show it. It is only ever set while
+     * advanced mode is on: advanced off means the plain look, with the theme's own background
+     * and cards.
+     */
     val applied = mutableStateOf<OwnTheme?>(null)
+
+    /** True while advanced mode is on. Advanced off means no advanced look at all. */
+    val advancedOn = mutableStateOf(true)
+
+    /** The theme that should be showing, which is none at all while advanced mode is off. */
+    val worn: OwnTheme?
+        get() = if (advancedOn.value) applied.value else null
 
     fun publish(store: BundleStore) {
         current.value = store.bundles() to store.themes()
