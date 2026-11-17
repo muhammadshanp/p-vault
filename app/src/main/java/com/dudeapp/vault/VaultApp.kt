@@ -1195,7 +1195,8 @@ fun VaultApp(
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
                     canSuggest = canSuggest,
-                    onSuggest = { closeMenu { suggestionOpen = true } },
+                    // One channel for both: the support page sends the same message.
+                    onSuggest = { closeMenu { assistantOpen = true } },
                     canTheme = access.theme,
                     canBundles = access.copy(admin = isAdmin).advanced && settings.advancedMode,
                     canAssistant = access.copy(admin = isAdmin).has(AccessFeature.SUPPORT),
@@ -1796,17 +1797,6 @@ fun VaultApp(
                             canSuggest = access.has(AccessFeature.SUGGESTIONS)
                         }
                     },
-                )
-            }
-
-            if (suggestionOpen) {
-                SuggestionDialog(
-                    onExternal = onExternal,
-                    onSent = {
-                        suggestionOpen = false
-                        Toast.makeText(context, "Suggestion sent. Thank you.", Toast.LENGTH_LONG).show()
-                    },
-                    onDismiss = { suggestionOpen = false },
                 )
             }
 

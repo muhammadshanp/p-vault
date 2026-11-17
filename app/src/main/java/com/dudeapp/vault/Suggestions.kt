@@ -425,7 +425,7 @@ fun SuggestionForm(
     }
 
     // The page instead of a dialog: the fields, the attachment and the send button.
-    Column(modifier, verticalScroll(rememberScrollState())) {
+    Column(modifier.verticalScroll(rememberScrollState())) {
         Text(
             "Your message goes to the P Vault admin together with your Google address, and is " +
                 "deleted after 2 days. A screenshot or a short video helps.",
