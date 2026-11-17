@@ -56,6 +56,7 @@ import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -170,8 +171,19 @@ fun VaultApp(
     var suppressNextStart by remember { mutableStateOf(false) }
     var wasStopped by remember { mutableStateOf(false) }
 
-    var tab by remember { mutableStateOf(Tab.HOME) }
-    val pagerState = rememberPagerState(initialPage = tab.ordinal, pageCount = { Tab.entries.size })
+    val tabPrefs = remember { context.getSharedPreferences("dude_files", Context.MODE_PRIVATE) }
+    // Which Files-tab page was showing when the user set off. A picker can come back after the
+    // app was rebuilt (Android reclaims the window behind a document picker on Android 11), and
+    // the page must still be the one the file is meant for, so it is saved rather than remembered.
+    var tab by remember {
+        mutableStateOf(
+            Tab.entries.firstOrNull { it.name == tabPrefs.getString("files_tab", null) } ?: Tab.HOME,
+        )
+    }
+    val pagerState = rememberPagerState(
+        initialPage = tab.ordinal.coerceIn(0, Tab.entries.lastIndex),
+        pageCount = { Tab.entries.size },
+    )
     fun switchTab(target: Tab) {
         tab = target
         scope.launch {
@@ -519,9 +531,14 @@ fun VaultApp(
         restorePrompt = false
     }
 
+    // A picker can come back empty-handed: some phones hand PDFs to an app that cannot return
+    // them, such as a browser. Say so instead of just flashing back to the vault.
+    val pickerProblem = remember { mutableStateOf<String?>(null) }
+
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(50),
     ) { uris ->
+        if (uris.isEmpty()) pickerProblem.value = "No photos came back. Try picking them again."
         if (uris.isNotEmpty()) {
             scope.launch {
                 val added = withContext(Dispatchers.IO) { uris.count { store.addFile(it, "Image.jpg") != null } }
@@ -535,6 +552,11 @@ fun VaultApp(
     val pdfPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
+        if (uris.isEmpty()) {
+            pickerProblem.value = "Nothing came back from the file picker. If you picked the PDF " +
+                "in a browser's downloads page, save it to Files first, then pick it from there " +
+                "with \"All files\"."
+        }
         if (uris.isNotEmpty()) {
             scope.launch {
                 val added = withContext(Dispatchers.IO) { uris.count { store.addFile(it, "Document.pdf") != null } }
@@ -636,11 +658,39 @@ fun VaultApp(
 
     fun launchPdfs() {
         onExternal()
+        pickerProblem.value = null
+        // The page the picked PDF is meant for is kept, so the app can be rebuilt behind the
+        // picker without losing it.
+        tabPrefs.edit().putString("files_tab", Tab.PDFS.name).apply()
         pdfPicker.launch(arrayOf("application/pdf"))
     }
 
+    // Reading a PDF can be done by any app that opens PDFs; a file manager can also be asked
+    // for the file itself when a browser's download page cannot hand it back.
+    fun launchPdfFiles() {
+        onExternal()
+        pickerProblem.value = null
+        tabPrefs.edit().putString("files_tab", Tab.PDFS.name).apply()
+        runCatching { pdfPicker.launch(arrayOf("application/pdf", "application/octet-stream")) }
+            .onFailure {
+                pickerProblem.value = "No file picker is available on this phone."
+            }
+    }
+
+    // Shown once the picker is done, whatever came back, so an empty trip is explained.
+    if (pickerProblem.value != null) {
+        val message = pickerProblem.value.orEmpty()
+        AlertDialog(
+            onDismissRequest = { pickerProblem.value = null },
+            confirmButton = {
+                TextButton(onClick = { pickerProblem.value = null }) { Text("OK") }
+            },
+            text = { Text(message) },
+        )
+    }
+
     // ---- Scan and camera ----------------------------------------------------
-    var addMenuOpen by remember { mutableStateOf(false) }
+    var addMenuOpen by rememberSaveable { mutableStateOf(false) }
     // Whether the photo being taken becomes a one-page PDF (from the PDFs tab) or a photo.
     var cameraAsPdf by rememberSaveable { mutableStateOf(false) }
 
@@ -736,8 +786,15 @@ fun VaultApp(
     fun openCamera(asPdf: Boolean) {
         cameraAsPdf = asPdf
         onExternal()
+        tabPrefs.edit().putString("files_tab", tab.name).apply()
         runCatching {
+            // The photo itself lands in this temporary file. It is written to disk now because
+            // the camera app can make Android reclaim P Vault's window, and the file has to
+            // still be there, and still be the one this app knows, when the camera comes back.
             cameraTempFile(context).delete()
+            if (!cameraTempFile(context).createNewFile()) {
+                throw IllegalStateException("No room for the photo")
+            }
             cameraLauncher.launch(cameraTempUri(context))
         }.onFailure {
             Toast.makeText(context, "The camera could not be opened", Toast.LENGTH_SHORT).show()
@@ -1000,6 +1057,7 @@ fun VaultApp(
         snapshotFlow { pagerState.settledPage }.collect { page ->
             val settled = page.coerceIn(0, Tab.entries.lastIndex)
             tab = Tab.entries[settled]
+            tabPrefs.edit().putString("files_tab", tab.name).apply()
             selecting = false
             selectedPaths = emptySet()
             searchOpen = false
@@ -1615,6 +1673,17 @@ fun VaultApp(
                                 AddMenuItem(Icons.Outlined.FolderOpen, Accent.Note, "Files") {
                                     addMenuOpen = false
                                     launchPdfs()
+                                }
+                                // Some phones, and browsers' download pages, only answer to a
+                                // plain file request; this opens the same picker showing every
+                                // file, with PDFs first.
+                                AddMenuItem(
+                                    Icons.Outlined.Description,
+                                    Accent.Pdf,
+                                    "All files",
+                                ) {
+                                    addMenuOpen = false
+                                    launchPdfFiles()
                                 }
                             } else {
                                 AddMenuItem(Icons.Outlined.Image, Accent.Photo, "Gallery") {

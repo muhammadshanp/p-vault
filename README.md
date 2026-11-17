@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.35** — Android 11 fixes and an honest answer when a picker comes back empty: the Files page is remembered across the trip, the camera's photo file is on disk before the camera takes the app away, and PDFs can be picked with "All files" when a browser's download page will not hand them back.
 - **0.5.34** — The advanced switch takes effect on the tap, whichever switch is used: the whole app re-themes at once — colours, background, cards and system bars — instead of needing a restart.
 - **0.5.33** — Turning advanced mode off switches the advanced things off, not just their screens: card photos, the background image and the themed look stand aside and the chosen theme's own background and cards come back. They come back as they were when advanced mode is turned on again.
 - **0.5.32** — Advanced mode has its switch on the Theme page itself, next to the Advanced row, so it can be turned on and off where the page lives; turning it off closes the pages it hides.
@@ -209,4 +210,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.34 (versionCode 64).
+`com.dudeapp.vault` — version 0.5.35 (versionCode 65).
