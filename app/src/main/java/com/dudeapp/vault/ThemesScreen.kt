@@ -129,17 +129,14 @@ fun ThemesScreen(
                     item(span = { GridItemSpan(2) }) {
                         Column(Modifier.padding(bottom = 4.dp)) {
                             Text(
-                                "Light and Dark are for everyone. The picture themes are for people with special access.",
+                                if (access.theme) {
+                                    "Pick a look. Each card shows what that look does to the app."
+                                } else {
+                                    "Light and Dark are for everyone. Ask the admin for access to the picture looks."
+                                },
                                 color = TextSoft,
                                 fontSize = 13.sp,
                             )
-                            if (!access.theme) {
-                                Text(
-                                    "Ask the admin for special access to unlock the other looks.",
-                                    color = TextSoft,
-                                    fontSize = 13.sp,
-                                )
-                            }
                             // Backgrounds and card pictures, kept apart, on their own page.
                             // The page is the admin's own, so the entry is hidden for everyone else.
                             if (access.advanced) {
@@ -238,7 +235,20 @@ fun ThemesScreen(
                             }
                         }
                     }
-                    items(ThemePreset.all) { preset ->
+                    item(span = { GridItemSpan(2) }) { SectionHeading("Light and Dark") }
+                    items(ThemePreset.all.filter { !it.special }) { preset ->
+                        ThemeOption(
+                            preset = preset,
+                            selected = preset == theme,
+                            locked = false,
+                            onClick = {
+                                onPick(preset)
+                                close()
+                            },
+                        )
+                    }
+                    item(span = { GridItemSpan(2) }) { SectionHeading("Picture looks") }
+                    items(ThemePreset.all.filter { it.special }) { preset ->
                         ThemeOption(
                             preset = preset,
                             selected = preset == theme,
@@ -250,6 +260,9 @@ fun ThemesScreen(
                                 }
                             },
                         )
+                    }
+                    if (catalogThemes.isNotEmpty()) {
+                        item(span = { GridItemSpan(2) }) { SectionHeading("Downloaded") }
                     }
                     items(catalogThemes, key = { "store:" + it.id }) { downloaded ->
                         val preset = downloaded.toPreset()
@@ -460,4 +473,16 @@ private fun ThemeOption(
             }
         }
     }
+}
+
+/** A quiet heading between blocks on the Theme page. */
+@Composable
+private fun SectionHeading(text: String) {
+    Text(
+        text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = TextSoft,
+        modifier = Modifier.padding(top = 6.dp),
+    )
 }

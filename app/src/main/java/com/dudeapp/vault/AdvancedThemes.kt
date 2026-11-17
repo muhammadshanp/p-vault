@@ -85,6 +85,8 @@ fun AdvancedThemesScreen(
     /** True while the bundles are open; the page shows them instead of the looks. */
     bundlesOpen: Boolean = false,
     onBundles: (Boolean) -> Unit = {},
+    /** Opens the bundles and jumps to them. */
+    onOpenBundles: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -119,7 +121,9 @@ fun AdvancedThemesScreen(
     }
     BackHandler(onBack = close)
 
-    val advanced = remember { ThemePreset.all.filter { it.cardPictures.isNotEmpty() } }
+    // Only the user's own themes for now: the built-in advanced looks are not listed.
+    val own = Bundles.current.value.second
+    val applied = Bundles.applied.value
 
     AnimatedVisibility(
         visibleState = visible,
@@ -191,17 +195,27 @@ fun AdvancedThemesScreen(
                             enabled = access.theme,
                         )
                     }
-                    items(advanced, key = { it.label }) { preset ->
-                        val locked = preset.special && (!access.theme || !access.allowsLook(preset.shareId()))
-                        AdvancedOption(
-                            preset = preset,
-                            selected = preset.label == theme.label,
-                            locked = locked,
-                            onClick = {
-                                if (!locked) {
-                                    onPick(preset)
-                                    close()
-                                }
+                    if (own.isEmpty()) {
+                        item {
+                            Text(
+                                "No themes of your own yet. Open your bundles to make one: a background " +
+                                    "image and a photo for each card.",
+                                color = TextSoft,
+                                fontSize = 13.sp,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            androidx.compose.material3.Button(onClick = onOpenBundles) {
+                                Text("Open your bundles")
+                            }
+                        }
+                    }
+                    items(own, key = { it.id }) { mine ->
+                        YourThemeRow(
+                            theme = mine,
+                            applied = applied?.id == mine.id,
+                            onApply = {
+                                Bundles.applied.value = mine
+                                close()
                             },
                         )
                     }
@@ -209,224 +223,6 @@ fun AdvancedThemesScreen(
             }
         }
     }
-}
-
-@Composable
-private fun AdvancedOption(
-    preset: ThemePreset,
-    selected: Boolean,
-    locked: Boolean,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(24.dp)
-    Column(
-        Modifier
-            .clip(shape)
-            .background(preset.surface)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
-                },
-                shape = shape,
-            )
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-    ) {
-        // The background picture, with the card pictures laid over it, so the two layers
-        // can be judged together.
-        val style = preset.backdrop
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(210.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(preset.background),
-        ) {
-            if (style is BackdropStyle.Picture) {
-                Image(
-                    painter = painterResource(style.image),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to preset.background.copy(alpha = style.scrim),
-                                0.6f to preset.background.copy(alpha = style.scrim * 0.8f),
-                                1f to preset.background,
-                            ),
-                        ),
-                )
-            }
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                CardPreview(preset, CardPicture.HERO, height = 74.dp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.weight(1f)) {
-                        CardPreview(preset, CardPicture.PHOTOS, height = 46.dp)
-                    }
-                    Box(Modifier.weight(1f)) {
-                        CardPreview(preset, CardPicture.PDFS, height = 46.dp)
-                    }
-                    Box(Modifier.weight(1f)) {
-                        CardPreview(preset, CardPicture.REELS, height = 46.dp)
-                    }
-                }
-            }
-            if (locked) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.Lock,
-                        contentDescription = "Needs access",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    preset.label,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = preset.onBackground,
-                )
-                Text(
-                    text = when {
-                        locked -> "Ask the admin for this look"
-                        else -> "Background + card pictures"
-                    },
-                    color = preset.onSurfaceVariant,
-                    fontSize = 11.sp,
-                )
-            }
-            if (selected) {
-                Box(
-                    Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(preset.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = preset.onPrimary, modifier = Modifier.size(14.dp))
-                }
-            }
-        }
-    }
-}
-
-/** One mini card with its own artwork, the way it appears on Home. */
-@Composable
-private fun CardPreview(preset: ThemePreset, kind: CardPicture, height: androidx.compose.ui.unit.Dp) {
-    val picture = preset.cardPictures[kind]
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(RoundedCornerShape(12.dp))
-            .background(preset.surface.copy(alpha = if (preset.glass) 0.75f else 1f))
-            .border(1.dp, preset.outline, RoundedCornerShape(12.dp)),
-    ) {
-        if (picture != null) {
-            // The same as on Home: the picture is behind the card's content, and the card
-            // keeps its size and its labels.
-            Image(
-                painter = painterResource(picture),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.45f),
-                            0.55f to Color.Black.copy(alpha = 0.12f),
-                            1f to Color.Black.copy(alpha = 0.5f),
-                        ),
-                    ),
-            )
-        }
-    }
-}
-
-/**
- * One row per card, with the photo this phone chose for it. A chosen photo wins over the
- * picture the look puts in the card; the card keeps its own size and its own labels.
- */
-@Composable
-private fun CardPhotoCard(
-    photos: Map<CardPicture, File>,
-    onPick: (CardPicture) -> Unit,
-    onClear: (CardPicture) -> Unit,
-    enabled: Boolean,
-) {
-    val shape = RoundedCornerShape(24.dp)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), shape)
-            .padding(16.dp),
-    ) {
-        Text("Photo for each card", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            "Pick a photo for any card. It sits behind the card's name, not in place of it, " +
-                "and the card stays the same size.",
-            color = TextSoft,
-            fontSize = 12.sp,
-        )
-        Spacer(Modifier.height(10.dp))
-        CardPicture.entries.forEach { kind ->
-            val file = photos[kind]
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(cardPictureName(kind), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        if (file == null) "No photo · the look decides" else "Your photo",
-                        color = TextSoft,
-                        fontSize = 11.sp,
-                    )
-                }
-                if (file != null) {
-                    TextButton(onClick = { onClear(kind) }, enabled = enabled) {
-                        Text("Remove", fontSize = 12.sp)
-                    }
-                }
-                TextButton(onClick = { onPick(kind) }, enabled = enabled) {
-                    Text(if (file == null) "Choose" else "Change", fontSize = 12.sp)
-                }
-            }
-        }
-    }
-}
-
-/** The name of a card, as it is shown on Home. */
-internal fun cardPictureName(kind: CardPicture): String = when (kind) {
-    CardPicture.HERO -> "The big card on Home"
-    CardPicture.PHOTOS -> "Photos card"
-    CardPicture.PDFS -> "PDFs card"
-    CardPicture.NOTES -> "Notes and chats card"
-    CardPicture.REELS -> "Reels card"
 }
 
 /** The way into the bundles, inside the Advanced page itself. */
@@ -551,6 +347,61 @@ private fun BackgroundChoice(
                     Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
                 }
             }
+        }
+    }
+}
+
+/** One of the user's own themes, with the marks of what it carries. */
+@Composable
+private fun YourThemeRow(
+    theme: OwnTheme,
+    applied: Boolean,
+    onApply: () -> Unit,
+) {
+    val shape = RoundedCornerShape(22.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = if (applied) 2.dp else 1.dp,
+                color = if (applied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                shape = shape,
+            )
+            .clickable(onClick = onApply)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                theme.name,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Text(
+                "${theme.cards.size}/5 card photos · " +
+                    if (theme.background == null) "theme background" else "own background",
+                color = TextSoft,
+                fontSize = 11.sp,
+            )
+        }
+        if (applied) {
+            Box(
+                Modifier.size(22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = "In use",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        } else {
+            Text("Use", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

@@ -14,6 +14,8 @@ data class AppSettings(
     val biometricUnlock: Boolean = true,
     /** The Advanced page and bundles are hidden from the Theme page while this is off. */
     val advancedMode: Boolean = true,
+    /** Grid cards (the default) or one item per row. */
+    val cardsAsList: Boolean = false,
 )
 
 internal val REMINDER_DAY_OPTIONS = listOf(1, 7, 14, 30)
@@ -34,6 +36,7 @@ class SettingsStore(context: Context) {
         lockDelaySeconds = prefs.getInt("lock_delay_seconds", 0).coerceIn(0, 300),
         biometricUnlock = prefs.getBoolean("biometric_unlock", true),
         advancedMode = prefs.getBoolean("advanced_mode", true),
+        cardsAsList = prefs.getBoolean("cards_as_list", false),
     )
 
     fun save(settings: AppSettings) {
@@ -47,6 +50,7 @@ class SettingsStore(context: Context) {
             .putInt("lock_delay_seconds", settings.lockDelaySeconds.coerceIn(0, 300))
             .putBoolean("biometric_unlock", settings.biometricUnlock)
             .putBoolean("advanced_mode", settings.advancedMode)
+            .putBoolean("cards_as_list", settings.cardsAsList)
             .apply()
     }
 }

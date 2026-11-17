@@ -85,6 +85,8 @@ fun BundlesSection(
     var openBundle by remember { mutableStateOf<ThemeBundle?>(null) }
     var building by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<String?>(null) }
+    // The bundle keep-open when a theme is saved, so a bundle can be filled in one go.
+    var chosen by remember { mutableStateOf<String?>(null) }
 
     if (building != null) {
         ThemeBuilderScreen(
@@ -94,6 +96,8 @@ fun BundlesSection(
                 Bundles.publish(store)
                 building = null
                 editing = null
+                // Back to the bundle that was being filled, not out of it.
+                chosen = building
             },
             onBack = {
                 building = null
@@ -103,17 +107,29 @@ fun BundlesSection(
         return
     }
 
-    val current = openBundle?.let { open -> bundles.firstOrNull { it.id == open.id } }
+    val current = (chosen ?: openBundle?.id)?.let { id -> bundles.firstOrNull { it.id == id } }
     if (current != null) {
         BundleDetail(
             bundle = current,
             themes = themes,
             canEdit = canEdit,
-            onBack = { openBundle = null },
+            onBack = {
+                openBundle = null
+                chosen = null
+            },
             onApply = { theme ->
                 Bundles.applied.value = theme
                 Bundles.publish(store)
                 onApplied()
+            },
+            onRename = { name ->
+                store.renameBundle(current.id, name)
+                Bundles.publish(store)
+            },
+            onDeleteBundle = {
+                store.removeBundle(current.id)
+                Bundles.publish(store)
+                openBundle = null
             },
             onNewTheme = {
                 editing = null
@@ -161,6 +177,12 @@ fun BundlesSection(
                 Spacer(Modifier.width(8.dp))
                 Text("New bundle")
             }
+            Text(
+                "Name it, then add themes to it straight away.",
+                color = TextSoft,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 6.dp),
+            )
             Spacer(Modifier.height(10.dp))
         }
         if (bundles.isEmpty()) {
@@ -189,9 +211,11 @@ fun BundlesSection(
             value = draft,
             onChange = { draft = it },
             onConfirm = {
-                store.addBundle(draft)
+                val made = store.addBundle(draft)
                 Bundles.publish(store)
                 naming = false
+                // Straight into the new bundle, so its first theme can be made at once.
+                chosen = made.id
             },
             onDismiss = { naming = false },
         )
@@ -298,6 +322,8 @@ private fun BundleDetail(
     canEdit: Boolean,
     onBack: () -> Unit,
     onApply: (OwnTheme) -> Unit,
+    onRename: (String) -> Unit,
+    onDeleteBundle: () -> Unit,
     onNewTheme: () -> Unit,
     onEditTheme: (OwnTheme) -> Unit,
     onRemove: (OwnTheme) -> Unit,
@@ -309,6 +335,9 @@ private fun BundleDetail(
     val outside = themes.filterNot { it.id in bundle.themeIds }
     var removing by remember { mutableStateOf<OwnTheme?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var nameDraft by remember { mutableStateOf(bundle.name) }
+    var deleting by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         Backdrop()
@@ -320,7 +349,22 @@ private fun BundleDetail(
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
-                Text(bundle.name, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    bundle.name,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (canEdit) {
+                    IconButton(onClick = { nameDraft = bundle.name; renaming = true }) {
+                        Icon(Icons.Outlined.Edit, contentDescription = "Rename bundle", tint = TextSoft)
+                    }
+                    IconButton(onClick = { deleting = true }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete bundle", tint = TextSoft)
+                    }
+                }
             }
             LazyColumn(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 32.dp),
@@ -389,6 +433,33 @@ private fun BundleDetail(
                     TextButton(onClick = { removing = null }) { Text("Keep") }
                 }
             },
+        )
+    }
+
+    if (renaming) {
+        NameDialog(
+            title = "Rename bundle",
+            value = nameDraft,
+            onChange = { nameDraft = it },
+            onConfirm = {
+                onRename(nameDraft)
+                renaming = false
+            },
+            onDismiss = { renaming = false },
+        )
+    }
+    if (deleting) {
+        AlertDialog(
+            onDismissRequest = { deleting = false },
+            title = { Text("Delete ${bundle.name}?") },
+            text = { Text("The bundle goes; the themes inside it stay, ready for another bundle.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleting = false
+                    onDeleteBundle()
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Keep") } },
         )
     }
 
