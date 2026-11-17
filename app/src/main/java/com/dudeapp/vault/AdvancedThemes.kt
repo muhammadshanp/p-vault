@@ -215,6 +215,7 @@ fun AdvancedThemesScreen(
                             applied = applied?.id == mine.id,
                             onApply = {
                                 Bundles.applied.value = mine
+                                BundleStore(context).setApplied(mine.id)
                                 close()
                             },
                         )

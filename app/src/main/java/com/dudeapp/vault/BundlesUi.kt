@@ -119,7 +119,9 @@ fun BundlesSection(
             },
             onApply = { theme ->
                 Bundles.applied.value = theme
+                store.setApplied(theme.id)
                 Bundles.publish(store)
+                CardPhotoStore(context).publish()
                 onApplied()
             },
             onRename = { name ->
@@ -675,7 +677,9 @@ fun ThemeBuilderScreen(
                             store.saveTheme(save)
                             store.addToBundle(bundleId, id)
                             Bundles.applied.value = save
+                            store.setApplied(save.id)
                             Bundles.publish(store)
+                            CardPhotoStore(context).publish()
                             onDone()
                         },
                         enabled = name.isNotBlank() && !busy,

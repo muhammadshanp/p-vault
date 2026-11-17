@@ -106,9 +106,19 @@ class CardPhotoStore(private val context: Context) {
         CardPhotoFiles.current.value = emptyMap()
     }
 
-    /** Reads what is saved and makes it the choice every screen sees. */
+    /**
+     * Reads what is saved and makes it the choice every screen sees. With advanced mode off
+     * nothing advanced is shown, though the photos stay saved for when it is turned on again.
+     */
     fun publish() {
-        CardPhotoFiles.current.value = chosen().associateWith { file(it)!! }
-        CardPhotoFiles.background.value = backgroundImage()
+        CardPhotoFiles.current.value =
+            if (Bundles.advancedOn.value) chosen().associateWith { file(it)!! } else emptyMap()
+        CardPhotoFiles.background.value = if (Bundles.advancedOn.value) backgroundImage() else null
+    }
+
+    /** The plain look: no card photos and no background image. Nothing is deleted. */
+    fun publishPlain() {
+        CardPhotoFiles.current.value = emptyMap()
+        CardPhotoFiles.background.value = null
     }
 }

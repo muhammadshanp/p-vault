@@ -29,6 +29,9 @@ class MainActivity : FragmentActivity() {
     private val themeStore by lazy { ThemeStore(this) }
     private val settingsStore by lazy { SettingsStore(this) }
     private var theme by mutableStateOf(ThemePreset.WHITE)
+    // Advanced mode as it was when the app started: off means the plain look is used, whatever
+    // advanced look was worn before.
+    private var advancedOn by mutableStateOf(true)
     // The looks that came from the theme catalogue, kept here so a picture can be found
     // from the backdrop.
     private var catalogThemes by mutableStateOf<List<DownloadedTheme>>(emptyList())
@@ -66,6 +69,14 @@ class MainActivity : FragmentActivity() {
         theme = themeStore.load(catalogThemes).forAccess(AccessStore(this).access())
         applyNightMode(theme.dark)
         val settings = settingsStore.load()
+        // Advanced mode off means no advanced look, whatever was worn before.
+        val bundleStore = BundleStore(this)
+        advancedOn = settings.advancedMode
+        Bundles.advancedOn.value = settings.advancedMode
+        Bundles.applied.value =
+            if (settings.advancedMode) bundleStore.appliedId()?.let(bundleStore::theme) else null
+        val cardPhotos = CardPhotoStore(this)
+        if (!settings.advancedMode) cardPhotos.publishPlain()
         needsLockChoice = !settings.lockChoiceMade && !Auth.hasPin(this)
         needsSetup = !needsLockChoice && settings.appLock && !Auth.hasPin(this)
         locked = !needsLockChoice && settings.appLock && !needsSetup
@@ -81,8 +92,9 @@ class MainActivity : FragmentActivity() {
                 onDispose { }
             }
             CompositionLocalProvider(LocalDownloadedThemes provides catalogThemes) {
-            // A theme made on this phone replaces the chosen look, backdrop and cards and all.
-            val ownTheme = Bundles.applied.value
+            // A theme made on this phone replaces the chosen look, backdrop and cards and all,
+            // but only while advanced mode is on.
+            val ownTheme = if (advancedOn) Bundles.applied.value else null
             val ownPreset = ownTheme?.toPreset(theme) ?: theme
             PVaultTheme(ownPreset) {
                 CompositionLocalProvider(LocalThemeCards provides ownTheme?.cards.orEmpty()) {
