@@ -287,12 +287,19 @@ private fun refusal(code: Int, response: String): String = when (code) {
     else -> "Firebase refused the request ($code ${errorText(response)})."
 }
 
-/** The "Give suggestion" window for members with special access. */
+/**
+ * The support page's body: one message to the admin, with an optional screenshot or a short
+ * video. It is the same channel as "Give suggestion", on a page instead of in a window.
+ *
+ * Sending one message to the admin: the body of the suggestion dialog, without the dialog, so
+ * the same channel is used from the Give suggestion item and from the support page.
+ */
 @Composable
-fun SuggestionDialog(
+fun SuggestionForm(
     onExternal: () -> Unit,
     onSent: () -> Unit,
-    onDismiss: () -> Unit,
+    onProblem: (String?) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -417,77 +424,74 @@ fun SuggestionDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Give a suggestion") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+    // The page instead of a dialog: the fields, the attachment and the send button.
+    Column(modifier, verticalScroll(rememberScrollState())) {
+        Text(
+            "Your message goes to the P Vault admin together with your Google address, and is " +
+                "deleted after 2 days. A screenshot or a short video helps.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it.take(MAX_TEXT) },
+            label = { Text("What do you need help with?") },
+            minLines = 5,
+            maxLines = 10,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        val attached = attachment
+        if (attached == null) {
+            TextButton(
+                onClick = {
+                    onExternal()
+                    picker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                    )
+                },
+                enabled = !busy,
+            ) {
+                Text("Add a screenshot or short video")
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "It goes to the P Vault admin together with your Google address, and is deleted after 2 days.",
-                    color = TextSoft,
-                    fontSize = 12.sp,
+                    "${if (attached.kind == "video") "Video" else "Picture"} · ${sizeLabel(attached.file.length())}",
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it.take(MAX_TEXT) },
-                    label = { Text("Your suggestion") },
-                    minLines = 4,
-                    maxLines = 8,
+                TextButton(
+                    onClick = {
+                        attached.file.delete()
+                        attachment = null
+                    },
                     enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(6.dp))
-                val attached = attachment
-                if (attached == null) {
-                    TextButton(
-                        onClick = {
-                            onExternal()
-                            picker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                            )
-                        },
-                        enabled = !busy,
-                    ) {
-                        Text("Add a screenshot or short video")
-                    }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${if (attached.kind == "video") "Video" else "Picture"} · ${sizeLabel(attached.file.length())}",
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(
-                            onClick = {
-                                attached.file.delete()
-                                attachment = null
-                            },
-                            enabled = !busy,
-                        ) {
-                            Text("Remove")
-                        }
-                    }
-                }
-                if (busy && progress.isNotEmpty()) {
-                    Text(progress, color = TextSoft, fontSize = 12.sp)
-                }
-                val problem = error
-                if (problem != null) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(problem, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                ) {
+                    Text("Remove")
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { start() }, enabled = !busy && draft.isNotBlank()) {
-                Text(if (busy) "Sending…" else "Send")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") }
-        },
-    )
+        }
+        if (busy && progress.isNotEmpty()) {
+            Text(progress, color = TextSoft, fontSize = 12.sp)
+        }
+        val problem = error
+        if (problem != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(problem, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            onProblem(problem)
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { start() },
+            enabled = !busy && draft.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (busy) "Sending…" else "Send to the admin")
+        }
+    }
 }
 
 /** Reads up to [count] bytes; shorter only at the end of the file. */

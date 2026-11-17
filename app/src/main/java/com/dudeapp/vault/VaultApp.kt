@@ -64,7 +64,7 @@ import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -1038,13 +1038,13 @@ fun VaultApp(
         }
     }
     if (assistantOpen) {
-        AssistantScreen(
-            onOpenItem = { assistantOpen = false; open = it },
+        SupportScreen(
+            onExternal = onExternal,
             onBack = { assistantOpen = false },
         )
     } else if (bundlesOpen) {
         BundlesScreen(
-            canEdit = access.copy(admin = isAdmin).advanced,
+            canEdit = access.copy(admin = isAdmin).advanced && settings.advancedMode,
             onApplied = { bundlesOpen = false },
             onBack = { bundlesOpen = false },
         )
@@ -1087,7 +1087,10 @@ fun VaultApp(
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
-            access = access.copy(admin = isAdmin),
+            // With advanced mode off the Theme page is the ordinary list: no Advanced entry.
+            access = access.copy(admin = isAdmin).let {
+                if (settings.advancedMode) it else it.copy(level = AccessLevel.THEME)
+            },
             catalogThemes = catalogThemes.filter {
                 it.isAllowedFor(GoogleAccountStore(context).email(), access.theme, access)
             },
@@ -1194,8 +1197,8 @@ fun VaultApp(
                     canSuggest = canSuggest,
                     onSuggest = { closeMenu { suggestionOpen = true } },
                     canTheme = access.theme,
-                    canBundles = access.copy(admin = isAdmin).advanced,
-                    canAssistant = access.copy(admin = isAdmin).has(AccessFeature.ASSISTANT),
+                    canBundles = access.copy(admin = isAdmin).advanced && settings.advancedMode,
+                    canAssistant = access.copy(admin = isAdmin).has(AccessFeature.SUPPORT),
                     onBundles = { bundlesOpen = true },
                     onAssistant = { assistantOpen = true },
                     onThemes = { closeMenu { themesOpen = true } },
@@ -2794,6 +2797,12 @@ private fun MenuDrawer(
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
         if (canTheme) {
             MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
+        }
+        if (canBundles) {
+            MenuDrawerItem(Icons.Outlined.Collections, "Bundles", onBundles)
+        }
+        if (canAssistant) {
+            MenuDrawerItem(Icons.Outlined.SupportAgent, "Support", onAssistant)
         }
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(

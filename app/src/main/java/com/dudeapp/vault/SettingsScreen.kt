@@ -257,6 +257,27 @@ fun SettingsScreen(
                     }
                 }
 
+                if (access.advanced) {
+                    SettingsGroup("Themes") {
+                        SettingsItem(
+                            icon = Icons.Outlined.Palette,
+                            tint = Accent.Reel,
+                            title = "Advanced mode",
+                            subtitle = if (settings.advancedMode) {
+                                "The Advanced page and bundles are in the Theme page."
+                            } else {
+                                "Hidden: Theme shows the ordinary looks only."
+                            },
+                            trailing = {
+                                OnOffSwitch(
+                                    checked = settings.advancedMode,
+                                    onCheckedChange = { onSettings(settings.copy(advancedMode = it)) },
+                                )
+                            },
+                        )
+                    }
+                }
+
                 SettingsGroup("Security") {
                     SettingsItem(
                         icon = Icons.Outlined.Lock,
