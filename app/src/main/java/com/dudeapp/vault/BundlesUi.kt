@@ -77,7 +77,6 @@ fun BundlesSection(
 ) {
     val context = LocalContext.current
     val store = remember { BundleStore(context) }
-    val scope = rememberCoroutineScope()
     val (bundles, themes) = Bundles.current.value
     var naming by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
