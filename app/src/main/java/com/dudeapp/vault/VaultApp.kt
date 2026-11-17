@@ -253,11 +253,8 @@ fun VaultApp(
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { Bundles.publish(bundlesStore) } }
     // The photos this phone chose for its cards, one per card at most.
     val cardPhotos = remember { CardPhotoStore(context) }
-    // Read as state, so a card redraws the moment its photo is chosen or removed. With advanced
-    // mode off no card photo is shown at all, so the cards go back to the theme's own pictures.
+    // Read as state, so a card redraws the moment its photo is chosen or removed.
     val photoFiles by CardPhotoFiles.current
-    val plainPhotos = remember(settings.advancedMode) { emptyMap<CardPicture, File>() }
-    val advancedPhotos = if (settings.advancedMode) photoFiles else plainPhotos
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { cardPhotos.publish() } }
 
     val themeStore = remember { ThemeStore(context) }
@@ -302,6 +299,10 @@ fun VaultApp(
     var restorePrompt by remember { mutableStateOf(false) }
     val settingsStore = remember { SettingsStore(context) }
     var settings by remember { mutableStateOf(settingsStore.load()) }
+    // With advanced mode off no card photo is shown at all, so the cards go back to the
+    // pictures the chosen theme gives them.
+    val advancedPhotos: Map<CardPicture, File> =
+        if (settings.advancedMode) photoFiles else emptyMap()
     var settingsOpen by remember { mutableStateOf(false) }
 
     fun presentUpdate(latest: AppUpdate) {
