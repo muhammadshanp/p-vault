@@ -58,7 +58,6 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
@@ -244,8 +243,6 @@ fun VaultApp(
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     // Picks up special access given or removed by the admin since the last time.
-    var canSuggest by remember { mutableStateOf(AccessStore(context).access().has(AccessFeature.SUGGESTIONS)) }
-    var suggestionOpen by remember { mutableStateOf(false) }
     // What this account may do: its level, its switches and the looks shared with it.
     var access by remember { mutableStateOf(AccessStore(context).access()) }
     val specialAccess = access.theme
@@ -295,7 +292,6 @@ fun VaultApp(
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
         access = AccessStore(context).refresh()
-        canSuggest = access.has(AccessFeature.SUGGESTIONS)
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
@@ -914,7 +910,6 @@ fun VaultApp(
                 if (ok) profileStore.clear()
                 if (ok) GoogleAccountStore(context).clear()
                 if (ok) AccessStore(context).clear()
-                if (ok) canSuggest = false
                 if (ok) access = MyAccess()
                 ok
             }
@@ -1194,9 +1189,6 @@ fun VaultApp(
                     onSettings = { closeMenu { settingsOpen = true } },
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
-                    canSuggest = canSuggest,
-                    // One channel for both: the support page sends the same message.
-                    onSuggest = { closeMenu { assistantOpen = true } },
                     canTheme = access.theme,
                     canBundles = access.copy(admin = isAdmin).advanced && settings.advancedMode,
                     canAssistant = access.copy(admin = isAdmin).has(AccessFeature.SUPPORT),
@@ -1794,8 +1786,7 @@ fun VaultApp(
                         // Signing in or out on the sheet can change this.
                         scope.launch {
                             access = AccessStore(context).refresh()
-                            canSuggest = access.has(AccessFeature.SUGGESTIONS)
-                        }
+                                            }
                     },
                 )
             }
@@ -2749,8 +2740,6 @@ private fun MenuDrawer(
     onSettings: () -> Unit,
     isAdmin: Boolean,
     onAdmin: () -> Unit,
-    canSuggest: Boolean,
-    onSuggest: () -> Unit,
     canTheme: Boolean,
     canBundles: Boolean,
     canAssistant: Boolean,
@@ -2801,9 +2790,6 @@ private fun MenuDrawer(
             onClick = onCheckUpdates,
             highlight = updateReady,
         )
-        if (canSuggest) {
-            MenuDrawerItem(Icons.Outlined.Lightbulb, "Give suggestion", onSuggest)
-        }
         MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
         if (isAdmin) {
             MenuDrawerItem(Icons.Outlined.AdminPanelSettings, "Admin panel", onAdmin)

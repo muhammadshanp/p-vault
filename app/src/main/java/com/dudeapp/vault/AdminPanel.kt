@@ -327,13 +327,6 @@ fun AdminScreen(
                                 withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
                                 onDone = { problem -> if (problem != null) fail(problem) else busy = false },
                             )
-                            Spacer(Modifier.height(14.dp))
-                            SuggestionsCard(
-                                busy = busy,
-                                withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
-                                onExternal = onExternal,
-                                onDone = { problem -> if (problem != null) fail(problem) else busy = false },
-                            )
                         }
                         AdminPage.MESSAGE -> AdminMessageCard(
                             busy = busy,

@@ -9,7 +9,6 @@ class SupportTest {
     @Test
     fun everySwitchHasAStableKey() {
         // The keys travel to Firestore, so they must not change by accident.
-        assertEquals("suggestions", AccessFeature.SUGGESTIONS.key)
         assertEquals("support", AccessFeature.SUPPORT.key)
         assertEquals(AccessFeature.SUPPORT, AccessFeature.of("support"))
         assertEquals(AccessFeature.SUPPORT, AccessFeature.of("SUPPORT"))
