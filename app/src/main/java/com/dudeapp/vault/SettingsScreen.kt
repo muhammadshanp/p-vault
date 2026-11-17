@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -255,6 +256,25 @@ fun SettingsScreen(
                             tint = TextSoft,
                         )
                     }
+                }
+
+                SettingsGroup("Photos and PDFs") {
+                    SettingsItem(
+                        icon = Icons.Outlined.ViewAgenda,
+                        tint = Accent.Pdf,
+                        title = "Show as cards or list",
+                        subtitle = if (settings.cardsAsList) {
+                            "One row per item, with its name and date."
+                        } else {
+                            "Cards in a grid, two across."
+                        },
+                        trailing = {
+                            OnOffSwitch(
+                                checked = settings.cardsAsList,
+                                onCheckedChange = { onSettings(settings.copy(cardsAsList = it)) },
+                            )
+                        },
+                    )
                 }
 
                 if (access.advanced) {

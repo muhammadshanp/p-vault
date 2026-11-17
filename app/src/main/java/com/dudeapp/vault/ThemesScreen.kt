@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,7 +76,11 @@ fun ThemesScreen(
     access: MyAccess = MyAccess(),
     /** Opens the advanced page, where background and card pictures are chosen. */
     onAdvanced: () -> Unit = {},
-    /** The advanced look in use, if any, so the entry can say so. */
+    /** True while advanced mode is on; the row is a switch, not a door, when it is off. */
+    advancedOn: Boolean = true,
+    /** Turns advanced mode on or off right here. */
+    onAdvancedChange: (Boolean) -> Unit = {},
+    /** Something advanced is in use, so the row can say so. */
     advancedInUse: Boolean = false,
     /** The looks from the catalogue, already filtered to the ones this account may use. */
     catalogThemes: List<DownloadedTheme>,
@@ -129,17 +134,14 @@ fun ThemesScreen(
                     item(span = { GridItemSpan(2) }) {
                         Column(Modifier.padding(bottom = 4.dp)) {
                             Text(
-                                "Light and Dark are for everyone. The picture themes are for people with special access.",
+                                if (access.theme) {
+                                    "Pick a look. Each card shows what that look does to the app."
+                                } else {
+                                    "Light and Dark are for everyone. Ask the admin for access to the picture looks."
+                                },
                                 color = TextSoft,
                                 fontSize = 13.sp,
                             )
-                            if (!access.theme) {
-                                Text(
-                                    "Ask the admin for special access to unlock the other looks.",
-                                    color = TextSoft,
-                                    fontSize = 13.sp,
-                                )
-                            }
                             // Backgrounds and card pictures, kept apart, on their own page.
                             // The page is the admin's own, so the entry is hidden for everyone else.
                             if (access.advanced) {
@@ -158,7 +160,7 @@ fun ThemesScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(20.dp))
-                                    .clickable(onClick = onAdvanced),
+                                    .clickable(enabled = advancedOn, onClick = onAdvanced),
                             ) {
                                 Row(
                                     Modifier.padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
@@ -185,16 +187,29 @@ fun ThemesScreen(
                                             }
                                         }
                                         Text(
-                                            "Background and card pictures, chosen separately.",
+                                            if (advancedOn) {
+                                                "On · backgrounds, your own themes and bundles."
+                                            } else {
+                                                "Off · the Advanced page is hidden."
+                                            },
                                             color = TextSoft,
                                             fontSize = 12.sp,
                                         )
                                     }
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = TextSoft,
+                                    Switch(
+                                        checked = advancedOn,
+                                        onCheckedChange = onAdvancedChange,
                                     )
+                                    if (advancedOn) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = "Open Advanced",
+                                            tint = TextSoft,
+                                            modifier = Modifier
+                                                .padding(start = 2.dp)
+                                                .clickable(onClick = onAdvanced),
+                                        )
+                                    }
                                 }
                             }
                             }
@@ -238,7 +253,20 @@ fun ThemesScreen(
                             }
                         }
                     }
-                    items(ThemePreset.all) { preset ->
+                    item(span = { GridItemSpan(2) }) { SectionHeading("Light and Dark") }
+                    items(ThemePreset.all.filter { !it.special }) { preset ->
+                        ThemeOption(
+                            preset = preset,
+                            selected = preset == theme,
+                            locked = false,
+                            onClick = {
+                                onPick(preset)
+                                close()
+                            },
+                        )
+                    }
+                    item(span = { GridItemSpan(2) }) { SectionHeading("Picture looks") }
+                    items(ThemePreset.all.filter { it.special }) { preset ->
                         ThemeOption(
                             preset = preset,
                             selected = preset == theme,
@@ -250,6 +278,9 @@ fun ThemesScreen(
                                 }
                             },
                         )
+                    }
+                    if (catalogThemes.isNotEmpty()) {
+                        item(span = { GridItemSpan(2) }) { SectionHeading("Downloaded") }
                     }
                     items(catalogThemes, key = { "store:" + it.id }) { downloaded ->
                         val preset = downloaded.toPreset()
@@ -460,4 +491,16 @@ private fun ThemeOption(
             }
         }
     }
+}
+
+/** A quiet heading between blocks on the Theme page. */
+@Composable
+private fun SectionHeading(text: String) {
+    Text(
+        text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = TextSoft,
+        modifier = Modifier.padding(top = 6.dp),
+    )
 }

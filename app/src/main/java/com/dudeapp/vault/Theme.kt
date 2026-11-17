@@ -543,6 +543,48 @@ fun Backdrop() {
     val preset = LocalThemePreset.current
     val downloadedThemes = LocalDownloadedThemes.current
     val context = LocalContext.current
+    // The whole background is one choice: the theme's own backdrop, or one image of the
+    // user's. While an image is chosen the theme only supplies the colours on top of it.
+    val ownImage = CardPhotoFiles.background.value
+    if (ownImage != null) {
+        val picture = remember(ownImage) {
+            runCatching {
+                val full = android.graphics.BitmapFactory.decodeFile(ownImage.absolutePath)
+                val small = android.graphics.Bitmap.createScaledBitmap(
+                    full,
+                    (full.width / 2).coerceAtLeast(1),
+                    (full.height / 2).coerceAtLeast(1),
+                    true,
+                )
+                small.asImageBitmap()
+            }.getOrNull()
+        }
+        Box(Modifier.fillMaxSize()) {
+            if (picture != null) {
+                Image(
+                    bitmap = picture,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+            }
+            // The same wash as a picture look, so text and cards stay readable on it.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to preset.background.copy(alpha = 0.42f),
+                            0.45f to preset.background.copy(alpha = 0.6f),
+                            1f to preset.background,
+                        ),
+                    ),
+            )
+        }
+        return
+    }
     when (val style = preset.backdrop) {
         is BackdropStyle.Plain -> Box(
             Modifier

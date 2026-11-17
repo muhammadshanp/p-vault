@@ -1061,17 +1061,45 @@ fun VaultApp(
                 cardPhotos.clear(kind)
                 cardPhotos.publish()
             },
+            // The whole background: one image, or back to the theme's own.
+            onBackground = { uri ->
+                if (uri != null) {
+                    scope.launch {
+                        if (cardPhotos.saveBackground(uri)) {
+                            cardPhotos.publish()
+                        } else {
+                            Toast.makeText(context, "Could not save that image", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            },
+            onClearBackground = {
+                cardPhotos.clearBackground()
+                cardPhotos.publish()
+            },
             bundlesOpen = bundlesOpen,
             onBundles = { bundlesOpen = it },
+            onOpenBundles = {
+                bundlesOpen = true
+            },
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
-            // With advanced mode off the Theme page is the ordinary list: no Advanced entry.
-            access = access.copy(admin = isAdmin).let {
-                if (settings.advancedMode) it else it.copy(level = AccessLevel.THEME)
+            access = access.copy(admin = isAdmin),
+            // The switch is on the Theme page itself, so advanced mode is turned on and off
+            // where the Advanced page lives.
+            advancedOn = settings.advancedMode,
+            onAdvancedChange = { on ->
+                settings = settings.copy(advancedMode = on)
+                settingsStore.save(settings)
+                if (!on) {
+                    // Leaving also closes the pages the switch hides.
+                    advancedThemesOpen = false
+                    bundlesOpen = false
+                }
             },
             catalogThemes = catalogThemes.filter {
                 it.isAllowedFor(GoogleAccountStore(context).email(), access.theme, access)
@@ -1082,12 +1110,12 @@ fun VaultApp(
             onPick = onThemeChange,
             // The advanced looks are the admin's own; everyone else does not see the page.
             onAdvanced = {
-                if (access.copy(admin = isAdmin).advanced) {
+                if (access.copy(admin = isAdmin).advanced && settings.advancedMode) {
                     themesOpen = false
                     advancedThemesOpen = true
                 }
             },
-            advancedInUse = theme.cardPictures.isNotEmpty(),
+            advancedInUse = Bundles.applied.value != null || CardPhotoFiles.background.value != null,
             onBack = { themesOpen = false },
         )
     } else if (settingsOpen) {
@@ -1478,7 +1506,8 @@ fun VaultApp(
                             )
                         } else {
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
+                                // Photos and PDFs can be cards (two across) or a list.
+                                columns = GridCells.Fixed(if (settings.cardsAsList) 1 else 2),
                                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1487,6 +1516,29 @@ fun VaultApp(
                                     .fillMaxWidth(),
                             ) {
                                 items(currentVisibleFiles, key = { it.file.absolutePath }) { item ->
+                                    if (settings.cardsAsList) {
+                                        VaultRow(
+                                            item = item,
+                                            selected = item.file.absolutePath in selectedPaths,
+                                            selecting = selecting,
+                                            onClick = {
+                                                if (selecting) {
+                                                    toggleSelected(item.file.absolutePath)
+                                                } else {
+                                                    open = item
+                                                }
+                                            },
+                                            onLongClick = {
+                                                if (selecting) {
+                                                    toggleSelected(item.file.absolutePath)
+                                                } else {
+                                                    selecting = true
+                                                    selectedPaths = setOf(item.file.absolutePath)
+                                                }
+                                            },
+                                        )
+                                        return@items
+                                    }
                                     VaultCard(
                                         item = item,
                                         selected = item.file.absolutePath in selectedPaths,
@@ -3257,3 +3309,108 @@ private data class VaultSnapshot(
     val categories: List<String>,
     val chats: List<ChatThread>,
 )
+
+/**
+ * One item as a row: its picture or badge, its name and its type, with the same selection
+ * ring as the card. It is the list form of [VaultCard], so the two can be swapped freely.
+ */
+@Composable
+private fun VaultRow(
+    item: VaultItem,
+    selected: Boolean,
+    selecting: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val marked = selecting && selected
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .vaultCard(shape, marked)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(58.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (item.type == ItemType.IMAGE) {
+                AsyncImage(
+                    model = item.file,
+                    contentDescription = item.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                IconBadge(
+                    icon = if (item.type == ItemType.PDF) {
+                        Icons.Outlined.PictureAsPdf
+                    } else {
+                        Icons.AutoMirrored.Outlined.StickyNote2
+                    },
+                    tint = accentOf(item.type),
+                    size = 42.dp,
+                    iconSize = 20.dp,
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                when (item.type) {
+                    ItemType.IMAGE -> "Photo"
+                    ItemType.PDF -> "PDF"
+                    ItemType.TEXT -> "Note"
+                },
+                color = TextSoft,
+                fontSize = 11.sp,
+            )
+        }
+        if (item.favourite && !selecting) {
+            Icon(
+                Icons.Default.Star,
+                contentDescription = "Favourite",
+                tint = FavouriteGold,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        if (selecting) {
+            Box(
+                Modifier
+                    .padding(start = 6.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    )
+                    .border(
+                        1.5.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
+    }
+}
