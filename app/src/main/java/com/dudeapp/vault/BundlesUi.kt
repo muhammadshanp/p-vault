@@ -69,11 +69,11 @@ import kotlinx.coroutines.launch
  * theme can sit in several bundles, and deleting a bundle never deletes a theme.
  */
 @Composable
-fun BundlesScreen(
+fun BundlesSection(
     /** True when this account may build and change bundles. */
     canEdit: Boolean,
+    /** Called when a theme from a bundle is picked, so the page can close. */
     onApplied: () -> Unit,
-    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val store = remember { BundleStore(context) }
@@ -86,8 +86,6 @@ fun BundlesScreen(
     var openBundle by remember { mutableStateOf<ThemeBundle?>(null) }
     var building by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<String?>(null) }
-
-    BackHandler(onBack = onBack)
 
     if (building != null) {
         ThemeBuilderScreen(
@@ -142,59 +140,47 @@ fun BundlesScreen(
         return
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Backdrop()
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 6.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text("Bundles", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), shape)
+            .padding(16.dp),
+    ) {
+        Text("Your bundles", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "A bundle is a named set of your own themes. One theme can sit in more than one bundle.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        if (canEdit) {
+            Button(onClick = { naming = true; draft = "" }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("New bundle")
             }
-            LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-            ) {
-                item {
-                    Text(
-                        "A bundle is a named set of your own themes. One theme can sit in more than one bundle.",
-                        color = TextSoft,
-                        fontSize = 13.sp,
-                    )
-                }
-                if (canEdit) {
-                    item {
-                        Button(onClick = { naming = true; draft = "" }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("New bundle")
-                        }
-                    }
-                }
-                if (bundles.isEmpty()) {
-                    item {
-                        Text(
-                            "No bundles yet. Make one, then build the themes inside it.",
-                            color = TextSoft,
-                            fontSize = 13.sp,
-                        )
-                    }
-                }
-                items(bundles, key = { it.id }) { bundle ->
-                    BundleRow(
-                        bundle = bundle,
-                        count = bundle.themeIds.count { id -> themes.any { it.id == id } },
-                        canEdit = canEdit,
-                        onOpen = { openBundle = bundle },
-                        onRename = { renaming = bundle; draft = bundle.name },
-                        onDelete = { deleting = bundle },
-                    )
-                }
-            }
+            Spacer(Modifier.height(10.dp))
+        }
+        if (bundles.isEmpty()) {
+            Text(
+                "No bundles yet. Make one, then build the themes inside it.",
+                color = TextSoft,
+                fontSize = 13.sp,
+            )
+        }
+        bundles.forEach { bundle ->
+            BundleRow(
+                bundle = bundle,
+                count = bundle.themeIds.count { id -> themes.any { it.id == id } },
+                canEdit = canEdit,
+                onOpen = { openBundle = bundle },
+                onRename = { renaming = bundle; draft = bundle.name },
+                onDelete = { deleting = bundle },
+            )
+            Spacer(Modifier.height(8.dp))
         }
     }
 

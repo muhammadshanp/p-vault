@@ -89,7 +89,6 @@ enum class AccessLevel(val label: String, val detail: String) {
 
 /** The switches that can be given to one address; more can be added over time. */
 enum class AccessFeature(val label: String, val detail: String) {
-    SUPPORT("Support", "The Support page in the menu: a message to the admin."),
     ;
 
     /** The key it is stored under: short, stable, and what an older phone still reads. */
