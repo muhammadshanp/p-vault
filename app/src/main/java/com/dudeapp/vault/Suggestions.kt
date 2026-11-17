@@ -287,12 +287,19 @@ private fun refusal(code: Int, response: String): String = when (code) {
     else -> "Firebase refused the request ($code ${errorText(response)})."
 }
 
-/** The "Give suggestion" window for members with special access. */
+/**
+ * The support page's body: one message to the admin, with an optional screenshot or a short
+ * video. It is the same channel as "Give suggestion", on a page instead of in a window.
+ *
+ * Sending one message to the admin: the body of the suggestion dialog, without the dialog, so
+ * the same channel is used from the Give suggestion item and from the support page.
+ */
 @Composable
-fun SuggestionDialog(
+fun SuggestionForm(
     onExternal: () -> Unit,
     onSent: () -> Unit,
-    onDismiss: () -> Unit,
+    onProblem: (String?) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -417,77 +424,74 @@ fun SuggestionDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Give a suggestion") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+    // The page instead of a dialog: the fields, the attachment and the send button.
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        Text(
+            "Your message goes to the P Vault admin together with your Google address, and is " +
+                "deleted after 2 days. A screenshot or a short video helps.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it.take(MAX_TEXT) },
+            label = { Text("What do you need help with?") },
+            minLines = 5,
+            maxLines = 10,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        val attached = attachment
+        if (attached == null) {
+            TextButton(
+                onClick = {
+                    onExternal()
+                    picker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                    )
+                },
+                enabled = !busy,
+            ) {
+                Text("Add a screenshot or short video")
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "It goes to the P Vault admin together with your Google address, and is deleted after 2 days.",
-                    color = TextSoft,
-                    fontSize = 12.sp,
+                    "${if (attached.kind == "video") "Video" else "Picture"} · ${sizeLabel(attached.file.length())}",
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it.take(MAX_TEXT) },
-                    label = { Text("Your suggestion") },
-                    minLines = 4,
-                    maxLines = 8,
+                TextButton(
+                    onClick = {
+                        attached.file.delete()
+                        attachment = null
+                    },
                     enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(6.dp))
-                val attached = attachment
-                if (attached == null) {
-                    TextButton(
-                        onClick = {
-                            onExternal()
-                            picker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                            )
-                        },
-                        enabled = !busy,
-                    ) {
-                        Text("Add a screenshot or short video")
-                    }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${if (attached.kind == "video") "Video" else "Picture"} · ${sizeLabel(attached.file.length())}",
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(
-                            onClick = {
-                                attached.file.delete()
-                                attachment = null
-                            },
-                            enabled = !busy,
-                        ) {
-                            Text("Remove")
-                        }
-                    }
-                }
-                if (busy && progress.isNotEmpty()) {
-                    Text(progress, color = TextSoft, fontSize = 12.sp)
-                }
-                val problem = error
-                if (problem != null) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(problem, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                ) {
+                    Text("Remove")
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { start() }, enabled = !busy && draft.isNotBlank()) {
-                Text(if (busy) "Sending…" else "Send")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") }
-        },
-    )
+        }
+        if (busy && progress.isNotEmpty()) {
+            Text(progress, color = TextSoft, fontSize = 12.sp)
+        }
+        val problem = error
+        if (problem != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(problem, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            onProblem(problem)
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { start() },
+            enabled = !busy && draft.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (busy) "Sending…" else "Send to the admin")
+        }
+    }
 }
 
 /** Reads up to [count] bytes; shorter only at the end of the file. */
@@ -500,154 +504,4 @@ private fun java.io.InputStream.readNBytesCompat(count: Int): ByteArray {
         filled += read
     }
     return if (filled == count) buffer else buffer.copyOf(filled)
-}
-
-/** The admin's list of suggestions, shown in the admin panel. */
-@Composable
-fun SuggestionsCard(
-    busy: Boolean,
-    withGoogle: ((String) -> Unit) -> Unit,
-    onExternal: () -> Unit,
-    onDone: (String?) -> Unit,
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var suggestions by remember { mutableStateOf<List<Suggestion>?>(null) }
-    var picture by remember { mutableStateOf<File?>(null) }
-    val timeFormat = remember { SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()) }
-
-    fun load() = withGoogle { token ->
-        scope.launch {
-            val response = call("$FIRESTORE/suggestions?pageSize=300", token, null)
-            when {
-                response == null -> onDone("No connection.")
-                response.first == 200 -> {
-                    val now = System.currentTimeMillis()
-                    val (old, fresh) = parseSuggestions(response.second).partition { isExpired(it, now) }
-                    suggestions = fresh.sortedByDescending { it.sent }
-                    // Anything older than two days is erased for good.
-                    old.forEach { call("$FIRESTORE:commit", token, deleteSuggestionJson(it)) }
-                    onDone(null)
-                }
-                response.first == 404 -> onDone("The Firestore database is not created yet in the Firebase console.")
-                else -> onDone("Firebase refused the request (${response.first} ${errorText(response.second)}).")
-            }
-        }
-    }
-
-    fun delete(suggestion: Suggestion) = withGoogle { token ->
-        scope.launch {
-            val response = call("$FIRESTORE:commit", token, deleteSuggestionJson(suggestion))
-            if (response != null && response.first == 200) {
-                suggestions = suggestions?.filter { it.id != suggestion.id }
-                onDone(null)
-            } else {
-                onDone("Could not delete the suggestion.")
-            }
-        }
-    }
-
-    fun open(suggestion: Suggestion) = withGoogle { token ->
-        scope.launch {
-            val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(suggestion.mime)
-                ?: if (suggestion.kind == "video") "mp4" else "jpg"
-            val target = File(suggestionDir(context), "${suggestion.id}.$extension")
-            val complete = withContext(Dispatchers.IO) {
-                runCatching {
-                    target.outputStream().use { sink ->
-                        for (part in 0 until suggestion.parts) {
-                            val response = call("$FIRESTORE/suggestions/${suggestion.id}/parts/$part", token, null)
-                            val bytes = response?.takeIf { it.first == 200 }?.let { parsePart(it.second) }
-                                ?: return@runCatching false
-                            sink.write(bytes)
-                        }
-                    }
-                    true
-                }.getOrDefault(false)
-            }
-            if (!complete) {
-                target.delete()
-                onDone("Could not download the attachment.")
-            } else if (suggestion.kind == "video") {
-                onDone(null)
-                onExternal()
-                val opened = runCatching {
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", target)
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW)
-                            .setDataAndType(uri, suggestion.mime.ifEmpty { "video/*" })
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }.isSuccess
-                if (!opened) onDone("No app on this phone can play the video.")
-            } else {
-                picture = target
-                onDone(null)
-            }
-        }
-    }
-
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Suggestions", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                "Sent by people with special access. Each one is deleted 2 days after it was sent.",
-                color = TextSoft,
-                fontSize = 12.sp,
-            )
-            Spacer(Modifier.height(12.dp))
-            val list = suggestions
-            Button(onClick = { load() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    when {
-                        busy -> "Working…"
-                        list == null -> "Show suggestions"
-                        else -> "Refresh"
-                    },
-                )
-            }
-            if (list != null && list.isEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Text("No suggestions right now.", color = TextSoft, fontSize = 13.sp)
-            }
-            list.orEmpty().forEach { suggestion ->
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                Spacer(Modifier.height(10.dp))
-                Text(suggestion.email, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Text(timeFormat.format(Date(suggestion.sent)), color = TextSoft, fontSize = 12.sp)
-                Spacer(Modifier.height(4.dp))
-                Text(suggestion.text, fontSize = 14.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (suggestion.parts > 0) {
-                        TextButton(onClick = { open(suggestion) }, enabled = !busy) {
-                            val label = if (suggestion.kind == "video") "Play video" else "Open picture"
-                            Text("$label (${sizeLabel(suggestion.size)})", fontSize = 12.sp)
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { delete(suggestion) }, enabled = !busy) {
-                        Text("Delete", fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-    }
-
-    val shown = picture
-    if (shown != null) {
-        Dialog(onDismissRequest = { picture = null }) {
-            AsyncImage(
-                model = shown,
-                contentDescription = "Suggestion picture",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
 }

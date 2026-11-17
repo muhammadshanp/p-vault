@@ -58,11 +58,12 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -242,13 +243,17 @@ fun VaultApp(
     val unreadPushes = remember(inboxChange) { pushInbox.unreadCount() }
     var isAdmin by remember { mutableStateOf(AdminStore(context).isAdmin()) }
     // Picks up special access given or removed by the admin since the last time.
-    var canSuggest by remember { mutableStateOf(AccessStore(context).access().has(AccessFeature.SUGGESTIONS)) }
-    var suggestionOpen by remember { mutableStateOf(false) }
     // What this account may do: its level, its switches and the looks shared with it.
     var access by remember { mutableStateOf(AccessStore(context).access()) }
     val specialAccess = access.theme
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
+    var bundlesOpen by remember { mutableStateOf(false) }
+    var assistantOpen by remember { mutableStateOf(false) }
+    // A theme made on this phone, if one is being worn.
+    val ownTheme = Bundles.applied.value
+    val bundlesStore = remember { BundleStore(context) }
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { Bundles.publish(bundlesStore) } }
     // The photos this phone chose for its cards, one per card at most.
     val cardPhotos = remember { CardPhotoStore(context) }
     // Read as state, so a card redraws the moment its photo is chosen or removed.
@@ -287,7 +292,6 @@ fun VaultApp(
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
         access = AccessStore(context).refresh()
-        canSuggest = access.has(AccessFeature.SUGGESTIONS)
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
@@ -906,7 +910,6 @@ fun VaultApp(
                 if (ok) profileStore.clear()
                 if (ok) GoogleAccountStore(context).clear()
                 if (ok) AccessStore(context).clear()
-                if (ok) canSuggest = false
                 if (ok) access = MyAccess()
                 ok
             }
@@ -1011,7 +1014,7 @@ fun VaultApp(
     val chatDetail = openChat
     BackHandler(
         enabled = detail == null && chatDetail == null && !settingsOpen && !adminOpen && !inboxOpen &&
-            !themesOpen && !advancedThemesOpen &&
+            !themesOpen && !advancedThemesOpen && !bundlesOpen && !assistantOpen &&
             (searchOpen || query.isNotBlank() || selecting || tab != Tab.HOME || reelFilter != null),
     ) {
         when {
@@ -1029,7 +1032,18 @@ fun VaultApp(
             tab != Tab.HOME -> switchTab(Tab.HOME)
         }
     }
-    if (inboxOpen) {
+    if (assistantOpen) {
+        SupportScreen(
+            onExternal = onExternal,
+            onBack = { assistantOpen = false },
+        )
+    } else if (bundlesOpen) {
+        BundlesScreen(
+            canEdit = access.copy(admin = isAdmin).advanced && settings.advancedMode,
+            onApplied = { bundlesOpen = false },
+            onBack = { bundlesOpen = false },
+        )
+    } else if (inboxOpen) {
         InboxScreen(onBack = { inboxOpen = false })
     } else if (adminOpen) {
         AdminScreen(
@@ -1061,13 +1075,17 @@ fun VaultApp(
                 cardPhotos.clear(kind)
                 cardPhotos.publish()
             },
+            onBundles = { advancedThemesOpen = false; bundlesOpen = true },
             onPick = onThemeChange,
             onBack = { advancedThemesOpen = false },
         )
     } else if (themesOpen) {
         ThemesScreen(
             theme = theme,
-            access = access.copy(admin = isAdmin),
+            // With advanced mode off the Theme page is the ordinary list: no Advanced entry.
+            access = access.copy(admin = isAdmin).let {
+                if (settings.advancedMode) it else it.copy(level = AccessLevel.THEME)
+            },
             catalogThemes = catalogThemes.filter {
                 it.isAllowedFor(GoogleAccountStore(context).email(), access.theme, access)
             },
@@ -1171,9 +1189,11 @@ fun VaultApp(
                     onSettings = { closeMenu { settingsOpen = true } },
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
-                    canSuggest = canSuggest,
-                    onSuggest = { closeMenu { suggestionOpen = true } },
                     canTheme = access.theme,
+                    canBundles = access.copy(admin = isAdmin).advanced && settings.advancedMode,
+                    canAssistant = access.copy(admin = isAdmin).has(AccessFeature.SUPPORT),
+                    onBundles = { bundlesOpen = true },
+                    onAssistant = { assistantOpen = true },
                     onThemes = { closeMenu { themesOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
@@ -1766,20 +1786,8 @@ fun VaultApp(
                         // Signing in or out on the sheet can change this.
                         scope.launch {
                             access = AccessStore(context).refresh()
-                            canSuggest = access.has(AccessFeature.SUGGESTIONS)
-                        }
+                                            }
                     },
-                )
-            }
-
-            if (suggestionOpen) {
-                SuggestionDialog(
-                    onExternal = onExternal,
-                    onSent = {
-                        suggestionOpen = false
-                        Toast.makeText(context, "Suggestion sent. Thank you.", Toast.LENGTH_LONG).show()
-                    },
-                    onDismiss = { suggestionOpen = false },
                 )
             }
 
@@ -2353,7 +2361,7 @@ private fun HomeHero(total: Int) {
     val preset = LocalThemePreset.current
     val colors = preset.gradient ?: listOf(Color(0xFFF0703F), Color(0xFFB9391A))
     val shape = RoundedCornerShape(28.dp)
-    val heroPhoto = CardPhotoFiles.current.value[CardPicture.HERO]
+    val heroPhoto = LocalThemeCards.current[CardPicture.HERO] ?: CardPhotoFiles.current.value[CardPicture.HERO]
     val heroPicture = if (heroPhoto != null) null else preset.cardPictures[CardPicture.HERO]
     val artwork = if (heroPicture != null) {
         remember(heroPicture) {
@@ -2504,6 +2512,9 @@ private fun themeArtwork(preset: ThemePreset): ImageBitmap? {
         is BackdropStyle.Picture -> remember(style.image) {
             BitmapFactory.decodeResource(context.resources, style.image)?.asImageBitmap()
         }
+        // A theme made on this phone carries its photos with it, so its backdrop is not an
+        // artwork source here; the card photos come from LocalThemeCards instead.
+        is BackdropStyle.LocalFile -> null
         BackdropStyle.Plain -> null
     }
 }
@@ -2519,7 +2530,8 @@ private fun HomeTile(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(22.dp)
-    val photo = CardPhotoFiles.current.value[kind]
+    // A theme made on this phone first, then a photo chosen for this card on its own.
+    val photo = LocalThemeCards.current[kind] ?: CardPhotoFiles.current.value[kind]
     // A photo of the user's own is the whole card; the theme's picture sits behind a wash.
     val ownPhoto = photo != null
     val picture = if (ownPhoto) null else LocalThemePreset.current.cardPictures[kind]
@@ -2728,9 +2740,11 @@ private fun MenuDrawer(
     onSettings: () -> Unit,
     isAdmin: Boolean,
     onAdmin: () -> Unit,
-    canSuggest: Boolean,
-    onSuggest: () -> Unit,
     canTheme: Boolean,
+    canBundles: Boolean,
+    canAssistant: Boolean,
+    onBundles: () -> Unit,
+    onAssistant: () -> Unit,
     onThemes: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
@@ -2763,6 +2777,12 @@ private fun MenuDrawer(
         if (canTheme) {
             MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
         }
+        if (canBundles) {
+            MenuDrawerItem(Icons.Outlined.Collections, "Bundles", onBundles)
+        }
+        if (canAssistant) {
+            MenuDrawerItem(Icons.Outlined.SupportAgent, "Support", onAssistant)
+        }
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
             icon = Icons.Outlined.SystemUpdateAlt,
@@ -2770,9 +2790,6 @@ private fun MenuDrawer(
             onClick = onCheckUpdates,
             highlight = updateReady,
         )
-        if (canSuggest) {
-            MenuDrawerItem(Icons.Outlined.Lightbulb, "Give suggestion", onSuggest)
-        }
         MenuDrawerItem(Icons.Outlined.Info, "About", onAbout)
         if (isAdmin) {
             MenuDrawerItem(Icons.Outlined.AdminPanelSettings, "Admin panel", onAdmin)

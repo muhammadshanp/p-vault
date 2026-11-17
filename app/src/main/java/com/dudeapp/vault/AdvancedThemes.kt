@@ -79,6 +79,8 @@ fun AdvancedThemesScreen(
     /** A photo was picked for one card; null when the picker was closed. */
     onPhoto: (CardPicture, Uri?) -> Unit = { _, _ -> },
     onClearPhoto: (CardPicture) -> Unit = {},
+    /** Opens the bundles page, where themes made on this phone live. */
+    onBundles: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -141,6 +143,9 @@ fun AdvancedThemesScreen(
                             color = TextSoft,
                             fontSize = 13.sp,
                         )
+                    }
+                    item {
+                        BundlesEntry(onClick = onBundles)
                     }
                     item {
                         // One photo per card, chosen from this phone.
@@ -387,4 +392,26 @@ internal fun cardPictureName(kind: CardPicture): String = when (kind) {
     CardPicture.PDFS -> "PDFs card"
     CardPicture.NOTES -> "Notes and chats card"
     CardPicture.REELS -> "Reels card"
+}
+
+/** The way through to the bundles, on the Advanced page. */
+@Composable
+private fun BundlesEntry(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), shape)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+    ) {
+        Text("Your bundles", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Group the themes you make into named sets. A theme can sit in more than one bundle.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+    }
 }

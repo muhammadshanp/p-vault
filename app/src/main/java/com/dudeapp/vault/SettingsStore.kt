@@ -12,6 +12,8 @@ data class AppSettings(
     val lockChoiceMade: Boolean = false,
     val lockDelaySeconds: Int = 0,
     val biometricUnlock: Boolean = true,
+    /** The Advanced page and bundles are hidden from the Theme page while this is off. */
+    val advancedMode: Boolean = true,
 )
 
 internal val REMINDER_DAY_OPTIONS = listOf(1, 7, 14, 30)
@@ -31,6 +33,7 @@ class SettingsStore(context: Context) {
         lockChoiceMade = prefs.getBoolean("lock_choice_made", false),
         lockDelaySeconds = prefs.getInt("lock_delay_seconds", 0).coerceIn(0, 300),
         biometricUnlock = prefs.getBoolean("biometric_unlock", true),
+        advancedMode = prefs.getBoolean("advanced_mode", true),
     )
 
     fun save(settings: AppSettings) {
@@ -43,6 +46,7 @@ class SettingsStore(context: Context) {
             .putBoolean("lock_choice_made", settings.lockChoiceMade)
             .putInt("lock_delay_seconds", settings.lockDelaySeconds.coerceIn(0, 300))
             .putBoolean("biometric_unlock", settings.biometricUnlock)
+            .putBoolean("advanced_mode", settings.advancedMode)
             .apply()
     }
 }
