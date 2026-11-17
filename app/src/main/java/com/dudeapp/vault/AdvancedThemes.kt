@@ -405,3 +405,65 @@ private fun YourThemeRow(
         }
     }
 }
+
+/**
+ * One row per card, with the photo this phone chose for it. A chosen photo wins over the
+ * picture the look puts in the card; the card keeps its own size and its own labels.
+ */
+@Composable
+private fun CardPhotoCard(
+    photos: Map<CardPicture, File>,
+    onPick: (CardPicture) -> Unit,
+    onClear: (CardPicture) -> Unit,
+    enabled: Boolean,
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), shape)
+            .padding(16.dp),
+    ) {
+        Text("Photo for each card", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Pick a photo for any card. It sits behind the card's name, not in place of it, " +
+                "and the card stays the same size.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        CardPicture.entries.forEach { kind ->
+            val file = photos[kind]
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(cardPictureName(kind), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        if (file == null) "No photo · the look decides" else "Your photo",
+                        color = TextSoft,
+                        fontSize = 11.sp,
+                    )
+                }
+                if (file != null) {
+                    TextButton(onClick = { onClear(kind) }, enabled = enabled) {
+                        Text("Remove", fontSize = 12.sp)
+                    }
+                }
+                TextButton(onClick = { onPick(kind) }, enabled = enabled) {
+                    Text(if (file == null) "Choose" else "Change", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+/** The name of a card, as it is shown on Home. */
+internal fun cardPictureName(kind: CardPicture): String = when (kind) {
+    CardPicture.HERO -> "The big card on Home"
+    CardPicture.PHOTOS -> "Photos card"
+    CardPicture.PDFS -> "PDFs card"
+    CardPicture.NOTES -> "Notes and chats card"
+    CardPicture.REELS -> "Reels card"
+}
+
