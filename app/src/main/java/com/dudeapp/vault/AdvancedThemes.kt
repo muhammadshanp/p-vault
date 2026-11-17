@@ -79,6 +79,9 @@ fun AdvancedThemesScreen(
     /** A photo was picked for one card; null when the picker was closed. */
     onPhoto: (CardPicture, Uri?) -> Unit = { _, _ -> },
     onClearPhoto: (CardPicture) -> Unit = {},
+    /** An image was picked for the whole background. */
+    onBackground: (Uri?) -> Unit = {},
+    onClearBackground: () -> Unit = {},
     /** True while the bundles are open; the page shows them instead of the looks. */
     bundlesOpen: Boolean = false,
     onBundles: (Boolean) -> Unit = {},
@@ -95,6 +98,19 @@ fun AdvancedThemesScreen(
     fun pick(kind: CardPicture) {
         picking = kind
         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    // The whole background: one image, picked from the same gallery.
+    var backgroundPicking by remember { mutableStateOf(false) }
+    val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (backgroundPicking) {
+            backgroundPicking = false
+            onBackground(uri)
+        }
+    }
+    fun pickBackground() {
+        backgroundPicking = true
+        backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     val close = { visible.targetState = false }
@@ -143,6 +159,15 @@ fun AdvancedThemesScreen(
                                 "same size as on every other theme, with its name and its count still on it.",
                             color = TextSoft,
                             fontSize = 13.sp,
+                        )
+                    }
+                    item {
+                        BackgroundChoice(
+                            image = CardPhotoFiles.background.value,
+                            themeName = theme.label,
+                            onPick = ::pickBackground,
+                            onTheme = onClearBackground,
+                            enabled = access.theme,
                         )
                     }
                     item {
@@ -435,5 +460,97 @@ private fun BundlesEntry(open: Boolean, onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.primary,
             fontSize = 14.sp,
         )
+    }
+}
+
+/**
+ * The whole background, as one choice: the theme's own backdrop, or one image of the user's.
+ * While an image is chosen the theme supplies only the colours, so the two never fight.
+ */
+@Composable
+private fun BackgroundChoice(
+    image: File?,
+    themeName: String,
+    onPick: () -> Unit,
+    onTheme: () -> Unit,
+    enabled: Boolean,
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), shape)
+            .padding(16.dp),
+    ) {
+        Text("Background", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Choose one: the theme's own background, or an image of your own for the whole app.",
+            color = TextSoft,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    width = 1.dp,
+                    color = if (image == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                .clickable(enabled = enabled, onClick = onTheme)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("The theme's background", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    if (image == null) "$themeName · in use" else "$themeName · tap to use it",
+                    color = TextSoft,
+                    fontSize = 11.sp,
+                )
+            }
+            if (image == null) {
+                Box(
+                    Modifier.size(22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    width = 1.dp,
+                    color = if (image != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                .clickable(enabled = enabled, onClick = onPick)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("My image", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    if (image == null) "Pick a photo for the whole app" else "Your image · in use · tap to change",
+                    color = TextSoft,
+                    fontSize = 11.sp,
+                )
+            }
+            if (image != null) {
+                Box(
+                    Modifier.size(22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+                }
+            }
+        }
     }
 }

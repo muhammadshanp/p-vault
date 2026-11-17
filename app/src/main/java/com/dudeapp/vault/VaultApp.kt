@@ -1061,6 +1061,22 @@ fun VaultApp(
                 cardPhotos.clear(kind)
                 cardPhotos.publish()
             },
+            // The whole background: one image, or back to the theme's own.
+            onBackground = { uri ->
+                if (uri != null) {
+                    scope.launch {
+                        if (cardPhotos.saveBackground(uri)) {
+                            cardPhotos.publish()
+                        } else {
+                            Toast.makeText(context, "Could not save that image", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            },
+            onClearBackground = {
+                cardPhotos.clearBackground()
+                cardPhotos.publish()
+            },
             bundlesOpen = bundlesOpen,
             onBundles = { bundlesOpen = it },
             onPick = onThemeChange,

@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.30** — The whole background is one choice in Advanced: the theme's own background, or one image of your own. Picking one replaces the other, and the theme then supplies only the colours. Card photos stay separate, behind each card's own label.
 - **0.5.29** — Bundles now live inside the Advanced page (no menu item), and the Support page is removed everywhere, with the suggestion channel it used.
 - **0.5.28** — The suggestion page is gone: Support is the only way to write to the admin, so there is one channel and one inbox. The "Give suggestion" menu item, its address switch and the admin's suggestions list are removed with it.
 - **0.5.27** — The Assistant page is now Support: one message to the admin from a page, with a screenshot or short video, on the same channel as Give suggestion. Advanced mode has a switch in Settings, so the Theme page can be the ordinary list again. Bundles: your own themes, grouped into named sets.
@@ -204,4 +205,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.29 (versionCode 59).
+`com.dudeapp.vault` — version 0.5.30 (versionCode 60).

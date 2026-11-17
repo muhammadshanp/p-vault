@@ -8,12 +8,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The card photos on this phone, as the screens read them. A photo of the user's own always
- * wins over the picture a theme puts in a card, and the card keeps its size and its label.
+ * The photos the user chose, as the screens read them. A photo of the user's own always wins
+ * over the picture a theme puts in a card, and the card keeps its size and its label.
  */
 object CardPhotoFiles {
     /** The photo of each card that has one; read by the cards themselves. */
     val current = mutableStateOf<Map<CardPicture, File>>(emptyMap())
+
+    /**
+     * The whole background: either the theme's own backdrop (null) or one image of the user's.
+     * It is the same choice the Theme page shows, so the two never fight.
+     */
+    val background = mutableStateOf<File?>(null)
 }
 
 /**
@@ -23,10 +29,45 @@ object CardPhotoFiles {
  * The card keeps its size and its labels; the photo is only behind them.
  */
 class CardPhotoStore(private val context: Context) {
+    private companion object {
+        const val BACKGROUND = "background"
+    }
+
     private val prefs = context.getSharedPreferences("dude_card_photos", Context.MODE_PRIVATE)
 
     private val dir: File
         get() = File(context.filesDir, "card_photos").apply { mkdirs() }
+
+    private val backgroundDir: File
+        get() = File(context.filesDir, "background").apply { mkdirs() }
+
+    /** The whole-background image, or null when the theme's own backdrop is used. */
+    fun backgroundImage(): File? =
+        prefs.getString(BACKGROUND, null)?.let { File(it) }?.takeIf { it.isFile && it.length() > 0 }
+
+    /** Keeps [uri] as the whole background, replacing any earlier image. */
+    suspend fun saveBackground(uri: Uri): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val target = File(backgroundDir, "background.img")
+            val copied = context.contentResolver.openInputStream(uri)?.use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+                true
+            } ?: false
+            if (copied && target.length() > 0) {
+                prefs.edit().putString(BACKGROUND, target.absolutePath).apply()
+                true
+            } else {
+                false
+            }
+        }.getOrDefault(false)
+    }
+
+    /** Goes back to the theme's own backdrop. */
+    fun clearBackground() {
+        prefs.getString(BACKGROUND, null)?.let { File(it).delete() }
+        prefs.edit().remove(BACKGROUND).apply()
+        CardPhotoFiles.background.value = null
+    }
 
     /** The photo chosen for [kind], or null when the card keeps its theme picture. */
     fun file(kind: CardPicture): File? =
@@ -61,11 +102,13 @@ class CardPhotoStore(private val context: Context) {
 
     fun clearAll() {
         CardPicture.entries.forEach { clear(it) }
+        clearBackground()
         CardPhotoFiles.current.value = emptyMap()
     }
 
-    /** Reads what is saved and makes it the choice every card sees. */
+    /** Reads what is saved and makes it the choice every screen sees. */
     fun publish() {
         CardPhotoFiles.current.value = chosen().associateWith { file(it)!! }
+        CardPhotoFiles.background.value = backgroundImage()
     }
 }
