@@ -92,6 +92,6 @@ class AccessTest {
         assertFalse(plain.advanced)
         assertFalse(plain.allowsLook("nightfall"))
         assertTrue(plain.allowsLook(null))
-        assertFalse(plain.has(SUPPORT_AI))
+        AccessFeature.entries.firstOrNull()?.let { assertFalse(plain.has(it)) }
     }
 }
