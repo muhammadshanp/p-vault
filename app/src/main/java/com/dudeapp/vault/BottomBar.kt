@@ -75,7 +75,9 @@ enum class Tab(val label: String, val icon: ImageVector, val selectedIcon: Image
     HOME("Home", Icons.Outlined.Home, Icons.Filled.Home),
     REELS("Reels", Icons.Outlined.PlayCircle, Icons.Filled.PlayCircle),
     IMAGES("Images", Icons.Outlined.Image, Icons.Filled.Image),
-    PDFS("PDFs", Icons.Outlined.PictureAsPdf, Icons.Filled.PictureAsPdf),
+    // "Files" rather than "PDFs": the page holds photos and PDFs, and at a narrow width
+    // "PDFs" and "Notes" crowded the Home label.
+    PDFS("Files", Icons.Outlined.PictureAsPdf, Icons.Filled.PictureAsPdf),
     NOTES("Notes", Icons.AutoMirrored.Outlined.StickyNote2, Icons.AutoMirrored.Filled.StickyNote2),
 }
 
@@ -125,7 +127,7 @@ fun BottomBar(
     var rowWidth by remember { mutableIntStateOf(0) }
     Box(
         modifier
-            .padding(start = 20.dp, end = 20.dp, bottom = systemInset + BarBottomGap)
+            .padding(start = Spacing.Screen, end = Spacing.Screen, bottom = systemInset + BarBottomGap)
             .widthIn(max = 460.dp)
             .fillMaxWidth()
             .height(BarHeight)

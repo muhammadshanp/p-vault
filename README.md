@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.48-pro** — A pre-release test build, so the ordinary app gets neither this nor any update notice. It is named **P Vault Pro** under the icon (the name comes from the version suffix, so normal releases stay "P Vault"), and the bottom bar's "PDFs" tab is now "Files", which covers photos-and-PDFs and no longer collides with the Home tab at narrow widths.
 - **0.5.47** — One spacing scale. Screens had ten different side margins (8, 10, 12, 14, 16, 20, 22, 24); they now share `Spacing.Screen` (20dp), cards sit `Spacing.Card` (12dp) apart, and the Theme grid's gutter matches the vault grid. Corners stay as the theme sets them.
 - **0.5.46-test** — A test build, published as a pre-release so the app never offers it: the username work back on top of 0.5.45.
 - **0.5.44** — The admin panel decides whether a username can be changed at all: with the switch off, the first name someone takes stands, the profile shows it read-only, and the app refuses a change before the database is even asked.
