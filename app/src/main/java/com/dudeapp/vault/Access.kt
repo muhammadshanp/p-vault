@@ -121,7 +121,15 @@ data class AccessDocument(
     val everything: Set<String> = emptySet(),
     val features: Map<AccessFeature, Set<String>> = emptyMap(),
     val looks: Map<String, Set<String>> = emptyMap(),
+    /**
+     * Usernames the admin keeps for later, or does not want anyone to have. Read by every
+     * install from this public document, so nobody signs in and takes a name that was set
+     * aside. Nothing here belongs to a person; the name is simply not offered.
+     */
+    val reservedNames: Set<String> = emptySet(),
 ) {
+    fun isReserved(name: String): Boolean = name.trim().lowercase() in reservedNames
+
     fun level(hash: String): AccessLevel = when {
         hash in everything -> AccessLevel.EVERYTHING
         hash in advanced -> AccessLevel.ADVANCED
@@ -151,6 +159,7 @@ data class AccessDocument(
             (from.keys + given).associateWith { key -> keep(from[key].orEmpty(), key in given) }
                 .filterValues { it.isNotEmpty() }
         return AccessDocument(
+            reservedNames = reservedNames,
             hashes = keep(hashes, level.member),
             theme = keep(theme, atLeast(AccessLevel.THEME)),
             advanced = keep(advanced, atLeast(AccessLevel.ADVANCED)),
@@ -164,6 +173,7 @@ data class AccessDocument(
     /** Every field of the public document, including empty ones, so removals stick. */
     internal fun fieldsJson(): JSONObject {
         val fields = JSONObject()
+            .put("reserved", arrayField(reservedNames.sorted()))
             .put("hashes", arrayField(hashes.sorted()))
             .put("theme", arrayField(theme.sorted()))
             .put("advanced", arrayField(advanced.sorted()))
@@ -206,6 +216,7 @@ data class AccessDocument(
                 everything = list("everything"),
                 features = pairs("f_").mapNotNull { (key, set) -> AccessFeature.of(key)?.let { it to set } }.toMap(),
                 looks = pairs("look_").filterKeys { it.isNotBlank() },
+                reservedNames = list("reserved"),
             )
         }.getOrDefault(AccessDocument())
 
@@ -277,18 +288,19 @@ internal fun accessPeople(emails: List<String>, document: AccessDocument): List<
     }
 
 /** The request that saves the address list and every level, switch and look in one step. */
-internal fun accessCommitJson(people: List<AccessPerson>): String {
-    val document = accessDocumentOf(people)
-    fun write(doc: String, fields: JSONObject) = JSONObject().put(
+internal fun accessCommitJson(people: List<AccessPerson>): String =
+    accessCommitJson(accessDocumentOf(people))
+
+/**
+ * The same commit built from a whole document, used by the reserved-name page: it changes
+ * only what it owns and writes the rest back as it found it.
+ */
+internal fun accessCommitJson(document: AccessDocument): String {
+    val update = JSONObject().put(
         "update",
-        JSONObject().put("name", "$DOCS_ROOT/access/$doc").put("fields", fields),
+        JSONObject().put("name", "$DOCS_ROOT/access/special").put("fields", document.fieldsJson()),
     )
-    return JSONObject().put(
-        "writes",
-        JSONArray()
-            .put(write("emails", JSONObject().put("emails", arrayField(people.map { it.email }.sorted()))))
-            .put(write("special", document.fieldsJson())),
-    ).toString()
+    return JSONObject().put("writes", JSONArray().put(update)).toString()
 }
 
 class AccessStore(private val context: Context) {
@@ -306,6 +318,10 @@ class AccessStore(private val context: Context) {
 
     /** True for the admin and for a signed-in address on the admin's list. */
     fun isSpecial(): Boolean = access().theme
+
+    /** Usernames the admin set aside, as last read; works with no connection. */
+    fun reservedNames(): Set<String> =
+        prefs.getStringSet("reserved", emptySet()).orEmpty().map { it.lowercase() }.toSet()
 
     /** True only for a signed-in address on the admin's list; this is what Firebase checks too. */
     fun isMember(): Boolean = access().level.member
@@ -344,13 +360,14 @@ class AccessStore(private val context: Context) {
                 .putString("level", level.name)
                 .putStringSet("features", document.featuresOf(hash).map { it.key }.toSet())
                 .putStringSet("looks", document.looksOf(hash, level))
+                .putStringSet("reserved", document.reservedNames)
                 .apply()
         }
         return access()
     }
 }
 
-private fun databaseProblem(code: Int): String = when (code) {
+internal fun databaseProblem(code: Int): String = when (code) {
     401 -> "Google sign-in expired. Try again."
     403 -> "This Google account may not change the list, or the Firestore database is not turned on."
     404 -> "The Firestore database is not created yet in the Firebase console."

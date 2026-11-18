@@ -1,6 +1,31 @@
 package com.dudeapp.vault
 
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
@@ -8,6 +33,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -30,7 +56,7 @@ import kotlin.coroutines.resume
  */
 
 /** Why a name was turned down, in words the user can act on. */
-enum class NameProblem { EMPTY, SHORT, LONG, CHARS, OFFENSIVE, TAKEN }
+enum class NameProblem { EMPTY, SHORT, LONG, CHARS, OFFENSIVE, TAKEN, RESERVED }
 
 /** The rule for a username: lower-case letters, numbers, dot, dash, underscore. */
 internal fun normalizeUsername(text: String): String =
@@ -54,6 +80,7 @@ fun nameProblemText(problem: NameProblem?): String? = when (problem) {
     NameProblem.CHARS -> "Only letters, numbers, dots, dashes and underscores."
     NameProblem.OFFENSIVE -> "That name is not allowed. Pick another."
     NameProblem.TAKEN -> "That name is already taken. Try another."
+    NameProblem.RESERVED -> "That name is kept by P Vault. Pick another."
 }
 
 /** Where a chosen name stands. */
@@ -162,6 +189,14 @@ internal suspend fun claimUsername(
 ): NameCheck {
     // Cheaper checks first: nothing is asked of the network for a name the rules already refuse.
     usernameProblem(name)?.let { return NameCheck.Refused(name, it) }
+    // A name the admin keeps for later, or has closed off, is refused on this phone with the
+    // list it last read, and on the database by the same rule.
+    if (AccessStore(context).reservedNames().contains(name)) {
+        return NameCheck.Refused(name, NameProblem.RESERVED)
+    }
+    // The admin's list can have been changed since this phone last looked, so the public
+    // document is re-read before a name is offered: a name reserved a minute ago is refused.
+    AccessStore(context).refresh()
     val email = GoogleAccountStore(context).email()
     if (email == null) {
         return NameCheck.Unconfirmed(name, "Sign in with Google to keep this name for yourself.")
@@ -266,3 +301,126 @@ internal suspend fun acquireToken(context: Context): String? = withContext(Dispa
     }.getOrNull()
 }
 
+
+/**
+ * The admin's page of names nobody may take. The list lives in the same public document the
+ * access list uses (`access/special`, field `reserved`), so every install reads it with the
+ * checks it already makes, with no extra database permission.
+ */
+@Composable
+fun ReservedNamesCard(
+    busy: Boolean,
+    withGoogle: ((String) -> Unit) -> Unit,
+    onDone: (String?) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var names by remember { mutableStateOf<Set<String>?>(null) }
+    var draft by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf<String?>(null) }
+
+    fun load() = withGoogle { token ->
+        scope.launch {
+            val response = googleRequest("$FIRESTORE/access/special", token, null)
+            when {
+                response == null -> onDone("No connection.")
+                response.first == 200 -> {
+                    names = AccessDocument.parse(response.second).reservedNames
+                    onDone(null)
+                }
+                response.first == 404 -> {
+                    names = emptySet()
+                    onDone(null)
+                }
+                else -> onDone(databaseProblem(response.first))
+            }
+        }
+    }
+
+    fun save(next: Set<String>) = withGoogle { token ->
+        scope.launch {
+            // Read first, so the fields the People page owns are written back untouched.
+            val current = googleRequest("$FIRESTORE/access/special", token, null)
+            val document = if (current?.first == 200) {
+                AccessDocument.parse(current.second)
+            } else {
+                AccessDocument()
+            }
+            val response = googleRequest(
+                "$FIRESTORE:commit",
+                token,
+                accessCommitJson(document.copy(reservedNames = next)),
+            )
+            when {
+                response == null -> onDone("No connection. The list was not changed.")
+                response.first == 200 -> {
+                    names = next
+                    draft = ""
+                    note = null
+                    onDone(null)
+                }
+                else -> onDone(databaseProblem(response.first))
+            }
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Names kept for you", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Nobody can take these usernames: no one else can claim them, and the phone " +
+                    "refuses them before it asks the database. They are also words you would " +
+                    "rather nobody used.",
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            val list = names
+            if (list == null) {
+                Button(onClick = { load() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (busy) "Working…" else "Show the reserved names")
+                }
+            } else {
+                if (list.isEmpty()) {
+                    Text("Nothing reserved yet.", color = TextSoft, fontSize = 13.sp)
+                }
+                list.sorted().forEach { name ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("@$name", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = { save(list - name) },
+                            enabled = !busy,
+                        ) { Text("Release") }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = {
+                        draft = normalizeUsername(it).filter { c -> c.isLetterOrDigit() || c in "._-" }
+                            .take(20)
+                        note = nameProblemText(usernameProblem(draft))
+                    },
+                    label = { Text("Reserve a name") },
+                    supportingText = note?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    isError = note != null,
+                    singleLine = true,
+                    leadingIcon = { Text("@", color = TextSoft) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { save(list + draft) },
+                    enabled = !busy && draft.isNotEmpty() && nameProblemText(usernameProblem(draft)) == null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (busy) "Saving…" else "Reserve")
+                }
+            }
+        }
+    }
+}

@@ -63,7 +63,7 @@ import androidx.compose.ui.unit.sp
 
 /** A look is offered only when this account's level, and its shared looks, allow it. */
 private fun lockedFor(preset: ThemePreset, access: MyAccess): Boolean =
-    preset.special && (!access.theme || !access.allowsLook(preset.catalogId))
+    preset.special && (!access.allowsLook(preset.catalogId))
 
 /**
  * The look of the app: Light and Dark for everyone, and the picture looks for people with

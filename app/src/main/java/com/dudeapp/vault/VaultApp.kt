@@ -62,6 +62,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Login
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
@@ -259,6 +260,8 @@ fun VaultApp(
 
     var profile by remember { mutableStateOf(profileStore.load()) }
     var profileOpen by remember { mutableStateOf(false) }
+    // Whether a Google account is signed in on this phone, for the menu's sign-in item.
+    var signedIn by remember { mutableStateOf(GoogleAccountStore(context).email() != null) }
     // Bumped whenever the profile changes, to reopen the sheet with the saved values.
     var profileSheetKey by remember { mutableIntStateOf(0) }
     val usernameStore = remember { UsernameStore(context) }
@@ -1361,6 +1364,8 @@ fun VaultApp(
                     onAdmin = { closeMenu { adminOpen = true } },
                     canTheme = access.theme,
                     onThemes = { closeMenu { themesOpen = true } },
+                    signedIn = signedIn,
+                    onSignIn = { closeMenu { adminOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -2008,6 +2013,7 @@ fun VaultApp(
                     onDismiss = {
                         profileOpen = false
                         // Signing in or out on the sheet can change this.
+                        signedIn = GoogleAccountStore(context).email() != null
                         scope.launch {
                             access = AccessStore(context).refresh()
                                             }
@@ -2967,6 +2973,10 @@ private fun MenuDrawer(
     onAdmin: () -> Unit,
     canTheme: Boolean,
     onThemes: () -> Unit,
+    /** A Google account is signed in on this phone. */
+    signedIn: Boolean,
+    /** Starts Google's own sign-in screen for the admin panel. */
+    onSignIn: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -2995,8 +3005,10 @@ private fun MenuDrawer(
         Spacer(Modifier.height(10.dp))
         MenuDrawerItem(Icons.Outlined.Person, "Profile", onProfile)
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
-        if (canTheme) {
-            MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
+        // The Theme page itself is for everyone; only its picture looks need special access.
+        MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
+        if (!signedIn) {
+            MenuDrawerItem(Icons.Outlined.Login, "Sign in with Google", onSignIn)
         }
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
