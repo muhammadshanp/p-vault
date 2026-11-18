@@ -1521,7 +1521,7 @@ fun VaultApp(
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 4.dp)
+                                    .padding(horizontal = Spacing.Screen, vertical = 4.dp)
                                     .clip(RoundedCornerShape(18.dp))
                                     .background(MaterialTheme.colorScheme.primaryContainer)
                                     .padding(start = 16.dp, end = 4.dp),
@@ -1678,9 +1678,9 @@ fun VaultApp(
                             LazyVerticalGrid(
                                 // Photos and PDFs can be cards (two across) or a list.
                                 columns = GridCells.Fixed(if (settings.cardsAsList) 1 else 2),
-                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(start = Spacing.Screen, end = Spacing.Screen, top = 4.dp, bottom = floatingBarSpace() + 88.dp),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.Card),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.Card),
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth(),
@@ -3147,7 +3147,7 @@ private fun ProfileHeader(
             onAutoFocused()
         }
     }
-    Column(Modifier.padding(horizontal = 20.dp)) {
+    Column(Modifier.padding(horizontal = Spacing.Screen)) {
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             HeaderButton(Icons.Default.Menu, "Menu", onMenu)
@@ -3244,7 +3244,7 @@ private fun SectionHeader(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
+            .padding(horizontal = Spacing.Screen, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(

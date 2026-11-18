@@ -124,9 +124,9 @@ fun ThemesScreen(
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(start = Spacing.Screen, end = Spacing.Screen, top = 8.dp, bottom = 32.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Card),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Card),
                     modifier = Modifier
                         .fillMaxSize()
                         .navigationBarsPadding(),

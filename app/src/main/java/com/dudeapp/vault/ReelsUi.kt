@@ -140,7 +140,7 @@ fun CategoryChips(
     onSelect: (String?) -> Unit,
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        contentPadding = PaddingValues(horizontal = Spacing.Screen),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "filter:all") {

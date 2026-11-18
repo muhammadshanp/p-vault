@@ -685,7 +685,7 @@ private fun TextViewer(item: VaultItem, store: VaultStore) {
             .fillMaxSize()
             // Keeps the text and the "add item" field above the keyboard.
             .imePadding()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = Spacing.Screen)
             .padding(bottom = 20.dp),
     ) {
         Row(
