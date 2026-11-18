@@ -240,8 +240,16 @@ internal suspend fun claimUsername(
             "Google did not give permission to save the name. Sign in again from the profile sheet.",
         )
     }
+    // The write is made as the person, not as the project's owner: Firestore then applies the
+    // database rules, so a name is really theirs. Without a session it cannot be claimed.
+    val session = FirebaseSession.signIn(context, token)
+    val idToken = if (session == null) null else FirebaseSession.idToken(forceRefresh = true)
+        ?: return NameCheck.Unconfirmed(
+            name,
+            "Signed in with Google, but the Firebase session was refused. Try again after signing out and in.",
+        )
 
-    val written = withContext(Dispatchers.IO) { writeUsername(name, email, token) }
+    val written = withContext(Dispatchers.IO) { writeUsername(name, email, idToken) }
     return when (written) {
         true -> {
             UsernameStore(context).save(name, true)
@@ -270,10 +278,11 @@ internal fun releaseUsername(name: String, token: String): Boolean = runCatching
 }.getOrDefault(false)
 
 /** The name's document, or null when it is free or could not be read. */
-private fun readUsername(name: String): UsernameEntry? = runCatching {
+private fun readUsername(name: String, idToken: String? = null): UsernameEntry? = runCatching {
     val connection = URL("$FIRESTORE/usernames/${usernameDocumentId(name)}").openConnection() as HttpURLConnection
     connection.connectTimeout = 10_000
     connection.readTimeout = 10_000
+    if (idToken != null) connection.setRequestProperty("Authorization", "Bearer $idToken")
     try {
         when (connection.responseCode) {
             200 -> parseUsernameEntry(connection.inputStream.bufferedReader().use { it.readText() })
@@ -486,7 +495,10 @@ fun ReservedNamesCard(
 internal suspend fun releaseOldUsername(context: Context, name: String, token: String?): Boolean {
     val email = GoogleAccountStore(context).email() ?: return false
     if (email.isEmpty() || token == null) return false
-    val released = withContext(Dispatchers.IO) { releaseUsername(name, token) }
+    // The name was written as the person's Firebase session, so it is given back the same way.
+    if (FirebaseSession.signIn(context, token) == null) return false
+    val idToken = FirebaseSession.idToken(forceRefresh = true) ?: return false
+    val released = withContext(Dispatchers.IO) { releaseUsername(name, idToken) }
     if (released) UsernameStore(context).markForRelease(name)
     return released
 }
