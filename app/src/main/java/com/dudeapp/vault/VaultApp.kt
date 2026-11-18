@@ -184,6 +184,17 @@ fun VaultApp(
         initialPage = tab.ordinal.coerceIn(0, Tab.entries.lastIndex),
         pageCount = { Tab.entries.size },
     )
+    // True from the moment a picker is opened until it answers. While it is set, a fresh
+    // tab page on Home must not pull the pager away from the page the file is meant for:
+    // Android can rebuild the app behind the picker, and that rebuild starts on Home.
+    var awaitingPicker by remember { mutableStateOf(false) }
+    // The same, remembered across a rebuild: a rebuild happens exactly while a picker is open.
+    var pickerOut by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (awaitingPicker && tab == Tab.PDFS && pagerState.currentPage != Tab.PDFS.ordinal) {
+            pagerState.scrollToPage(Tab.PDFS.ordinal)
+        }
+    }
     fun switchTab(target: Tab) {
         tab = target
         scope.launch {
@@ -216,7 +227,9 @@ fun VaultApp(
     var categories by remember { mutableStateOf<List<String>>(emptyList()) }
     var chats by remember { mutableStateOf<List<ChatThread>>(emptyList()) }
     var open by remember { mutableStateOf<VaultItem?>(null) }
-    var addOpen by remember { mutableStateOf(false) }
+    // The Add sheet is closed the moment a picker is opened, and it must stay closed: a sheet
+    // left open across the trip would cover the vault when the picker comes back.
+    var addOpen by rememberSaveable { mutableStateOf(false) }
     var noteOpen by remember { mutableStateOf(false) }
     var version by remember { mutableIntStateOf(0) }
     var autoBackupTick by remember { mutableIntStateOf(0) }
@@ -552,10 +565,15 @@ fun VaultApp(
     val pdfPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
+        // A picker is back, so the tab must not be started on again.
+        awaitingPicker = false
+        pickerOut = false
+        tabPrefs.edit().putBoolean("picker_open", false).apply()
         if (uris.isEmpty()) {
-            pickerProblem.value = "Nothing came back from the file picker. If you picked the PDF " +
-                "in a browser's downloads page, save it to Files first, then pick it from there " +
-                "with \"All files\"."
+            pickerProblem.value = "No PDF came back from the file picker.\n\n" +
+                "Some PDFs — one tapped in a browser's downloads, for example — are handed over " +
+                "as \"Open with\" instead of being pickable. Save the file to your phone's Files " +
+                "first, then use the PDFs tab's + button and pick it from there."
         }
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -656,28 +674,43 @@ fun VaultApp(
         imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
-    fun launchPdfs() {
+    /**
+     * Opens Android's own file picker for PDFs. The page a picked file is meant for is saved
+     * first, so a picker that returns after the app was rebuilt still lands in the right place.
+     * If no app on the phone can answer a PDF request, the vault is told instead of the app
+     * quietly closing.
+     */
+    fun launchPdfs(anyFile: Boolean = false) {
         onExternal()
         pickerProblem.value = null
-        // The page the picked PDF is meant for is kept, so the app can be rebuilt behind the
-        // picker without losing it.
+        if (tab == Tab.HOME) switchTab(Tab.PDFS)
         tabPrefs.edit().putString("files_tab", Tab.PDFS.name).apply()
-        pdfPicker.launch(arrayOf("application/pdf"))
-    }
-
-    // Reading a PDF can be done by any app that opens PDFs; a file manager can also be asked
-    // for the file itself when a browser's download page cannot hand it back.
-    fun launchPdfFiles() {
-        onExternal()
-        pickerProblem.value = null
-        tabPrefs.edit().putString("files_tab", Tab.PDFS.name).apply()
-        runCatching { pdfPicker.launch(arrayOf("application/pdf", "application/octet-stream")) }
+        awaitingPicker = true
+        val types = if (anyFile) {
+            arrayOf("application/pdf", "application/octet-stream")
+        } else {
+            arrayOf("application/pdf")
+        }
+        tabPrefs.edit().putBoolean("picker_open", true).apply()
+        pickerOut = true
+        runCatching { pdfPicker.launch(types) }
             .onFailure {
-                pickerProblem.value = "No file picker is available on this phone."
+                awaitingPicker = false
+                tabPrefs.edit().putBoolean("picker_open", false).apply()
+                pickerProblem.value = "No file picker answered on this phone. Open the PDF in " +
+                    "Files first, then add it from the PDFs tab."
             }
     }
 
     // Shown once the picker is done, whatever came back, so an empty trip is explained.
+    // Coming back with a picker's answer: close the sheet the user never saw close.
+    LaunchedEffect(pickerOut) {
+        if (pickerOut) {
+            addOpen = false
+            addMenuOpen = false
+        }
+    }
+
     if (pickerProblem.value != null) {
         val message = pickerProblem.value.orEmpty()
         AlertDialog(
@@ -1683,7 +1716,7 @@ fun VaultApp(
                                     "All files",
                                 ) {
                                     addMenuOpen = false
-                                    launchPdfFiles()
+                                    launchPdfs(anyFile = true)
                                 }
                             } else {
                                 AddMenuItem(Icons.Outlined.Image, Accent.Photo, "Gallery") {

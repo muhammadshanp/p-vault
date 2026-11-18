@@ -74,6 +74,15 @@ class MainActivity : FragmentActivity() {
             if (settings.advancedMode) bundleStore.appliedId()?.let(bundleStore::theme) else null
         val cardPhotos = CardPhotoStore(this)
         if (!settings.advancedMode) cardPhotos.publishPlain()
+        // A picker left open (Android may rebuild the app behind it) means this start-up is the
+        // user coming back with a file, not them setting off. The share sheet, file picker and
+        // camera all count, so the lock screen must not swallow the file.
+        if (this.getSharedPreferences("dude_files", MODE_PRIVATE)
+                .getBoolean("picker_open", false) ||
+            savedInstanceState != null
+        ) {
+            external = true
+        }
         needsLockChoice = !settings.lockChoiceMade && !Auth.hasPin(this)
         needsSetup = !needsLockChoice && settings.appLock && !Auth.hasPin(this)
         locked = !needsLockChoice && settings.appLock && !needsSetup
@@ -225,7 +234,14 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         ReminderCenter.appVisible = false
         val settings = settingsStore.load()
-        if (!external && !needsSetup && !needsLockChoice && settings.appLock) {
+        // Locking is armed by onStop, but a picker may show its content picker in a window of its
+        // own, which can stop this activity without the app really going away. Coming back from
+        // a picker must not put the lock screen in front of the file the user just chose.
+        val returningFromPicker = getSharedPreferences("dude_files", MODE_PRIVATE)
+            .getBoolean("picker_open", false)
+        if (!external && !returningFromPicker &&
+            !needsSetup && !needsLockChoice && settings.appLock
+        ) {
             if (settings.lockDelaySeconds == 0) {
                 // Always arm the auto-prompt, even if the lock screen was already showing
                 // when the user backgrounded the app (e.g. while a biometric prompt was up).
