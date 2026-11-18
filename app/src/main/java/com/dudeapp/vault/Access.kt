@@ -289,18 +289,26 @@ internal fun accessPeople(emails: List<String>, document: AccessDocument): List<
 
 /** The request that saves the address list and every level, switch and look in one step. */
 internal fun accessCommitJson(people: List<AccessPerson>): String =
-    accessCommitJson(accessDocumentOf(people))
+    accessCommitJson(accessDocumentOf(people), people.map { it.email }.sorted())
 
 /**
  * The same commit built from a whole document, used by the reserved-name page: it changes
  * only what it owns and writes the rest back as it found it.
  */
-internal fun accessCommitJson(document: AccessDocument): String {
-    val update = JSONObject().put(
+internal fun accessCommitJson(
+    document: AccessDocument,
+    emails: List<String>? = null,
+): String {
+    fun write(doc: String, fields: JSONObject) = JSONObject().put(
         "update",
-        JSONObject().put("name", "$DOCS_ROOT/access/special").put("fields", document.fieldsJson()),
+        JSONObject().put("name", "$DOCS_ROOT/access/$doc").put("fields", fields),
     )
-    return JSONObject().put("writes", JSONArray().put(update)).toString()
+    val writes = JSONArray()
+    if (emails != null) {
+        writes.put(write("emails", JSONObject().put("emails", arrayField(emails))))
+    }
+    writes.put(write("special", document.fieldsJson()))
+    return JSONObject().put("writes", writes).toString()
 }
 
 class AccessStore(private val context: Context) {
