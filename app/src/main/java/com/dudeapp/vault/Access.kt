@@ -127,6 +127,11 @@ data class AccessDocument(
      * aside. Nothing here belongs to a person; the name is simply not offered.
      */
     val reservedNames: Set<String> = emptySet(),
+    /**
+     * Whether a name can be changed after it has been taken. Off means the first name stands:
+     * a username is one name per person, and the admin decides whether that is forever.
+     */
+    val namesFixed: Boolean = false,
 ) {
     fun isReserved(name: String): Boolean = name.trim().lowercase() in reservedNames
 
@@ -160,6 +165,7 @@ data class AccessDocument(
                 .filterValues { it.isNotEmpty() }
         return AccessDocument(
             reservedNames = reservedNames,
+            namesFixed = namesFixed,
             hashes = keep(hashes, level.member),
             theme = keep(theme, atLeast(AccessLevel.THEME)),
             advanced = keep(advanced, atLeast(AccessLevel.ADVANCED)),
@@ -174,6 +180,7 @@ data class AccessDocument(
     internal fun fieldsJson(): JSONObject {
         val fields = JSONObject()
             .put("reserved", arrayField(reservedNames.sorted()))
+            .put("namesFixed", JSONObject().put("booleanValue", namesFixed))
             .put("hashes", arrayField(hashes.sorted()))
             .put("theme", arrayField(theme.sorted()))
             .put("advanced", arrayField(advanced.sorted()))
@@ -217,6 +224,7 @@ data class AccessDocument(
                 features = pairs("f_").mapNotNull { (key, set) -> AccessFeature.of(key)?.let { it to set } }.toMap(),
                 looks = pairs("look_").filterKeys { it.isNotBlank() },
                 reservedNames = list("reserved"),
+                namesFixed = fields.optJSONObject("namesFixed")?.optBoolean("booleanValue") == true,
             )
         }.getOrDefault(AccessDocument())
 
@@ -327,6 +335,9 @@ class AccessStore(private val context: Context) {
     /** True for the admin and for a signed-in address on the admin's list. */
     fun isSpecial(): Boolean = access().theme
 
+    /** True when names may no longer be changed; false also while the list is unread. */
+    fun namesFixed(): Boolean = prefs.getBoolean("names_fixed", false)
+
     /** Usernames the admin set aside, as last read; works with no connection. */
     fun reservedNames(): Set<String> =
         prefs.getStringSet("reserved", emptySet()).orEmpty().map { it.lowercase() }.toSet()
@@ -369,6 +380,7 @@ class AccessStore(private val context: Context) {
                 .putStringSet("features", document.featuresOf(hash).map { it.key }.toSet())
                 .putStringSet("looks", document.looksOf(hash, level))
                 .putStringSet("reserved", document.reservedNames)
+                .putBoolean("names_fixed", document.namesFixed)
                 .apply()
         }
         return access()

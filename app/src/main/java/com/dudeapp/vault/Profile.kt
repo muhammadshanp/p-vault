@@ -119,6 +119,8 @@ fun ProfileSheet(
     onGoogleSignedIn: (GoogleUser) -> Unit,
     /** True when a Google account is signed in; without one there is no identity, so no name. */
     signedIn: Boolean,
+    /** True when the admin has fixed names: a name already taken can no longer be changed. */
+    namesFixed: Boolean,
     /** The username this phone has, and whether it is settled with the database. */
     username: String,
     usernameConfirmed: Boolean,
@@ -142,6 +144,8 @@ fun ProfileSheet(
     val sheetContext = LocalContext.current
     // A name waiting for Google's permission to be saved, and the pass it comes back with.
     var pendingName by remember { mutableStateOf<String?>(null) }
+    // The Google pass, kept while the session is being made from it.
+    var pendingPass by remember { mutableStateOf<String?>(null) }
 
     // Saves the name once a pass is in hand, and says what happened either way.
     fun keepName(wanted: String, token: String?) {
@@ -167,20 +171,66 @@ fun ProfileSheet(
         }
     }
 
-    // Google's sign-in screen for a name: the answer carries the pass.
+    // The account picker; its answer holds the ID token Firebase accepts as proof of identity.
+    val signInScreen = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val wanted = pendingName
+        val pass = pendingPass
+        pendingName = null
+        pendingPass = null
+        val activity = sheetContext.findActivity()
+        val idToken = activity?.let { FirebaseSession.idTokenFrom(it, result.data) }
+        if (idToken == null || wanted == null) {
+            userBusy = false
+            userNote = "Google sign-in was cancelled."
+            return@rememberLauncherForActivityResult
+        }
+        userScope.launch {
+            val session = FirebaseSession.signInWithIdToken(sheetContext, idToken)
+            if (session == null) {
+                userBusy = false
+                userNote = "Firebase refused the session. Google sign-in must be enabled for " +
+                    "P Vault in the Firebase console."
+            } else {
+                keepName(wanted, pass)
+            }
+        }
+    }
+
+    // Google's sign-in screen for a name: the answer carries the pass, and the token that
+    // proves who the person is.
     val consent = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
         val wanted = pendingName
-        pendingName = null
-        val token = tokenFromConsent(sheetContext, result.data)
-        if (wanted != null && token != null) {
-            keepName(wanted, token)
-        } else {
+        val pass = tokenFromConsent(sheetContext, result.data)
+        if (wanted == null || pass == null) {
+            pendingName = null
             userBusy = false
             userNote = "Google sign-in was cancelled."
+            return@rememberLauncherForActivityResult
+        }
+        userScope.launch {
+            val activity = sheetContext.findActivity()
+            val sender = activity?.let { FirebaseSession.signInPendingIntent(it) }
+            if (activity == null || sender == null) {
+                pendingName = null
+                userBusy = false
+                userNote = "Google could not confirm the account. Sign out and in, then try again."
+            } else {
+                pendingPass = pass
+                runCatching {
+                    signInScreen.launch(IntentSenderRequest.Builder(sender).build())
+                }.onFailure {
+                    pendingName = null
+                    userBusy = false
+                    userNote = "Google's sign-in screen could not be opened."
+                }
+            }
         }
     }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -285,17 +335,18 @@ fun ProfileSheet(
                     userNote = null
                 },
                 label = { Text("Username") },
+                // A fixed name is read-only: the field is shown, but there is nothing to change.
+                readOnly = namesFixed && userSaved.isNotEmpty(),
                 supportingText = {
                     val clean = normalizeUsername(userDraft)
                     val rule = nameProblemText(usernameProblem(clean))
-                    if (rule != null) {
-                        Text(rule, color = MaterialTheme.colorScheme.error)
-                    } else if (clean == userSaved) {
-                        Text("Yours — tap it to pick a different name.")
-                    } else if (userNote != null) {
-                        Text(userNote.orEmpty(), color = MaterialTheme.colorScheme.error)
-                    } else {
-                        Text("Tap Keep to take this name.")
+                    when {
+                        rule != null -> Text(rule, color = MaterialTheme.colorScheme.error)
+                        namesFixed && userSaved.isNotEmpty() ->
+                            Text("Fixed — this username cannot be changed.")
+                        clean == userSaved -> Text("Yours — tap it to pick a different name.")
+                        userNote != null -> Text(userNote.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        else -> Text("Tap Keep to take this name.")
                     }
                 },
                 isError = userNote != null || usernameProblem(normalizeUsername(userDraft)) != null,
@@ -304,7 +355,8 @@ fun ProfileSheet(
                 trailingIcon = {
                     if (userBusy) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else if (normalizeUsername(userDraft).isNotEmpty() &&
+                    } else if (!(namesFixed && userSaved.isNotEmpty()) &&
+                        normalizeUsername(userDraft).isNotEmpty() &&
                         (normalizeUsername(userDraft) != userSaved || !savedConfirmed)
                     ) {
                         TextButton(

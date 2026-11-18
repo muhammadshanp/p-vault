@@ -34,14 +34,49 @@ internal object FirebaseSession {
     fun signedInAs(email: String): Boolean =
         runCatching { auth().currentUser?.email.equals(email, ignoreCase = true) }.getOrDefault(false)
 
-    /** Exchanges a Google pass for a Firebase session, creating the person's account if new. */
-    suspend fun signIn(context: Context, googleAccessToken: String): FirebaseUser? {
-        // Firebase needs the app to be initialised before it is asked anything.
+    /** True when [email]'s account is signed in to Firebase right now. */
+    fun isSignedIn(email: String): Boolean = signedInAs(email)
+
+    /**
+     * Google's sign-in intent for this account: the account picker, then Google's own checks.
+     * Shown through an activity result by the caller, and [idTokenFrom] reads the answer.
+     * An ID token says who the person is; an access token does not, so Firebase refuses a
+     * session built on one.
+     */
+    suspend fun signInPendingIntent(activity: android.app.Activity): android.content.IntentSender? =
+        suspendCancellableCoroutine { continuation ->
+            val request = com.google.android.gms.auth.api.identity.BeginSignInRequest.builder()
+                .setGoogleIdTokenRequestOptions(
+                    com.google.android.gms.auth.api.identity.BeginSignInRequest
+                        .GoogleIdTokenRequestOptions.builder()
+                        .setSupported(true)
+                        .setServerClientId(WEB_CLIENT_ID)
+                        // The account already signed in to the phone is the one offered.
+                        .setFilterByAuthorizedAccounts(true)
+                        .build(),
+                )
+                .setAutoSelectEnabled(true)
+                .build()
+            com.google.android.gms.auth.api.identity.Identity.getSignInClient(activity)
+                .beginSignIn(request)
+                .addOnSuccessListener { result ->
+                    if (continuation.isActive) continuation.resume(result.pendingIntent.intentSender)
+                }
+                .addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
+        }
+
+    /** The ID token in Google's answer, after the sign-in screen has been through. */
+    fun idTokenFrom(activity: android.app.Activity, data: android.content.Intent?): String? = runCatching {
+        com.google.android.gms.auth.api.identity.Identity.getSignInClient(activity)
+            .getSignInCredentialFromIntent(data)
+            .googleIdToken
+    }.getOrNull()
+
+    /** Signs in to Firebase with a Google ID token, creating the person's account if new. */
+    suspend fun signInWithIdToken(context: Context, idToken: String): FirebaseUser? {
         runCatching { FirebaseApp.initializeApp(context) }
         return runCatching {
-            val existing = auth().currentUser
-            if (existing != null) return@runCatching existing
-            val credential = GoogleAuthProvider.getCredential(googleAccessToken, null)
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
             auth().signInWithCredential(credential).await()?.user
         }.getOrNull()
     }
