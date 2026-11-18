@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.45** — Usernames are removed: no field on the profile, no Names page in the admin panel, no reserved-name list and no Firebase session. Signing in with Google is back to what it was — a name and a picture for the profile.
 - **0.5.44** — The admin panel decides whether a username can be changed at all: with the switch off, the first name someone takes stands, the profile shows it read-only, and the app refuses a change before the database is even asked.
 - **0.5.43** — Usernames get a Firebase session the way Firebase actually requires it: Google's account picker returns an ID token, which is exchanged for the session before a name is written. The old path rebuilt a session from an access token, which Firebase always refuses.
 - **0.5.42** — Usernames are written with a Firebase session for the signed-in person, so the database rules apply to them and not just to the project owner: anyone signed in can take, change and give back a name.
@@ -219,4 +220,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.44 (versionCode 74).
+`com.dudeapp.vault` — version 0.5.45 (versionCode 75).

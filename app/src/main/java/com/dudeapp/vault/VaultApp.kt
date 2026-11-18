@@ -262,12 +262,8 @@ fun VaultApp(
     var profileOpen by remember { mutableStateOf(false) }
     // Whether a Google account is signed in on this phone, for the menu's sign-in item.
     var signedIn by remember { mutableStateOf(GoogleAccountStore(context).email() != null) }
-    // Whether usernames may still be changed, as the admin last set it. Read from the public
-    // document when the access list refreshes, so it is right without opening a screen.
-    var namesFixed by remember { mutableStateOf(AccessStore(context).namesFixed()) }
     // Bumped whenever the profile changes, to reopen the sheet with the saved values.
     var profileSheetKey by remember { mutableIntStateOf(0) }
-    val usernameStore = remember { UsernameStore(context) }
     var chatAvatarTarget by remember { mutableStateOf<ChatThread?>(null) }
     var drive by remember { mutableStateOf(driveStore.state()) }
     LaunchedEffect(Unit) { backupProtected = withContext(Dispatchers.IO) { driveStore.isEncrypted() } }
@@ -1361,14 +1357,7 @@ fun VaultApp(
                     profile = profile,
                     version = currentVersion,
                     updateReady = availableUpdate != null,
-                    onProfile = {
-                        // The admin may have fixed names since this phone last looked.
-                        scope.launch {
-                            AccessStore(context).refresh()
-                            namesFixed = AccessStore(context).namesFixed()
-                        }
-                        closeMenu { profileOpen = true }
-                    },
+                    onProfile = { closeMenu { profileOpen = true } },
                     onSettings = { closeMenu { settingsOpen = true } },
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
@@ -1945,28 +1934,6 @@ fun VaultApp(
                     // on screen is always what is saved rather than a leftover draft.
                     name = profile.name,
                     avatar = profile.avatar,
-                    signedIn = signedIn,
-                    namesFixed = namesFixed,
-                    username = usernameStore.saved().orEmpty(),
-                    usernameConfirmed = usernameStore.confirmed(),
-                    onChangeUsername = { wanted, token ->
-                        when (val check = claimUsername(context, wanted, token)) {
-                            is NameCheck.Free -> {
-                                // The name held before this one is handed back, so it does not
-                                // stay taken by an account that no longer uses it.
-                                val old = usernameStore.saved()
-                                if (old != null && old != check.name) {
-                                    releaseOldUsername(context, old, token)
-                                }
-                                null
-                            }
-                            is NameCheck.Refused -> nameProblemText(check.problem)
-                            is NameCheck.Unconfirmed -> {
-                                usernameStore.save(check.name, false)
-                                check.reason
-                            }
-                        }
-                    },
                     drive = drive,
                     onPickPhoto = {
                         onExternal()
