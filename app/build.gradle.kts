@@ -44,7 +44,7 @@ android {
         versionName = "0.5.48-pro"
         // The pro build gets its own name under the icon, so the two are told apart at a
         // glance. Normal releases keep "P Vault".
-        resValue("string", "app_name", if (versionName.contains('-')) "P Vault Pro" else "P Vault")
+        resValue("string", "app_name", if (versionName.orEmpty().contains('-')) "P Vault Pro" else "P Vault")
     }
 
     buildTypes {
