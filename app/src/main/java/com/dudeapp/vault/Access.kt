@@ -121,7 +121,19 @@ data class AccessDocument(
     val everything: Set<String> = emptySet(),
     val features: Map<AccessFeature, Set<String>> = emptyMap(),
     val looks: Map<String, Set<String>> = emptyMap(),
+    /**
+     * Usernames the admin keeps for later, or does not want anyone to have. Read by every
+     * install from this public document, so nobody signs in and takes a name that was set
+     * aside. Nothing here belongs to a person; the name is simply not offered.
+     */
+    val reservedNames: Set<String> = emptySet(),
+    /**
+     * Whether a name can be changed after it has been taken. Off means the first name stands:
+     * a username is one name per person, and the admin decides whether that is forever.
+     */
+    val namesFixed: Boolean = false,
 ) {
+    fun isReserved(name: String): Boolean = name.trim().lowercase() in reservedNames
 
     fun level(hash: String): AccessLevel = when {
         hash in everything -> AccessLevel.EVERYTHING
@@ -152,6 +164,8 @@ data class AccessDocument(
             (from.keys + given).associateWith { key -> keep(from[key].orEmpty(), key in given) }
                 .filterValues { it.isNotEmpty() }
         return AccessDocument(
+            reservedNames = reservedNames,
+            namesFixed = namesFixed,
             hashes = keep(hashes, level.member),
             theme = keep(theme, atLeast(AccessLevel.THEME)),
             advanced = keep(advanced, atLeast(AccessLevel.ADVANCED)),
@@ -165,6 +179,8 @@ data class AccessDocument(
     /** Every field of the public document, including empty ones, so removals stick. */
     internal fun fieldsJson(): JSONObject {
         val fields = JSONObject()
+            .put("reserved", arrayField(reservedNames.sorted()))
+            .put("namesFixed", JSONObject().put("booleanValue", namesFixed))
             .put("hashes", arrayField(hashes.sorted()))
             .put("theme", arrayField(theme.sorted()))
             .put("advanced", arrayField(advanced.sorted()))
@@ -207,6 +223,8 @@ data class AccessDocument(
                 everything = list("everything"),
                 features = pairs("f_").mapNotNull { (key, set) -> AccessFeature.of(key)?.let { it to set } }.toMap(),
                 looks = pairs("look_").filterKeys { it.isNotBlank() },
+                reservedNames = list("reserved"),
+                namesFixed = fields.optJSONObject("namesFixed")?.optBoolean("booleanValue") == true,
             )
         }.getOrDefault(AccessDocument())
 
@@ -317,6 +335,13 @@ class AccessStore(private val context: Context) {
     /** True for the admin and for a signed-in address on the admin's list. */
     fun isSpecial(): Boolean = access().theme
 
+    /** True when names may no longer be changed; false also while the list is unread. */
+    fun namesFixed(): Boolean = prefs.getBoolean("names_fixed", false)
+
+    /** Usernames the admin set aside, as last read; works with no connection. */
+    fun reservedNames(): Set<String> =
+        prefs.getStringSet("reserved", emptySet()).orEmpty().map { it.lowercase() }.toSet()
+
     /** True only for a signed-in address on the admin's list; this is what Firebase checks too. */
     fun isMember(): Boolean = access().level.member
 
@@ -354,6 +379,8 @@ class AccessStore(private val context: Context) {
                 .putString("level", level.name)
                 .putStringSet("features", document.featuresOf(hash).map { it.key }.toSet())
                 .putStringSet("looks", document.looksOf(hash, level))
+                .putStringSet("reserved", document.reservedNames)
+                .putBoolean("names_fixed", document.namesFixed)
                 .apply()
         }
         return access()

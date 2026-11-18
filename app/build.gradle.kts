@@ -38,8 +38,8 @@ android {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 75
-        versionName = "0.5.45"
+        versionCode = 76
+        versionName = "0.5.46-test"
     }
 
     buildTypes {
@@ -97,6 +97,9 @@ dependencies {
     // Push notifications only. Analytics is not included.
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")
+    // A Firebase session for the signed-in Google account. Usernames are written with it, so
+    // the database rules apply to the person rather than to a project owner's token.
+    implementation("com.google.firebase:firebase-auth")
     // Google sign-in for the admin panel.
     implementation("com.google.android.gms:play-services-auth:21.3.0")
 
