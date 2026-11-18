@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.41** — A username can be changed: the sheet shows Google's permission screen when the name needs saving, the Keep button offers itself for the name actually typed, and the old name is handed back so it does not stay taken.
 - **0.5.40** — A username is only offered to a signed-in Google account, because a name has to belong to somebody; without a sign-in the profile sheet says so and points at the sign-in below it.
 - **0.5.39** — The Theme page is in the menu for everyone (only its picture looks need access), signing in with Google has its own menu item, and the admin panel gets a Names page for reserving usernames nobody else can take.
 - **0.5.38** — Profile changes show at once (a new photo gets its own file, and the sheet rebuilds from what was saved), plus usernames: unique across phones, checked as typed, with insults and impersonation refused.
@@ -215,4 +216,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.40 (versionCode 70).
+`com.dudeapp.vault` — version 0.5.41 (versionCode 71).

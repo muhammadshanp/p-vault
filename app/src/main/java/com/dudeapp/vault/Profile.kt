@@ -48,6 +48,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import java.io.File
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 
 data class UserProfile(val name: String, val avatar: File?)
@@ -118,18 +122,65 @@ fun ProfileSheet(
     /** The username this phone has, and whether it is settled with the database. */
     username: String,
     usernameConfirmed: Boolean,
-    /** Checks and keeps a name; reports back in words. */
-    onChangeUsername: suspend (String) -> String?,
+    /**
+     * Checks and keeps a name, with the Google pass that lets this phone write it. Reports
+     * back in words: null when the name was taken, a sentence when it was not.
+     */
+    onChangeUsername: suspend (String, String?) -> String?,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(name) { mutableStateOf(name) }
-    var userDraft by remember(username) { mutableStateOf(username) }
+    // Seeded from what is saved, and never reset by the sheet reopening, so a name that was
+    // just typed is not pulled back to the old one by a redraw.
+    var userDraft by remember { mutableStateOf(username) }
     var userNote by remember(username) { mutableStateOf<String?>(null) }
     var userBusy by remember { mutableStateOf(false) }
-    var userSaved by remember(username) { mutableStateOf(username) }
-    var savedConfirmed by remember(usernameConfirmed) { mutableStateOf(usernameConfirmed) }
+    var userSaved by remember { mutableStateOf(username) }
+    var savedConfirmed by remember { mutableStateOf(usernameConfirmed) }
     val userScope = rememberCoroutineScope()
+    val sheetContext = LocalContext.current
+    // A name waiting for Google's permission to be saved, and the pass it comes back with.
+    var pendingName by remember { mutableStateOf<String?>(null) }
+
+    // Saves the name once a pass is in hand, and says what happened either way.
+    fun keepName(wanted: String, token: String?) {
+        userBusy = true
+        userScope.launch {
+            val problem = onChangeUsername(wanted, token)
+            userBusy = false
+            if (problem == null) {
+                userSaved = wanted
+                savedConfirmed = true
+                userNote = null
+            } else {
+                userNote = problem
+                // A name that could not be checked is still kept on this phone, so the note
+                // explains rather than blocks.
+                if (problem.contains("this phone", ignoreCase = true) ||
+                    problem.contains("could not be reserved", ignoreCase = true)
+                ) {
+                    userSaved = wanted
+                    savedConfirmed = false
+                }
+            }
+        }
+    }
+
+    // Google's sign-in screen for a name: the answer carries the pass.
+    val consent = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val wanted = pendingName
+        pendingName = null
+        val token = tokenFromConsent(sheetContext, result.data)
+        if (wanted != null && token != null) {
+            keepName(wanted, token)
+        } else {
+            userBusy = false
+            userNote = "Google sign-in was cancelled."
+        }
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -235,14 +286,16 @@ fun ProfileSheet(
                 },
                 label = { Text("Username") },
                 supportingText = {
-                    val note = userNote ?: nameProblemText(usernameProblem(normalizeUsername(userDraft)))
-                    when {
-                        note != null -> Text(note, color = MaterialTheme.colorScheme.error)
-                        userDraft.isNotEmpty() && userDraft == userSaved && !savedConfirmed ->
-                            Text("Kept on this phone; sign in to keep it for yourself.")
-                        userDraft.isNotEmpty() && userDraft == userSaved ->
-                            Text("Yours, everywhere you sign in.")
-                        userDraft.isNotEmpty() -> Text("Free to take — tap Keep.")
+                    val clean = normalizeUsername(userDraft)
+                    val rule = nameProblemText(usernameProblem(clean))
+                    if (rule != null) {
+                        Text(rule, color = MaterialTheme.colorScheme.error)
+                    } else if (clean == userSaved) {
+                        Text("Yours — tap it to pick a different name.")
+                    } else if (userNote != null) {
+                        Text(userNote.orEmpty(), color = MaterialTheme.colorScheme.error)
+                    } else {
+                        Text("Tap Keep to take this name.")
                     }
                 },
                 isError = userNote != null || usernameProblem(normalizeUsername(userDraft)) != null,
@@ -251,27 +304,36 @@ fun ProfileSheet(
                 trailingIcon = {
                     if (userBusy) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else if (userDraft.isNotEmpty() && userDraft != userSaved) {
+                    } else if (normalizeUsername(userDraft).isNotEmpty() &&
+                        (normalizeUsername(userDraft) != userSaved || !savedConfirmed)
+                    ) {
                         TextButton(
                             onClick = {
-                                val wanted = userDraft
+                                val wanted = normalizeUsername(userDraft)
                                 userBusy = true
+                                userNote = null
                                 userScope.launch {
-                                    val problem = onChangeUsername(wanted)
-                                    userBusy = false
-                                    if (problem == null) {
-                                        userSaved = wanted
-                                        savedConfirmed = true
-                                        userNote = null
-                                    } else {
-                                        userNote = problem
-                                        // A name that could not be checked is still kept,
-                                        // so the note explains rather than blocks.
-                                        if (problem.contains("This phone", ignoreCase = true) ||
-                                            problem.contains("could not be reserved", ignoreCase = true)
-                                        ) {
-                                            userSaved = wanted
-                                            savedConfirmed = false
+                                    // Google may need to ask first; that answer arrives through
+                                    // the launcher below, and the name is kept from there.
+                                    when (val answer = requestToken(sheetContext)) {
+                                        is TokenAnswer.Ready -> {
+                                            userBusy = false
+                                            keepName(wanted, answer.accessToken)
+                                        }
+                                        is TokenAnswer.Consent -> {
+                                            pendingName = wanted
+                                            runCatching {
+                                                consent.launch(
+                                                    IntentSenderRequest.Builder(answer.intentSender).build(),
+                                                )
+                                            }.onFailure {
+                                                userBusy = false
+                                                userNote = "Google sign-in could not be opened."
+                                            }
+                                        }
+                                        TokenAnswer.Failed -> {
+                                            userBusy = false
+                                            userNote = "Sign in with Google below, then tap Keep again."
                                         }
                                     }
                                 }

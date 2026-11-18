@@ -1938,9 +1938,17 @@ fun VaultApp(
                     signedIn = signedIn,
                     username = usernameStore.saved().orEmpty(),
                     usernameConfirmed = usernameStore.confirmed(),
-                    onChangeUsername = { wanted ->
-                        when (val check = claimUsername(context, wanted)) {
-                            is NameCheck.Free -> null
+                    onChangeUsername = { wanted, token ->
+                        when (val check = claimUsername(context, wanted, token)) {
+                            is NameCheck.Free -> {
+                                // The name held before this one is handed back, so it does not
+                                // stay taken by an account that no longer uses it.
+                                val old = usernameStore.saved()
+                                if (old != null && old != check.name) {
+                                    releaseOldUsername(context, old, token)
+                                }
+                                null
+                            }
                             is NameCheck.Refused -> nameProblemText(check.problem)
                             is NameCheck.Unconfirmed -> {
                                 usernameStore.save(check.name, false)

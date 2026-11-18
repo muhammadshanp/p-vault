@@ -127,7 +127,7 @@ internal fun isOffensive(name: String): Boolean {
 internal fun usernameDocumentId(name: String): String =
     java.net.URLEncoder.encode(name, "UTF-8")
 
-private fun ownerHash(email: String): String {
+internal fun ownerHash(email: String): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(email.trim().lowercase().toByteArray())
     return digest.joinToString("") { "%02x".format(it) }
 }
@@ -143,6 +143,25 @@ class UsernameStore(context: Context) {
     fun save(name: String, confirmed: Boolean) {
         prefs.edit().putString("name", name).putBoolean("confirmed", confirmed).apply()
     }
+
+    /**
+     * Remembers [next] and, when the old name was claimed by this account, gives it back so
+     * it can be taken by somebody else. A name is one name per person: keeping the old one
+     * would quietly take it away from everyone for good.
+     */
+    fun rename(next: String, confirmed: Boolean, releaseOld: ((String) -> Boolean)? = null) {
+        val old = saved()
+        if (old != null && old != next) releaseOld?.invoke(old)
+        prefs.edit().remove("old").apply()
+        save(next, confirmed)
+    }
+
+    /** The name to give back after a rename, kept apart so a rollback does not release twice. */
+    fun markForRelease(name: String) {
+        prefs.edit().putString("old", name).apply()
+    }
+
+    fun pendingRelease(): String? = prefs.getString("old", null)
 
     fun clear() {
         prefs.edit().clear().apply()
@@ -186,6 +205,8 @@ internal fun usernameCommitJson(name: String, email: String): String {
 internal suspend fun claimUsername(
     context: Context,
     name: String,
+    /** Already obtained before the name is offered, by the sheet's own sign-in. */
+    token: String?,
 ): NameCheck {
     // Cheaper checks first: nothing is asked of the network for a name the rules already refuse.
     usernameProblem(name)?.let { return NameCheck.Refused(name, it) }
@@ -213,8 +234,12 @@ internal suspend fun claimUsername(
             NameCheck.Refused(name, NameProblem.TAKEN)
         }
     }
-    val token = acquireToken(context)
-        ?: return NameCheck.Unconfirmed(name, "Could not reach Google. The name is kept on this phone only.")
+    if (token == null) {
+        return NameCheck.Unconfirmed(
+            name,
+            "Google did not give permission to save the name. Sign in again from the profile sheet.",
+        )
+    }
 
     val written = withContext(Dispatchers.IO) { writeUsername(name, email, token) }
     return when (written) {
@@ -228,6 +253,21 @@ internal suspend fun claimUsername(
         null -> NameCheck.Unconfirmed(name, "The name could not be reserved right now. It is kept on this phone.")
     }
 }
+
+/** Gives a name back: true when the document was removed (or was already gone). */
+internal fun releaseUsername(name: String, token: String): Boolean = runCatching {
+    val connection = URL("$FIRESTORE/usernames/${usernameDocumentId(name)}").openConnection() as HttpURLConnection
+    connection.connectTimeout = 10_000
+    connection.readTimeout = 10_000
+    connection.requestMethod = "DELETE"
+    connection.setRequestProperty("Authorization", "Bearer $token")
+    try {
+        // 404 is fine: the name is free, which is all that matters.
+        connection.responseCode in 200..299 || connection.responseCode == 404
+    } finally {
+        connection.disconnect()
+    }
+}.getOrDefault(false)
 
 /** The name's document, or null when it is free or could not be read. */
 private fun readUsername(name: String): UsernameEntry? = runCatching {
@@ -273,33 +313,47 @@ private fun writeUsername(name: String, email: String, token: String): Boolean? 
 }.getOrNull()
 
 /**
- * An access token for the database, through Google's own consent screen. The screen is
- * started from the running activity; Android shows it and the answer comes back to the same
- * object, so the token arrives once the user has tapped through.
+ * Google's answer to a request for the pass P Vault needs to write a username.
+ *
+ * [accessToken] is the pass, ready to use. [consent] is set instead when Google wants to ask
+ * the user first: the caller must show that sign-in screen (it needs an activity result, so it
+ * cannot be opened from inside here) and then fetch the pass from the result.
  */
-internal suspend fun acquireToken(context: Context): String? = withContext(Dispatchers.Main) {
-    runCatching {
-        val activity: android.app.Activity = context.findActivity() ?: return@runCatching null
-        suspendCancellableCoroutine<String?> { continuation ->
-            val request = AuthorizationRequest.builder()
-                .setRequestedScopes(listOf(Scope(SCOPE_DATASTORE), Scope("email")))
-                .build()
-            Identity.getAuthorizationClient(activity).authorize(request)
-                .addOnSuccessListener { result ->
-                    val pending = result.pendingIntent
-                    if (result.hasResolution() && pending != null) {
-                        // Nobody to hand the answer back to outside a launcher, so this is the
-                        // one case that cannot be finished here: the name stays unconfirmed
-                        // until the user signs in from the admin screen.
-                        if (continuation.isActive) continuation.resume(null)
-                    } else if (continuation.isActive) {
-                        continuation.resume(result.accessToken)
-                    }
-                }
-                .addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
-        }
-    }.getOrNull()
+internal sealed interface TokenAnswer {
+    data class Ready(val accessToken: String) : TokenAnswer
+    data class Consent(val intentSender: android.content.IntentSender) : TokenAnswer
+    data object Failed : TokenAnswer
 }
+
+/** Asks Google for the pass a username needs, without showing anything. */
+internal suspend fun requestToken(context: Context): TokenAnswer = withContext(Dispatchers.Main) {
+    runCatching {
+        val activity = context.findActivity() ?: return@runCatching TokenAnswer.Failed
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(SCOPE_DATASTORE), Scope("email")))
+            .build()
+        val result = Identity.getAuthorizationClient(activity).authorize(request).await()
+            ?: return@runCatching TokenAnswer.Failed
+        val pending = result.pendingIntent
+        when {
+            result.hasResolution() && pending != null -> TokenAnswer.Consent(pending.intentSender)
+            else -> result.accessToken?.let { TokenAnswer.Ready(it) } ?: TokenAnswer.Failed
+        }
+    }.getOrDefault(TokenAnswer.Failed)
+}
+
+/** The pass that comes back from the sign-in screen [requestToken] asked for. */
+internal fun tokenFromConsent(context: Context, data: android.content.Intent?): String? = runCatching {
+    Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(data).accessToken
+}.getOrNull()
+
+/** Waits for Google's answer without blocking anything. */
+private suspend fun com.google.android.gms.tasks.Task<com.google.android.gms.auth.api.identity.AuthorizationResult>.await():
+    com.google.android.gms.auth.api.identity.AuthorizationResult? =
+    suspendCancellableCoroutine { continuation ->
+        addOnSuccessListener { result -> if (continuation.isActive) continuation.resume(result) }
+        addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
+    }
 
 
 /**
@@ -423,4 +477,16 @@ fun ReservedNamesCard(
             }
         }
     }
+}
+
+/**
+ * Gives [name] back so somebody else can take it. It is best effort: when it cannot be done
+ * (no connection, no sign-in) the name stays as it was, and the next rename tries again.
+ */
+internal suspend fun releaseOldUsername(context: Context, name: String, token: String?): Boolean {
+    val email = GoogleAccountStore(context).email() ?: return false
+    if (email.isEmpty() || token == null) return false
+    val released = withContext(Dispatchers.IO) { releaseUsername(name, token) }
+    if (released) UsernameStore(context).markForRelease(name)
+    return released
 }
