@@ -146,6 +146,8 @@ private const val AUTO_BACKUP_DELAY_MS = 20_000L
 fun VaultApp(
     sharedText: String?,
     onShareConsumed: () -> Unit,
+    sharedFiles: List<Uri> = emptyList(),
+    onFilesConsumed: () -> Unit = {},
     onExternal: () -> Unit,
     onPinSetup: () -> Unit,
     theme: ThemePreset,
@@ -667,6 +669,36 @@ fun VaultApp(
         openChat = null
         reelDialogOpen = true
         onShareConsumed()
+    }
+
+    // Files shared in from another app go where they belong: photos to Images, PDFs to PDFs.
+    LaunchedEffect(sharedFiles) {
+        if (sharedFiles.isEmpty()) return@LaunchedEffect
+        val files = sharedFiles
+        onFilesConsumed()
+        val sorted = sortedShared(context, files)
+        val addedPhotos = withContext(Dispatchers.IO) {
+            sorted.photos.count { store.addFile(it, "Image.jpg") != null }
+        }
+        val addedPdfs = withContext(Dispatchers.IO) {
+            sorted.pdfs.count { store.addFile(it, "Document.pdf") != null }
+        }
+        val added = addedPhotos + addedPdfs
+        if (added > 0) {
+            val target = if (addedPhotos > 0) Tab.IMAGES else Tab.PDFS
+            tabPrefs.edit().putString("files_tab", target.name).apply()
+            refresh()
+            switchTab(target)
+        }
+        val message = when {
+            added == 0 && sorted.refused > 0 ->
+                "Only photos and PDFs can go into the vault."
+            added == 0 -> "Nothing in that share could be added to the vault."
+            addedPhotos > 0 && addedPdfs > 0 -> "$added files added: $addedPhotos to Images, $addedPdfs to PDFs"
+            addedPhotos > 0 -> addedMessage(addedPhotos, sorted.photos.size, "photo")
+            else -> addedMessage(addedPdfs, sorted.pdfs.size, "PDF")
+        }
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
 
     fun launchPhotos() {
@@ -3418,6 +3450,30 @@ private fun openUrl(context: Context, url: String) {
         .onFailure {
             Toast.makeText(context, "No app can open this link", Toast.LENGTH_SHORT).show()
         }
+}
+
+/** Shared files, sorted by what the vault can keep: photos, PDFs, and everything else. */
+private data class SharedSet(val photos: List<Uri>, val pdfs: List<Uri>, val refused: Int)
+
+private fun sortedShared(context: Context, uris: List<Uri>): SharedSet {
+    val photos = ArrayList<Uri>()
+    val pdfs = ArrayList<Uri>()
+    var refused = 0
+    uris.forEach { uri ->
+        val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull().orEmpty()
+        val name = uri.lastPathSegment.orEmpty().lowercase()
+        when {
+            mime.startsWith("image/") -> photos.add(uri)
+            mime == "application/pdf" -> pdfs.add(uri)
+            // A few apps hand over a file with no type at all; the name is all there is to go on.
+            mime.isEmpty() && name.substringAfterLast('.', "") in setOf(
+                "jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif",
+            ) -> photos.add(uri)
+            mime.isEmpty() && name.endsWith(".pdf") -> pdfs.add(uri)
+            else -> refused += 1
+        }
+    }
+    return SharedSet(photos, pdfs, refused)
 }
 
 private data class VaultSnapshot(
