@@ -233,6 +233,9 @@ fun VaultApp(
     // left open across the trip would cover the vault when the picker comes back.
     var addOpen by rememberSaveable { mutableStateOf(false) }
     var noteOpen by remember { mutableStateOf(false) }
+    // Text shared from another app, waiting in the note dialog. Saved, so a rebuild behind the
+    // other app's window does not lose it.
+    var sharedNote by rememberSaveable { mutableStateOf("") }
     var version by remember { mutableIntStateOf(0) }
     var autoBackupTick by remember { mutableIntStateOf(0) }
     var autoBackupSkip by remember { mutableIntStateOf(0) }
@@ -657,18 +660,25 @@ fun VaultApp(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri -> exportInto(uri) }
 
+    // Shared text goes where it belongs: a reel link to Reels, anything else to a note carrying
+    // the text, ready to save. Sharing is not a way to turn every sentence into a reel.
     LaunchedEffect(sharedText) {
         val text = sharedText?.trim().orEmpty()
         if (text.isEmpty()) return@LaunchedEffect
-        val url = extractUrl(text) ?: text
-        val title = text.replace(url, "").replace("\n", " ").trim().take(60)
-        reelDraftUrl = url
-        reelDraftTitle = title.ifBlank { "Instagram Reel" }
-        reelDraftCategory = store.pendingCategoryName()
+        val url = extractUrl(text)
+        onShareConsumed()
         open = null
         openChat = null
-        reelDialogOpen = true
-        onShareConsumed()
+        if (url != null && looksLikeReel(text)) {
+            reelDraftUrl = url
+            reelDraftTitle = text.replace(url, "").replace("\n", " ").trim().take(60)
+                .ifBlank { "Instagram Reel" }
+            reelDraftCategory = store.pendingCategoryName()
+            reelDialogOpen = true
+        } else {
+            sharedNote = text
+            noteOpen = true
+        }
     }
 
     // Files shared in from another app go where they belong: photos to Images, PDFs to PDFs.
@@ -1825,9 +1835,15 @@ fun VaultApp(
 
             if (noteOpen) {
                 NoteDialog(
-                    onDismiss = { noteOpen = false },
+                    onDismiss = {
+                        noteOpen = false
+                        sharedNote = ""
+                    },
+                    startTitle = sharedNote.lineSequence().firstOrNull()?.take(40).orEmpty(),
+                    startBody = sharedNote,
                     onSave = { title, body ->
                         noteOpen = false
+                        sharedNote = ""
                         scope.launch {
                             withContext(Dispatchers.IO) { store.addText(title, body) }
                             refresh()
@@ -3453,6 +3469,23 @@ private fun openUrl(context: Context, url: String) {
 }
 
 /** Shared files, sorted by what the vault can keep: photos, PDFs, and everything else. */
+/**
+ * True when shared text is a link to a reel, or is only a link plus a line about it. A link to
+ * anything else, or plain text, belongs in a note instead.
+ */
+private fun looksLikeReel(text: String): Boolean {
+    val link = extractUrl(text) ?: return false
+    val host = runCatching { Uri.parse(link).host.orEmpty().lowercase() }.getOrDefault("")
+    val reelHost = host.contains("instagram") || host.contains("instagr.am") ||
+        host.contains("youtube.com") || host.contains("youtu.be") ||
+        host.contains("facebook.com") || host.contains("tiktok.com") ||
+        host.contains("twitter.com") || host.contains("x.com")
+    if (!reelHost) return false
+    // The rest of the message, if any, must be a short caption rather than a paragraph.
+    val rest = text.replace(link, "").replace("\n", " ").trim()
+    return rest.length <= 120
+}
+
 private data class SharedSet(val photos: List<Uri>, val pdfs: List<Uri>, val refused: Int)
 
 private fun sortedShared(context: Context, uris: List<Uri>): SharedSet {
