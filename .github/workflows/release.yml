@@ -41,7 +41,14 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           state=$(gh release view "v$name" --json isDraft --jq .isDraft 2>/dev/null || echo none)
           echo "state=$state" >> "$GITHUB_OUTPUT"
-          echo "Version $name, existing release: $state (false = already published)"
+          # A version ending in -test (or -beta and the like) is published as a pre-release,
+          # so it never becomes the "latest" release and no ordinary phone is offered it.
+          case "$name" in
+            *-*) prerelease=true ;;
+            *) prerelease=false ;;
+          esac
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Version $name, existing: $state (false = published), pre-release: $prerelease"
 
       - name: Install signing key
         if: steps.version.outputs.state != 'false'
@@ -135,10 +142,19 @@ jobs:
         if: steps.version.outputs.state != 'false'
         run: |
           tag=${{ steps.version.outputs.tag }}
+          # A pre-release is never marked latest, so the app's update check (which reads
+          # /releases/latest) does not offer it to anyone.
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
+            latest=""
+            pre="--prerelease"
+          else
+            latest="--latest"
+            pre=""
+          fi
           if [ "${{ steps.version.outputs.state }}" = "true" ]; then
             gh release upload "$tag" P-Vault.apk --clobber
-            gh release edit "$tag" --draft=false --latest --target "$GITHUB_SHA"
+            gh release edit "$tag" --draft=false $latest $pre --target "$GITHUB_SHA"
           else
             gh release create "$tag" P-Vault.apk --title "P Vault ${{ steps.version.outputs.name }}" \
-              --generate-notes --latest --target "$GITHUB_SHA"
+              --generate-notes $latest $pre --target "$GITHUB_SHA"
           fi
