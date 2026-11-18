@@ -169,6 +169,33 @@ fun ProfileSheet(
         }
     }
 
+    // The account picker; its answer holds the ID token Firebase accepts as proof of identity.
+    val signInScreen = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val wanted = pendingName
+        val pass = pendingPass
+        pendingName = null
+        pendingPass = null
+        val activity = sheetContext.findActivity()
+        val idToken = activity?.let { FirebaseSession.idTokenFrom(it, result.data) }
+        if (idToken == null || wanted == null) {
+            userBusy = false
+            userNote = "Google sign-in was cancelled."
+            return@rememberLauncherForActivityResult
+        }
+        userScope.launch {
+            val session = FirebaseSession.signInWithIdToken(sheetContext, idToken)
+            if (session == null) {
+                userBusy = false
+                userNote = "Firebase refused the session. Google sign-in must be enabled for " +
+                    "P Vault in the Firebase console."
+            } else {
+                keepName(wanted, pass)
+            }
+        }
+    }
+
     // Google's sign-in screen for a name: the answer carries the pass, and the token that
     // proves who the person is.
     val consent = rememberLauncherForActivityResult(
@@ -198,33 +225,6 @@ fun ProfileSheet(
                     userBusy = false
                     userNote = "Google's sign-in screen could not be opened."
                 }
-            }
-        }
-    }
-
-    // The account picker; its answer holds the ID token Firebase accepts as proof of identity.
-    val signInScreen = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result ->
-        val wanted = pendingName
-        val pass = pendingPass
-        pendingName = null
-        pendingPass = null
-        val activity = sheetContext.findActivity()
-        val idToken = activity?.let { FirebaseSession.idTokenFrom(it, result.data) }
-        if (idToken == null || wanted == null) {
-            userBusy = false
-            userNote = "Google sign-in was cancelled."
-            return@rememberLauncherForActivityResult
-        }
-        userScope.launch {
-            val session = FirebaseSession.signInWithIdToken(sheetContext, idToken)
-            if (session == null) {
-                userBusy = false
-                userNote = "Firebase refused the session. Google sign-in must be enabled for " +
-                    "P Vault in the Firebase console."
-            } else {
-                keepName(wanted, pass)
             }
         }
     }
