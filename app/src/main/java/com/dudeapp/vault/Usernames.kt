@@ -241,13 +241,14 @@ internal suspend fun claimUsername(
         )
     }
     // The write is made as the person, not as the project's owner: Firestore then applies the
-    // database rules, so a name is really theirs. Without a session it cannot be claimed.
-    val session = FirebaseSession.signIn(context, token)
-    val idToken = if (session == null) null else FirebaseSession.idToken(forceRefresh = true)
+    // database rules, so a name is really theirs. The session is made when the sheet asks for
+    // a name, in the same Google sign-in the pass came from.
+    val idToken = FirebaseSession.idToken(forceRefresh = true)
     if (idToken == null) {
         return NameCheck.Unconfirmed(
             name,
-            "Signed in with Google, but the Firebase session was refused. Try again after signing out and in.",
+            "Google needed to confirm who you are before the name could be saved. Tap Keep " +
+                "again and complete the Google sign-in.",
         )
     }
 
@@ -498,7 +499,6 @@ internal suspend fun releaseOldUsername(context: Context, name: String, token: S
     val email = GoogleAccountStore(context).email() ?: return false
     if (email.isEmpty() || token == null) return false
     // The name was written as the person's Firebase session, so it is given back the same way.
-    if (FirebaseSession.signIn(context, token) == null) return false
     val idToken = FirebaseSession.idToken(forceRefresh = true) ?: return false
     val released = withContext(Dispatchers.IO) { releaseUsername(name, idToken) }
     if (released) UsernameStore(context).markForRelease(name)

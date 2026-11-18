@@ -142,6 +142,8 @@ fun ProfileSheet(
     val sheetContext = LocalContext.current
     // A name waiting for Google's permission to be saved, and the pass it comes back with.
     var pendingName by remember { mutableStateOf<String?>(null) }
+    // The Google pass, kept while the session is being made from it.
+    var pendingPass by remember { mutableStateOf<String?>(null) }
 
     // Saves the name once a pass is in hand, and says what happened either way.
     fun keepName(wanted: String, token: String?) {
@@ -175,10 +177,61 @@ fun ProfileSheet(
         pendingName = null
         val token = tokenFromConsent(sheetContext, result.data)
         if (wanted != null && token != null) {
-            keepName(wanted, token)
+            // The pass lets Google's account picker identify this person, which is what makes
+            // the Firebase session: a name has to be written by its owner, not by an app.
+            userScope.launch {
+                val activity = sheetContext.findActivity()
+                val intent = activity?.let { manager ->
+                    FirebaseSession.signInIntent(manager, GoogleAccountStore(sheetContext).email())
+                }
+                if (intent == null) {
+                    userBusy = false
+                    userNote = "Google could not confirm the account. Try signing out and in."
+                } else {
+                    pendingName = wanted
+                    pendingPass = token
+                    runCatching { googleSignIn.launch(intent) }
+                        .onFailure {
+                            userBusy = false
+                            userNote = "Google sign-in could not be opened."
+                        }
+                }
+            }
         } else {
             userBusy = false
             userNote = "Google sign-in was cancelled."
+        }
+    }
+
+    // Google's account picker for the session; its answer holds an ID token, which is what
+    // Firebase accepts as proof of who the person is.
+    val googleSignIn = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val wanted = pendingName
+        val pass = pendingPass
+        pendingName = null
+        pendingPass = null
+        val activity = sheetContext.findActivity()
+        val idToken = if (activity != null && result.resultCode == android.app.Activity.RESULT_OK) {
+            FirebaseSession.idTokenFrom(activity, result.data)
+        } else {
+            null
+        }
+        if (idToken == null) {
+            userBusy = false
+            userNote = "Google sign-in was cancelled."
+            return@rememberLauncherForActivityResult
+        }
+        userScope.launch {
+            val session = FirebaseSession.signInWithIdToken(sheetContext, idToken)
+            if (session == null || wanted == null) {
+                userBusy = false
+                userNote = "Firebase refused the session. Check that Google sign-in is enabled " +
+                    "for P Vault in the Firebase console."
+            } else {
+                keepName(wanted, pass)
+            }
         }
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
