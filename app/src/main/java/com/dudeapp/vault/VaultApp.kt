@@ -1935,6 +1935,7 @@ fun VaultApp(
                     // on screen is always what is saved rather than a leftover draft.
                     name = profile.name,
                     avatar = profile.avatar,
+                    signedIn = signedIn,
                     username = usernameStore.saved().orEmpty(),
                     usernameConfirmed = usernameStore.confirmed(),
                     onChangeUsername = { wanted ->

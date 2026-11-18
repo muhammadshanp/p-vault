@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.40** — A username is only offered to a signed-in Google account, because a name has to belong to somebody; without a sign-in the profile sheet says so and points at the sign-in below it.
 - **0.5.39** — The Theme page is in the menu for everyone (only its picture looks need access), signing in with Google has its own menu item, and the admin panel gets a Names page for reserving usernames nobody else can take.
 - **0.5.38** — Profile changes show at once (a new photo gets its own file, and the sheet rebuilds from what was saved), plus usernames: unique across phones, checked as typed, with insults and impersonation refused.
 - **0.5.37** — P Vault shows up in Android's share sheet for files, not just text: photos land in Images, PDFs in PDFs, several files at once work, and anything else is turned away with a word. Shared text follows the same idea: a reel link opens the reel dialog, any other text opens a note already carrying it.
@@ -214,4 +215,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.39 (versionCode 69).
+`com.dudeapp.vault` — version 0.5.40 (versionCode 70).

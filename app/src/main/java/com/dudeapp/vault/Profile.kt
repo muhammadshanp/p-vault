@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -112,6 +113,8 @@ fun ProfileSheet(
     onRestoreFile: () -> Unit,
     onExternal: () -> Unit,
     onGoogleSignedIn: (GoogleUser) -> Unit,
+    /** True when a Google account is signed in; without one there is no identity, so no name. */
+    signedIn: Boolean,
     /** The username this phone has, and whether it is settled with the database. */
     username: String,
     usernameConfirmed: Boolean,
@@ -198,7 +201,33 @@ fun ProfileSheet(
             // Usernames are unique and checked as they are typed; the name is kept only when
             // the check passes, and the verdict is always said in words.
             Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
+            // A username belongs to a person, so it is only offered once a Google account is
+            // signed in: that is the only way to keep a name for someone and check it again
+            // on their next phone.
+            if (!signedIn) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Outlined.AlternateEmail,
+                        contentDescription = null,
+                        tint = TextSoft,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Usernames need a Google account. Sign in below to pick yours.",
+                        color = TextSoft,
+                        fontSize = 12.sp,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+            if (signedIn) OutlinedTextField(
                 value = userDraft,
                 onValueChange = { typed ->
                     userDraft = normalizeUsername(typed).take(20)
