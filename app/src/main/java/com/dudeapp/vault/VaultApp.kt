@@ -262,6 +262,9 @@ fun VaultApp(
     var profileOpen by remember { mutableStateOf(false) }
     // Whether a Google account is signed in on this phone, for the menu's sign-in item.
     var signedIn by remember { mutableStateOf(GoogleAccountStore(context).email() != null) }
+    // Whether usernames may still be changed, as the admin last set it. Read from the public
+    // document when the access list refreshes, so it is right without opening a screen.
+    var namesFixed by remember { mutableStateOf(AccessStore(context).namesFixed()) }
     // Bumped whenever the profile changes, to reopen the sheet with the saved values.
     var profileSheetKey by remember { mutableIntStateOf(0) }
     val usernameStore = remember { UsernameStore(context) }
@@ -1358,7 +1361,14 @@ fun VaultApp(
                     profile = profile,
                     version = currentVersion,
                     updateReady = availableUpdate != null,
-                    onProfile = { closeMenu { profileOpen = true } },
+                    onProfile = {
+                        // The admin may have fixed names since this phone last looked.
+                        scope.launch {
+                            AccessStore(context).refresh()
+                            namesFixed = AccessStore(context).namesFixed()
+                        }
+                        closeMenu { profileOpen = true }
+                    },
                     onSettings = { closeMenu { settingsOpen = true } },
                     isAdmin = isAdmin,
                     onAdmin = { closeMenu { adminOpen = true } },
@@ -1936,6 +1946,7 @@ fun VaultApp(
                     name = profile.name,
                     avatar = profile.avatar,
                     signedIn = signedIn,
+                    namesFixed = namesFixed,
                     username = usernameStore.saved().orEmpty(),
                     usernameConfirmed = usernameStore.confirmed(),
                     onChangeUsername = { wanted, token ->

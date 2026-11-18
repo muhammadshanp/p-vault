@@ -56,7 +56,7 @@ import kotlin.coroutines.resume
  */
 
 /** Why a name was turned down, in words the user can act on. */
-enum class NameProblem { EMPTY, SHORT, LONG, CHARS, OFFENSIVE, TAKEN, RESERVED }
+enum class NameProblem { EMPTY, SHORT, LONG, CHARS, OFFENSIVE, TAKEN, RESERVED, FIXED }
 
 /** The rule for a username: lower-case letters, numbers, dot, dash, underscore. */
 internal fun normalizeUsername(text: String): String =
@@ -81,6 +81,7 @@ fun nameProblemText(problem: NameProblem?): String? = when (problem) {
     NameProblem.OFFENSIVE -> "That name is not allowed. Pick another."
     NameProblem.TAKEN -> "That name is already taken. Try another."
     NameProblem.RESERVED -> "That name is kept by P Vault. Pick another."
+    NameProblem.FIXED -> "Your username is fixed. Ask the P Vault team if it must change."
 }
 
 /** Where a chosen name stands. */
@@ -210,6 +211,12 @@ internal suspend fun claimUsername(
 ): NameCheck {
     // Cheaper checks first: nothing is asked of the network for a name the rules already refuse.
     usernameProblem(name)?.let { return NameCheck.Refused(name, it) }
+    // Names are one per person. When the admin has fixed them, a name already taken by this
+    // account stands, and the sheet never offers a change in the first place.
+    val held = UsernameStore(context).saved()
+    if (AccessStore(context).namesFixed() && held != null && held != name) {
+        return NameCheck.Refused(name, NameProblem.FIXED)
+    }
     // A name the admin keeps for later, or has closed off, is refused on this phone with the
     // list it last read, and on the database by the same rule.
     if (AccessStore(context).reservedNames().contains(name)) {
@@ -383,6 +390,8 @@ fun ReservedNamesCard(
     var names by remember { mutableStateOf<Set<String>?>(null) }
     var draft by remember { mutableStateOf("") }
     var note by remember { mutableStateOf<String?>(null) }
+    // Whether a taken name can still be changed. Read and written with the same document.
+    var fixed by remember { mutableStateOf<Boolean?>(null) }
 
     fun load() = withGoogle { token ->
         scope.launch {
@@ -390,11 +399,14 @@ fun ReservedNamesCard(
             when {
                 response == null -> onDone("No connection.")
                 response.first == 200 -> {
-                    names = AccessDocument.parse(response.second).reservedNames
+                    val document = AccessDocument.parse(response.second)
+                    names = document.reservedNames
+                    fixed = document.namesFixed
                     onDone(null)
                 }
                 response.first == 404 -> {
                     names = emptySet()
+                    fixed = false
                     onDone(null)
                 }
                 else -> onDone(databaseProblem(response.first))
@@ -402,7 +414,7 @@ fun ReservedNamesCard(
         }
     }
 
-    fun save(next: Set<String>) = withGoogle { token ->
+    fun save(next: Set<String>, namesFixed: Boolean) = withGoogle { token ->
         scope.launch {
             // Read first, so the fields the People page owns are written back untouched.
             val current = googleRequest("$FIRESTORE/access/special", token, null)
@@ -414,12 +426,13 @@ fun ReservedNamesCard(
             val response = googleRequest(
                 "$FIRESTORE:commit",
                 token,
-                accessCommitJson(document.copy(reservedNames = next)),
+                accessCommitJson(document.copy(reservedNames = next, namesFixed = namesFixed)),
             )
             when {
                 response == null -> onDone("No connection. The list was not changed.")
                 response.first == 200 -> {
                     names = next
+                    fixed = namesFixed
                     draft = ""
                     note = null
                     onDone(null)
@@ -451,6 +464,30 @@ fun ReservedNamesCard(
                     Text(if (busy) "Working…" else "Show the reserved names")
                 }
             } else {
+                // The switch that decides whether a name, once taken, can ever be changed.
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Usernames can be changed", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (fixed == true) {
+                                "Off: the first name a person takes stands for good."
+                            } else {
+                                "On: anyone may pick a different name, and the old one is freed."
+                            },
+                            color = TextSoft,
+                            fontSize = 11.sp,
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = fixed != true,
+                        onCheckedChange = { canChange -> save(list, namesFixed = !canChange) },
+                        enabled = !busy,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
                 if (list.isEmpty()) {
                     Text("Nothing reserved yet.", color = TextSoft, fontSize = 13.sp)
                 }
@@ -458,7 +495,7 @@ fun ReservedNamesCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("@$name", fontSize = 14.sp, modifier = Modifier.weight(1f))
                         TextButton(
-                            onClick = { save(list - name) },
+                            onClick = { save(list - name, fixed == true) },
                             enabled = !busy,
                         ) { Text("Release") }
                     }
@@ -480,7 +517,7 @@ fun ReservedNamesCard(
                 )
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick = { save(list + draft) },
+                    onClick = { save(list + draft, fixed == true) },
                     enabled = !busy && draft.isNotEmpty() && nameProblemText(usernameProblem(draft)) == null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {

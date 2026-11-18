@@ -119,6 +119,8 @@ fun ProfileSheet(
     onGoogleSignedIn: (GoogleUser) -> Unit,
     /** True when a Google account is signed in; without one there is no identity, so no name. */
     signedIn: Boolean,
+    /** True when the admin has fixed names: a name already taken can no longer be changed. */
+    namesFixed: Boolean,
     /** The username this phone has, and whether it is settled with the database. */
     username: String,
     usernameConfirmed: Boolean,
@@ -333,17 +335,18 @@ fun ProfileSheet(
                     userNote = null
                 },
                 label = { Text("Username") },
+                // A fixed name is read-only: the field is shown, but there is nothing to change.
+                readOnly = namesFixed && userSaved.isNotEmpty(),
                 supportingText = {
                     val clean = normalizeUsername(userDraft)
                     val rule = nameProblemText(usernameProblem(clean))
-                    if (rule != null) {
-                        Text(rule, color = MaterialTheme.colorScheme.error)
-                    } else if (clean == userSaved) {
-                        Text("Yours — tap it to pick a different name.")
-                    } else if (userNote != null) {
-                        Text(userNote.orEmpty(), color = MaterialTheme.colorScheme.error)
-                    } else {
-                        Text("Tap Keep to take this name.")
+                    when {
+                        rule != null -> Text(rule, color = MaterialTheme.colorScheme.error)
+                        namesFixed && userSaved.isNotEmpty() ->
+                            Text("Fixed — this username cannot be changed.")
+                        clean == userSaved -> Text("Yours — tap it to pick a different name.")
+                        userNote != null -> Text(userNote.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        else -> Text("Tap Keep to take this name.")
                     }
                 },
                 isError = userNote != null || usernameProblem(normalizeUsername(userDraft)) != null,
@@ -352,7 +355,8 @@ fun ProfileSheet(
                 trailingIcon = {
                     if (userBusy) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else if (normalizeUsername(userDraft).isNotEmpty() &&
+                    } else if (!(namesFixed && userSaved.isNotEmpty()) &&
+                        normalizeUsername(userDraft).isNotEmpty() &&
                         (normalizeUsername(userDraft) != userSaved || !savedConfirmed)
                     ) {
                         TextButton(
