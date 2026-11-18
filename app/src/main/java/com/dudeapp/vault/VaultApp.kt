@@ -1934,6 +1934,57 @@ fun VaultApp(
                     // on screen is always what is saved rather than a leftover draft.
                     name = profile.name,
                     avatar = profile.avatar,
+                    drive = drive,
+                    onPickPhoto = {
+                        onExternal()
+                        avatarPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onConnectDrive = { connectDrive() },
+                    onDisconnectDrive = { disconnectDrive() },
+                    onBackupNow = { name ->
+                        val clean = name.trim()
+                        if (clean.isNotBlank() && clean != profile.name) {
+                            profileStore.setName(clean)
+                            profile = profileStore.load()
+                        }
+                        backupNow()
+                    },
+                    onRestoreFile = {
+                        onExternal()
+                        restorePicker.launch(
+                            BACKUP_MIME_TYPES,
+                        )
+                    },
+                    onExternal = onExternal,
+                    onGoogleSignedIn = { user ->
+                        // Only fills gaps: a name or picture the user already chose is kept.
+                        var changed = false
+                        if (profile.name.isBlank() && user.name.isNotBlank()) {
+                            profileStore.setName(user.name.take(40))
+                            profile = profileStore.load()
+                            changed = true
+                        }
+                        if (changed) {
+                            autoBackupTick += 1
+                            driveStore.markPending()
+                        }
+                        if (profile.avatar == null && user.picture.isNotBlank()) {
+                            scope.launch {
+                                val saved = downloadGooglePicture(context, user.picture)?.let { file ->
+                                    withContext(Dispatchers.IO) {
+                                        profileStore.saveAvatar(Uri.fromFile(file)).also { file.delete() }
+                                    }
+                                }
+                                if (saved != null && profile.avatar == null) {
+                                    profile = profile.copy(avatar = saved)
+                                    autoBackupTick += 1
+                                    driveStore.markPending()
+                                }
+                            }
+                        }
+                    },
                     onSave = { name ->
                         val changed = name != profile.name
                         profileStore.setName(name)
