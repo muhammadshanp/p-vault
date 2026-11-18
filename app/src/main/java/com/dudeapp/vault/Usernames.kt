@@ -244,8 +244,8 @@ private fun writeUsername(name: String, email: String, token: String): Boolean? 
  */
 internal suspend fun acquireToken(context: Context): String? = withContext(Dispatchers.Main) {
     runCatching {
-        val activity = context.findActivity() ?: return@runCatching null
-        suspendCancellableCoroutine { continuation ->
+        val activity: android.app.Activity = context.findActivity() ?: return@runCatching null
+        suspendCancellableCoroutine<String?> { continuation ->
             val request = AuthorizationRequest.builder()
                 .setRequestedScopes(listOf(Scope(SCOPE_DATASTORE), Scope("email")))
                 .build()
@@ -266,12 +266,3 @@ internal suspend fun acquireToken(context: Context): String? = withContext(Dispa
     }.getOrNull()
 }
 
-/** The activity behind a Compose context. */
-internal fun Context.findActivity(): android.app.Activity? {
-    var current = this
-    while (current is android.content.ContextWrapper) {
-        if (current is android.app.Activity) return current
-        current = current.baseContext
-    }
-    return current as? android.app.Activity
-}
