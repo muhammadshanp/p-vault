@@ -177,9 +177,14 @@ private fun AddRow(
 }
 
 @Composable
-fun NoteDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var body by remember { mutableStateOf(TextFieldValue("")) }
+fun NoteDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+    startTitle: String = "",
+    startBody: String = "",
+) {
+    var title by remember { mutableStateOf(startTitle) }
+    var body by remember { mutableStateOf(TextFieldValue(startBody)) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

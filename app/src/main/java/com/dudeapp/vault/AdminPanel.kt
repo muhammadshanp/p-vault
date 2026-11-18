@@ -139,7 +139,7 @@ private suspend fun googleEmail(token: String): String {
     return runCatching { JSONObject(response.second).optString("email") }.getOrDefault("")
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
@@ -328,6 +328,11 @@ fun AdminScreen(
                                 onDone = { problem -> if (problem != null) fail(problem) else busy = false },
                             )
                         }
+                        AdminPage.NAMES -> ReservedNamesCard(
+                            busy = busy,
+                            withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
+                            onDone = { problem -> if (problem != null) fail(problem) else busy = false },
+                        )
                         AdminPage.MESSAGE -> AdminMessageCard(
                             busy = busy,
                             title = title,
@@ -393,6 +398,7 @@ fun AdminScreen(
 enum class AdminPage(val label: String) {
     MESSAGE("Message"),
     PEOPLE("People"),
+    NAMES("Names"),
     ACCOUNT("Account"),
 }
 

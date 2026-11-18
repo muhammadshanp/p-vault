@@ -232,6 +232,8 @@ fun GoogleAccountSection(
                 TextButton(
                     onClick = {
                         account.clear()
+                        // The Firebase session belongs to the same account, so it goes too.
+                        FirebaseSession.signOut()
                         access.clear()
                         special = access.isSpecial()
                         email = null

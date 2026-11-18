@@ -62,6 +62,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Login
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
@@ -104,6 +105,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -146,6 +148,8 @@ private const val AUTO_BACKUP_DELAY_MS = 20_000L
 fun VaultApp(
     sharedText: String?,
     onShareConsumed: () -> Unit,
+    sharedFiles: List<Uri> = emptyList(),
+    onFilesConsumed: () -> Unit = {},
     onExternal: () -> Unit,
     onPinSetup: () -> Unit,
     theme: ThemePreset,
@@ -231,6 +235,9 @@ fun VaultApp(
     // left open across the trip would cover the vault when the picker comes back.
     var addOpen by rememberSaveable { mutableStateOf(false) }
     var noteOpen by remember { mutableStateOf(false) }
+    // Text shared from another app, waiting in the note dialog. Saved, so a rebuild behind the
+    // other app's window does not lose it.
+    var sharedNote by rememberSaveable { mutableStateOf("") }
     var version by remember { mutableIntStateOf(0) }
     var autoBackupTick by remember { mutableIntStateOf(0) }
     var autoBackupSkip by remember { mutableIntStateOf(0) }
@@ -253,6 +260,11 @@ fun VaultApp(
 
     var profile by remember { mutableStateOf(profileStore.load()) }
     var profileOpen by remember { mutableStateOf(false) }
+    // Whether a Google account is signed in on this phone, for the menu's sign-in item.
+    var signedIn by remember { mutableStateOf(GoogleAccountStore(context).email() != null) }
+    // Bumped whenever the profile changes, to reopen the sheet with the saved values.
+    var profileSheetKey by remember { mutableIntStateOf(0) }
+    val usernameStore = remember { UsernameStore(context) }
     var chatAvatarTarget by remember { mutableStateOf<ChatThread?>(null) }
     var drive by remember { mutableStateOf(driveStore.state()) }
     LaunchedEffect(Unit) { backupProtected = withContext(Dispatchers.IO) { driveStore.isEncrypted() } }
@@ -591,7 +603,10 @@ fun VaultApp(
             scope.launch {
                 val saved = withContext(Dispatchers.IO) { profileStore.saveAvatar(uri) }
                 if (saved != null) {
-                    profile = profile.copy(avatar = saved)
+                    // Read back from the store, so the picture on screen is the one saved
+                    // rather than a copy made up here that can be missed by a comparison.
+                    profile = profileStore.load()
+                    profileSheetKey += 1
                     autoBackupTick += 1
                     driveStore.markPending()
                 }
@@ -655,18 +670,55 @@ fun VaultApp(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri -> exportInto(uri) }
 
+    // Shared text goes where it belongs: a reel link to Reels, anything else to a note carrying
+    // the text, ready to save. Sharing is not a way to turn every sentence into a reel.
     LaunchedEffect(sharedText) {
         val text = sharedText?.trim().orEmpty()
         if (text.isEmpty()) return@LaunchedEffect
-        val url = extractUrl(text) ?: text
-        val title = text.replace(url, "").replace("\n", " ").trim().take(60)
-        reelDraftUrl = url
-        reelDraftTitle = title.ifBlank { "Instagram Reel" }
-        reelDraftCategory = store.pendingCategoryName()
+        val url = extractUrl(text)
+        onShareConsumed()
         open = null
         openChat = null
-        reelDialogOpen = true
-        onShareConsumed()
+        if (url != null && looksLikeReel(text)) {
+            reelDraftUrl = url
+            reelDraftTitle = text.replace(url, "").replace("\n", " ").trim().take(60)
+                .ifBlank { "Instagram Reel" }
+            reelDraftCategory = store.pendingCategoryName()
+            reelDialogOpen = true
+        } else {
+            sharedNote = text
+            noteOpen = true
+        }
+    }
+
+    // Files shared in from another app go where they belong: photos to Images, PDFs to PDFs.
+    LaunchedEffect(sharedFiles) {
+        if (sharedFiles.isEmpty()) return@LaunchedEffect
+        val files = sharedFiles
+        onFilesConsumed()
+        val sorted = sortedShared(context, files)
+        val addedPhotos = withContext(Dispatchers.IO) {
+            sorted.photos.count { store.addFile(it, "Image.jpg") != null }
+        }
+        val addedPdfs = withContext(Dispatchers.IO) {
+            sorted.pdfs.count { store.addFile(it, "Document.pdf") != null }
+        }
+        val added = addedPhotos + addedPdfs
+        if (added > 0) {
+            val target = if (addedPhotos > 0) Tab.IMAGES else Tab.PDFS
+            tabPrefs.edit().putString("files_tab", target.name).apply()
+            refresh()
+            switchTab(target)
+        }
+        val message = when {
+            added == 0 && sorted.refused > 0 ->
+                "Only photos and PDFs can go into the vault."
+            added == 0 -> "Nothing in that share could be added to the vault."
+            addedPhotos > 0 && addedPdfs > 0 -> "$added files added: $addedPhotos to Images, $addedPdfs to PDFs"
+            addedPhotos > 0 -> addedMessage(addedPhotos, sorted.photos.size, "photo")
+            else -> addedMessage(addedPdfs, sorted.pdfs.size, "PDF")
+        }
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
 
     fun launchPhotos() {
@@ -1312,6 +1364,8 @@ fun VaultApp(
                     onAdmin = { closeMenu { adminOpen = true } },
                     canTheme = access.theme,
                     onThemes = { closeMenu { themesOpen = true } },
+                    signedIn = signedIn,
+                    onSignIn = { closeMenu { adminOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -1793,9 +1847,15 @@ fun VaultApp(
 
             if (noteOpen) {
                 NoteDialog(
-                    onDismiss = { noteOpen = false },
+                    onDismiss = {
+                        noteOpen = false
+                        sharedNote = ""
+                    },
+                    startTitle = sharedNote.lineSequence().firstOrNull()?.take(40).orEmpty(),
+                    startBody = sharedNote,
                     onSave = { title, body ->
                         noteOpen = false
+                        sharedNote = ""
                         scope.launch {
                             withContext(Dispatchers.IO) { store.addText(title, body) }
                             refresh()
@@ -1869,9 +1929,33 @@ fun VaultApp(
             }
 
             if (profileOpen) {
+                key(profileSheetKey) {
                 ProfileSheet(
+                    // The key above rebuilds the sheet whenever the profile changes, so what is
+                    // on screen is always what is saved rather than a leftover draft.
                     name = profile.name,
                     avatar = profile.avatar,
+                    signedIn = signedIn,
+                    username = usernameStore.saved().orEmpty(),
+                    usernameConfirmed = usernameStore.confirmed(),
+                    onChangeUsername = { wanted, token ->
+                        when (val check = claimUsername(context, wanted, token)) {
+                            is NameCheck.Free -> {
+                                // The name held before this one is handed back, so it does not
+                                // stay taken by an account that no longer uses it.
+                                val old = usernameStore.saved()
+                                if (old != null && old != check.name) {
+                                    releaseOldUsername(context, old, token)
+                                }
+                                null
+                            }
+                            is NameCheck.Refused -> nameProblemText(check.problem)
+                            is NameCheck.Unconfirmed -> {
+                                usernameStore.save(check.name, false)
+                                check.reason
+                            }
+                        }
+                    },
                     drive = drive,
                     onPickPhoto = {
                         onExternal()
@@ -1928,6 +2012,8 @@ fun VaultApp(
                         profileStore.setName(name)
                         profile = profileStore.load()
                         profileOpen = false
+                        // A rebuilt sheet, so no half-filled field survives into the next look.
+                        profileSheetKey += 1
                         if (changed) {
                             autoBackupTick += 1
                             driveStore.markPending()
@@ -1936,11 +2022,13 @@ fun VaultApp(
                     onDismiss = {
                         profileOpen = false
                         // Signing in or out on the sheet can change this.
+                        signedIn = GoogleAccountStore(context).email() != null
                         scope.launch {
                             access = AccessStore(context).refresh()
                                             }
                     },
                 )
+                }
             }
 
             if (reelDialogOpen) {
@@ -2894,6 +2982,10 @@ private fun MenuDrawer(
     onAdmin: () -> Unit,
     canTheme: Boolean,
     onThemes: () -> Unit,
+    /** A Google account is signed in on this phone. */
+    signedIn: Boolean,
+    /** Starts Google's own sign-in screen for the admin panel. */
+    onSignIn: () -> Unit,
     onBackup: () -> Unit,
     onCheckUpdates: () -> Unit,
     onAbout: () -> Unit,
@@ -2922,8 +3014,10 @@ private fun MenuDrawer(
         Spacer(Modifier.height(10.dp))
         MenuDrawerItem(Icons.Outlined.Person, "Profile", onProfile)
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
-        if (canTheme) {
-            MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
+        // The Theme page itself is for everyone; only its picture looks need special access.
+        MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
+        if (!signedIn) {
+            MenuDrawerItem(Icons.Outlined.Login, "Sign in with Google", onSignIn)
         }
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
@@ -3418,6 +3512,47 @@ private fun openUrl(context: Context, url: String) {
         .onFailure {
             Toast.makeText(context, "No app can open this link", Toast.LENGTH_SHORT).show()
         }
+}
+
+/** Shared files, sorted by what the vault can keep: photos, PDFs, and everything else. */
+/**
+ * True when shared text is a link to a reel, or is only a link plus a line about it. A link to
+ * anything else, or plain text, belongs in a note instead.
+ */
+private fun looksLikeReel(text: String): Boolean {
+    val link = extractUrl(text) ?: return false
+    val host = runCatching { Uri.parse(link).host.orEmpty().lowercase() }.getOrDefault("")
+    val reelHost = host.contains("instagram") || host.contains("instagr.am") ||
+        host.contains("youtube.com") || host.contains("youtu.be") ||
+        host.contains("facebook.com") || host.contains("tiktok.com") ||
+        host.contains("twitter.com") || host.contains("x.com")
+    if (!reelHost) return false
+    // The rest of the message, if any, must be a short caption rather than a paragraph.
+    val rest = text.replace(link, "").replace("\n", " ").trim()
+    return rest.length <= 120
+}
+
+private data class SharedSet(val photos: List<Uri>, val pdfs: List<Uri>, val refused: Int)
+
+private fun sortedShared(context: Context, uris: List<Uri>): SharedSet {
+    val photos = ArrayList<Uri>()
+    val pdfs = ArrayList<Uri>()
+    var refused = 0
+    uris.forEach { uri ->
+        val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull().orEmpty()
+        val name = uri.lastPathSegment.orEmpty().lowercase()
+        when {
+            mime.startsWith("image/") -> photos.add(uri)
+            mime == "application/pdf" -> pdfs.add(uri)
+            // A few apps hand over a file with no type at all; the name is all there is to go on.
+            mime.isEmpty() && name.substringAfterLast('.', "") in setOf(
+                "jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif",
+            ) -> photos.add(uri)
+            mime.isEmpty() && name.endsWith(".pdf") -> pdfs.add(uri)
+            else -> refused += 1
+        }
+    }
+    return SharedSet(photos, pdfs, refused)
 }
 
 private data class VaultSnapshot(

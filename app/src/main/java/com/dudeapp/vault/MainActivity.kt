@@ -2,6 +2,7 @@ package com.dudeapp.vault
 
 import android.app.UiModeManager
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.animation.DecelerateInterpolator
@@ -23,6 +24,8 @@ class MainActivity : FragmentActivity() {
     private var needsSetup by mutableStateOf(false)
     private var needsLockChoice by mutableStateOf(false)
     private var pendingShare by mutableStateOf<String?>(null)
+    // Files shared into P Vault from another app: photos go to Images, PDFs to PDFs.
+    private var pendingFiles by mutableStateOf<List<Uri>>(emptyList())
     private var external = false // a system picker is open; don't lock on that trip
     private var backgroundAt = 0L
     private var biometricPromptKey by mutableIntStateOf(0)
@@ -89,6 +92,7 @@ class MainActivity : FragmentActivity() {
         autoPromptPending = locked
         pendingShare = extractShare(intent)
 
+        pendingFiles = extractSharedFiles(intent)
         setContent {
             val dark = theme.dark
             DisposableEffect(dark) {
@@ -143,6 +147,8 @@ class MainActivity : FragmentActivity() {
                     else -> VaultApp(
                         sharedText = pendingShare,
                         onShareConsumed = { pendingShare = null },
+                        sharedFiles = pendingFiles,
+                        onFilesConsumed = { pendingFiles = emptyList() },
                         onExternal = { external = true },
                         onPinSetup = {
                             needsSetup = true
@@ -180,12 +186,42 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingShare = extractShare(intent)
+        pendingFiles = extractSharedFiles(intent)
     }
 
     private fun extractShare(intent: Intent?): String? {
         if (intent?.action != Intent.ACTION_SEND) return null
         if (intent.type?.startsWith("text/") != true) return null
         return intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+    }
+
+    /**
+     * The files another app shared. They are read here, from the intent that carries them: the
+     * read permission Android grants comes with that intent and is gone once it is replaced.
+     * A file shared while P Vault is already running arrives through onNewIntent.
+     */
+    private fun extractSharedFiles(intent: Intent?): List<Uri> {
+        val action = intent?.action
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return emptyList()
+        // A link shared as text is not a file.
+        if (intent.type?.startsWith("text/") == true) return emptyList()
+        val uris = when (action) {
+            Intent.ACTION_SEND_MULTIPLE ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+                }
+            else ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)?.let { listOf(it) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { listOf(it) }
+                }
+        }
+        return uris.orEmpty().filterNotNull()
     }
 
     override fun onResume() {
