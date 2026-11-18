@@ -703,14 +703,6 @@ fun VaultApp(
     }
 
     // Shown once the picker is done, whatever came back, so an empty trip is explained.
-    // Coming back with a picker's answer: close the sheet the user never saw close.
-    LaunchedEffect(pickerOut) {
-        if (pickerOut) {
-            addOpen = false
-            addMenuOpen = false
-        }
-    }
-
     if (pickerProblem.value != null) {
         val message = pickerProblem.value.orEmpty()
         AlertDialog(
@@ -726,6 +718,14 @@ fun VaultApp(
     var addMenuOpen by rememberSaveable { mutableStateOf(false) }
     // Whether the photo being taken becomes a one-page PDF (from the PDFs tab) or a photo.
     var cameraAsPdf by rememberSaveable { mutableStateOf(false) }
+
+    // Coming back with a picker's answer: close the sheet or menu the user never saw close.
+    LaunchedEffect(pickerOut) {
+        if (pickerOut) {
+            addOpen = false
+            addMenuOpen = false
+        }
+    }
 
     val scanLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
