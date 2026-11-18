@@ -37,6 +37,22 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * One spacing scale, on a 4dp grid. Before this there were ten different horizontal insets
+ * (8, 10, 12, 14, 16, 20, 22, 24) and nothing lined up across screens. The three margins
+ * below are the only screen gutters: use them instead of a literal.
+ */
+object Spacing {
+    /** Side margin of a full screen: header, list, section. */
+    val Screen = 20.dp
+
+    /** Gap between two cards, chips or tiles. */
+    val Card = 12.dp
+
+    /** Gap between two blocks of content. */
+    val Section = 24.dp
+}
+
 /** One colour per kind of content, so each section is recognisable at a glance. */
 object Accent {
     val Photo = Color(0xFF3B82F6)

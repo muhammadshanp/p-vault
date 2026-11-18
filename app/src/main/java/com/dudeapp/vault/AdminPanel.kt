@@ -283,7 +283,7 @@ fun AdminScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = Spacing.Screen)
                     .padding(bottom = 32.dp),
             ) {
                 Spacer(Modifier.height(10.dp))

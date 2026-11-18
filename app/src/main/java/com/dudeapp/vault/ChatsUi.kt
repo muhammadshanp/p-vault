@@ -117,7 +117,7 @@ fun TextModeChips(chatView: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .padding(horizontal = Spacing.Screen, vertical = 4.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(4.dp),
@@ -823,7 +823,7 @@ fun ChatScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = Spacing.Screen),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -843,7 +843,7 @@ fun ChatScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = Spacing.Screen),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(

@@ -159,7 +159,7 @@ fun SettingsScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = Spacing.Screen)
                     .padding(bottom = 32.dp),
             ) {
                 Spacer(Modifier.height(10.dp))
@@ -228,7 +228,7 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .clickable(onClick = onThemes)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = Spacing.Screen, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
