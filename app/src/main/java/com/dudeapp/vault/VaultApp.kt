@@ -258,6 +258,9 @@ fun VaultApp(
 
     var profile by remember { mutableStateOf(profileStore.load()) }
     var profileOpen by remember { mutableStateOf(false) }
+    // Bumped whenever the profile changes, to reopen the sheet with the saved values.
+    var profileSheetKey by remember { mutableIntStateOf(0) }
+    val usernameStore = remember { UsernameStore(context) }
     var chatAvatarTarget by remember { mutableStateOf<ChatThread?>(null) }
     var drive by remember { mutableStateOf(driveStore.state()) }
     LaunchedEffect(Unit) { backupProtected = withContext(Dispatchers.IO) { driveStore.isEncrypted() } }
@@ -596,7 +599,10 @@ fun VaultApp(
             scope.launch {
                 val saved = withContext(Dispatchers.IO) { profileStore.saveAvatar(uri) }
                 if (saved != null) {
-                    profile = profile.copy(avatar = saved)
+                    // Read back from the store, so the picture on screen is the one saved
+                    // rather than a copy made up here that can be missed by a comparison.
+                    profile = profileStore.load()
+                    profileSheetKey += 1
                     autoBackupTick += 1
                     driveStore.markPending()
                 }
@@ -1917,9 +1923,24 @@ fun VaultApp(
             }
 
             if (profileOpen) {
+                key(profileSheetKey) {
                 ProfileSheet(
+                    // The key above rebuilds the sheet whenever the profile changes, so what is
+                    // on screen is always what is saved rather than a leftover draft.
                     name = profile.name,
                     avatar = profile.avatar,
+                    username = usernameStore.saved().orEmpty(),
+                    usernameConfirmed = usernameStore.confirmed(),
+                    onChangeUsername = { wanted ->
+                        when (val check = claimUsername(context, wanted)) {
+                            is NameCheck.Free -> null
+                            is NameCheck.Refused -> nameProblemText(check.problem)
+                            is NameCheck.Unconfirmed -> {
+                                usernameStore.save(check.name, false)
+                                check.reason
+                            }
+                        }
+                    },
                     drive = drive,
                     onPickPhoto = {
                         onExternal()
@@ -1976,6 +1997,8 @@ fun VaultApp(
                         profileStore.setName(name)
                         profile = profileStore.load()
                         profileOpen = false
+                        // A rebuilt sheet, so no half-filled field survives into the next look.
+                        profileSheetKey += 1
                         if (changed) {
                             autoBackupTick += 1
                             driveStore.markPending()
@@ -1989,6 +2012,7 @@ fun VaultApp(
                                             }
                     },
                 )
+                }
             }
 
             if (reelDialogOpen) {

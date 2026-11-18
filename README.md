@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.5.38** — Profile changes show at once (a new photo gets its own file, and the sheet rebuilds from what was saved), plus usernames: unique across phones, checked as typed, with insults and impersonation refused.
 - **0.5.37** — P Vault shows up in Android's share sheet for files, not just text: photos land in Images, PDFs in PDFs, several files at once work, and anything else is turned away with a word. Shared text follows the same idea: a reel link opens the reel dialog, any other text opens a note already carrying it.
 - **0.5.36** — Adding a PDF no longer throws the user back to Home or to the lock screen: the Add sheet is closed and stays closed across the trip, the PDFs page is forced back into view after a rebuild, and coming back from a picker never arms the app lock.
 - **0.5.35** — Android 11 fixes and an honest answer when a picker comes back empty: the Files page is remembered across the trip, the camera's photo file is on disk before the camera takes the app away, and PDFs can be picked with "All files" when a browser's download page will not hand them back.
@@ -212,4 +213,4 @@ Or copy `P-Vault.apk` to the phone and open it (allow "install unknown apps" for
 
 ## Package
 
-`com.dudeapp.vault` — version 0.5.37 (versionCode 67).
+`com.dudeapp.vault` — version 0.5.38 (versionCode 68).
