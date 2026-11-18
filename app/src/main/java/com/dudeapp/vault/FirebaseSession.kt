@@ -43,20 +43,27 @@ internal object FirebaseSession {
      * An ID token says who the person is; an access token does not, so Firebase refuses a
      * session built on one.
      */
-    suspend fun signInIntent(
-        activity: android.app.Activity,
-        accountEmail: String?,
-    ): android.content.Intent? = suspendCancellableCoroutine { continuation ->
-        val client = com.google.android.gms.auth.api.identity.Identity.getSignInClient(activity)
-        val request = com.google.android.gms.auth.api.identity.GetSignInIntentRequest.builder()
-            .setServerClientId(WEB_CLIENT_ID)
-            // Only the account already signed in is offered, so nobody is asked twice.
-            .setFilterByAuthorizedAccounts(accountEmail != null)
-            .build()
-        client.getSignInIntent(request)
-            .addOnSuccessListener { intent -> if (continuation.isActive) continuation.resume(intent) }
-            .addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
-    }
+    suspend fun signInPendingIntent(activity: android.app.Activity): android.content.IntentSender? =
+        suspendCancellableCoroutine { continuation ->
+            val request = com.google.android.gms.auth.api.identity.BeginSignInRequest.builder()
+                .setGoogleIdTokenRequestOptions(
+                    com.google.android.gms.auth.api.identity.BeginSignInRequest
+                        .GoogleIdTokenRequestOptions.builder()
+                        .setSupported(true)
+                        .setServerClientId(WEB_CLIENT_ID)
+                        // The account already signed in to the phone is the one offered.
+                        .setFilterByAuthorizedAccounts(true)
+                        .build(),
+                )
+                .setAutoSelectEnabled(true)
+                .build()
+            com.google.android.gms.auth.api.identity.Identity.getSignInClient(activity)
+                .beginSignIn(request)
+                .addOnSuccessListener { result ->
+                    if (continuation.isActive) continuation.resume(result.pendingIntent.intentSender)
+                }
+                .addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
+        }
 
     /** The ID token in Google's answer, after the sign-in screen has been through. */
     fun idTokenFrom(activity: android.app.Activity, data: android.content.Intent?): String? = runCatching {
