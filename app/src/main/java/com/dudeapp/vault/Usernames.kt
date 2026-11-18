@@ -244,10 +244,12 @@ internal suspend fun claimUsername(
     // database rules, so a name is really theirs. Without a session it cannot be claimed.
     val session = FirebaseSession.signIn(context, token)
     val idToken = if (session == null) null else FirebaseSession.idToken(forceRefresh = true)
-        ?: return NameCheck.Unconfirmed(
+    if (idToken == null) {
+        return NameCheck.Unconfirmed(
             name,
             "Signed in with Google, but the Firebase session was refused. Try again after signing out and in.",
         )
+    }
 
     val written = withContext(Dispatchers.IO) { writeUsername(name, email, idToken) }
     return when (written) {

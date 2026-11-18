@@ -26,9 +26,6 @@ internal object FirebaseSession {
     const val WEB_CLIENT_ID =
         "161802196335-g7unbms6ncajc5c6tjg106ljsklgo4ki.apps.googleusercontent.com"
 
-    fun isAvailable(): Boolean =
-        runCatching { FirebaseApp.getApps(null).isNotEmpty() }.getOrDefault(false)
-
     private fun auth(): FirebaseAuth = FirebaseAuth.getInstance()
 
     fun email(): String? = runCatching { auth().currentUser?.email }.getOrNull()
@@ -53,7 +50,7 @@ internal object FirebaseSession {
     suspend fun idToken(forceRefresh: Boolean = false): String? = withContext(Dispatchers.IO) {
         runCatching {
             val user = auth().currentUser ?: return@runCatching null
-            user.getIdToken(forceRefresh).await()?.token
+            user.getIdToken(forceRefresh).await()?.tokenOrNull()
         }.getOrNull()
     }
 
@@ -67,3 +64,6 @@ internal suspend fun <T> Task<T>.await(): T? = suspendCancellableCoroutine { con
     addOnSuccessListener { result -> if (continuation.isActive) continuation.resume(result) }
     addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
 }
+
+/** The token inside a Firebase result, or null when the result or its token is missing. */
+private fun com.google.firebase.auth.GetTokenResult?.tokenOrNull(): String? = this?.token
