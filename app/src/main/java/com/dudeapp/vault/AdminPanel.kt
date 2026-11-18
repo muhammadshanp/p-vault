@@ -328,11 +328,6 @@ fun AdminScreen(
                                 onDone = { problem -> if (problem != null) fail(problem) else busy = false },
                             )
                         }
-                        AdminPage.NAMES -> ReservedNamesCard(
-                            busy = busy,
-                            withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
-                            onDone = { problem -> if (problem != null) fail(problem) else busy = false },
-                        )
                         AdminPage.MESSAGE -> AdminMessageCard(
                             busy = busy,
                             title = title,
@@ -398,7 +393,6 @@ fun AdminScreen(
 enum class AdminPage(val label: String) {
     MESSAGE("Message"),
     PEOPLE("People"),
-    NAMES("Names"),
     ACCOUNT("Account"),
 }
 
