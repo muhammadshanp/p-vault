@@ -139,7 +139,7 @@ private suspend fun googleEmail(token: String): String {
     return runCatching { JSONObject(response.second).optString("email") }.getOrDefault("")
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
