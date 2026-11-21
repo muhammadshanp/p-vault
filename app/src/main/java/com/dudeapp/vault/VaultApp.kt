@@ -13,6 +13,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -40,6 +42,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -204,7 +208,12 @@ fun VaultApp(
         scope.launch {
             pagerState.animateScrollToPage(
                 page = target.ordinal,
-                animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                // A spring, not a 160ms tween: the page carries a little momentum into place
+                // instead of stopping dead the instant the animation ends.
+                animationSpec = spring(
+                    dampingRatio = 0.86f,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             )
         }
     }
@@ -283,6 +292,28 @@ fun VaultApp(
     // Picks up special access given or removed by the admin since the last time.
     // What this account may do: its level, its switches and the looks shared with it.
     var access by remember { mutableStateOf(AccessStore(context).access()) }
+    // What the server says this name may use. Applied only when the server answers for this
+    // device: with no claimed name, or offline, nothing is restricted — a lock that depends on
+    // a network call must never make the vault unusable on a plane.
+    var grantsActive by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE)
+        // The owner can rename a name from the panel. The phone asks the server which name it
+        // holds, so a rename lands here instead of leaving the phone with a name that is gone.
+        val synced = Supabase.myName(context)
+        if (synced != null && synced != prefs.getString("claimed_name", null)) {
+            prefs.edit().putString("claimed_name", synced).apply()
+        }
+        val claimed = synced ?: prefs.getString("claimed_name", null) ?: return@LaunchedEffect
+        val remote = Supabase.myAccess(context, claimed) ?: return@LaunchedEffect
+        prefs.edit().putBoolean("verified", remote.granted && remote.verified).apply()
+        if (!remote.granted) return@LaunchedEffect
+        val granted = remote.features.mapNotNull { AccessFeature.of(it) }.toSet()
+        access = access.copy(level = AccessLevel.of(remote.level), features = access.features + granted)
+        grantsActive = true
+    }
+    val chatsAllowed = !grantsActive || access.has(AccessFeature.CHATS)
+    LaunchedEffect(chatsAllowed) { if (!chatsAllowed) chatView = false }
     val specialAccess = access.theme
     var themesOpen by remember { mutableStateOf(false) }
     var advancedThemesOpen by remember { mutableStateOf(false) }
@@ -1262,9 +1293,10 @@ fun VaultApp(
             catalogueProblem = catalogProblem,
             onRefresh = { loadCatalogue(lookOnline = true) },
             onPick = onThemeChange,
-            // The advanced looks are the admin's own; everyone else does not see the page.
+            // Advanced mode has to be on for the page to mean anything: it is the switch
+            // that lets a look carry its own background and card pictures.
             onAdvanced = {
-                if (access.copy(admin = isAdmin).advanced && settings.advancedMode) {
+                if (settings.advancedMode) {
                     themesOpen = false
                     advancedThemesOpen = true
                 }
@@ -1430,9 +1462,17 @@ fun VaultApp(
                 ) {
                 HorizontalPager(
                     state = pagerState,
-                    // Keep every tab composed. Swiping then only moves pages that already
-                    // exist, instead of building the next one in the middle of the gesture.
-                    beyondViewportPageCount = Tab.entries.size,
+                    // One page either side. Composing all five meant every tab's grid, its
+                    // bitmaps and its Backdrop were built and kept alive while any one page
+                    // moved, which is what made a fast swipe stutter.
+                    beyondViewportPageCount = 1,
+                    // A flick always completes the page change and lands centred, so a half
+                    // swipe can no longer leave the content sitting between two tabs.
+                    flingBehavior = PagerDefaults.flingBehavior(
+                        state = pagerState,
+                        pagerSnapDistance = PagerSnapDistance.atMost(1),
+                    ),
+                    key = { Tab.entries[it].name },
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val currentTab = Tab.entries[page]
@@ -1585,7 +1625,9 @@ fun VaultApp(
                         }
 
                         if (currentTab == Tab.NOTES) {
-                            TextModeChips(chatView = chatView, onChange = { chatView = it })
+                            if (chatsAllowed) {
+                                TextModeChips(chatView = chatView, onChange = { chatView = it })
+                            }
                             Spacer(Modifier.height(6.dp))
                         }
 
@@ -1615,6 +1657,7 @@ fun VaultApp(
                                 ) {
                                     currentVisibleReels.forEach { reel ->
                                         item(key = reel.file.absolutePath) {
+                                            Box(Modifier.animateItem()) {
                                             ReelCard(
                                                 reel = reel,
                                                 selected = reel.file.absolutePath in selectedPaths,
@@ -1628,6 +1671,7 @@ fun VaultApp(
                                                 },
                                                 onMenu = { if (!selecting) reelMenu = reel },
                                             )
+                                            }
                                         }
                                     }
                                 }
@@ -1651,6 +1695,7 @@ fun VaultApp(
                                 ) {
                                     currentVisibleChats.forEach { chat ->
                                         item(key = chat.dir.absolutePath) {
+                                            Box(Modifier.animateItem()) {
                                             ChatRow(
                                                 chat = chat,
                                                 selected = chat.dir.absolutePath in selectedPaths,
@@ -1663,6 +1708,7 @@ fun VaultApp(
                                                     }
                                                 },
                                             )
+                                            }
                                         }
                                     }
                                 }
@@ -1688,6 +1734,7 @@ fun VaultApp(
                                 items(currentVisibleFiles, key = { it.file.absolutePath }) { item ->
                                     if (settings.cardsAsList) {
                                         VaultRow(
+                                            modifier = Modifier.animateItem(),
                                             item = item,
                                             selected = item.file.absolutePath in selectedPaths,
                                             selecting = selecting,
@@ -1710,6 +1757,7 @@ fun VaultApp(
                                         return@items
                                     }
                                     VaultCard(
+                                        modifier = Modifier.animateItem(),
                                         item = item,
                                         selected = item.file.absolutePath in selectedPaths,
                                         selecting = selecting,
@@ -1945,29 +1993,8 @@ fun VaultApp(
                     // on screen is always what is saved rather than a leftover draft.
                     name = profile.name,
                     avatar = profile.avatar,
-                    signedIn = signedIn,
-                    namesFixed = namesFixed,
-                    username = usernameStore.saved().orEmpty(),
-                    usernameConfirmed = usernameStore.confirmed(),
-                    onChangeUsername = { wanted, token ->
-                        when (val check = claimUsername(context, wanted, token)) {
-                            is NameCheck.Free -> {
-                                // The name held before this one is handed back, so it does not
-                                // stay taken by an account that no longer uses it.
-                                val old = usernameStore.saved()
-                                if (old != null && old != check.name) {
-                                    releaseOldUsername(context, old, token)
-                                }
-                                null
-                            }
-                            is NameCheck.Refused -> nameProblemText(check.problem)
-                            is NameCheck.Unconfirmed -> {
-                                usernameStore.save(check.name, false)
-                                check.reason
-                            }
-                        }
-                    },
                     drive = drive,
+                    backupAllowed = !grantsActive || access.has(AccessFeature.BACKUP),
                     onPickPhoto = {
                         onExternal()
                         avatarPicker.launch(
@@ -2202,7 +2229,7 @@ fun VaultApp(
             version = currentVersion,
             onWebsite = {
                 aboutOpen = false
-                openUrl(context, "https://muhammadshanp.github.io/p-vault-website/")
+                openUrl(context, "https://muhammadshanp.github.io/Pre-release-/")
             },
             onDismiss = { aboutOpen = false },
         )
@@ -3330,6 +3357,7 @@ private fun addedMessage(added: Int, picked: Int, unit: String): String {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VaultCard(
+    modifier: Modifier = Modifier,
     item: VaultItem,
     selected: Boolean,
     selecting: Boolean,
@@ -3338,7 +3366,7 @@ private fun VaultCard(
 ) {
     val marked = selecting && selected
     Box(
-        Modifier
+        modifier
             .aspectRatio(0.86f)
             .vaultCard(RoundedCornerShape(22.dp), marked)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
@@ -3579,6 +3607,7 @@ private data class VaultSnapshot(
  */
 @Composable
 private fun VaultRow(
+    modifier: Modifier = Modifier,
     item: VaultItem,
     selected: Boolean,
     selecting: Boolean,
@@ -3588,7 +3617,7 @@ private fun VaultRow(
     val marked = selecting && selected
     val shape = RoundedCornerShape(18.dp)
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .vaultCard(shape, marked)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)

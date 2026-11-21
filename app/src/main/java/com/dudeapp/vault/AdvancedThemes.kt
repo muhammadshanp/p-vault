@@ -7,6 +7,9 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -127,8 +130,14 @@ fun AdvancedThemesScreen(
 
     AnimatedVisibility(
         visibleState = visible,
-        enter = fadeIn(tween(200)) + slideInHorizontally(tween(240)) { it / 5 },
-        exit = fadeOut(tween(140)) + slideOutHorizontally(tween(180)) { it / 5 },
+        enter = fadeIn(tween(180)) +
+            slideInHorizontally(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)) {
+                it / 4
+            },
+        // Leaving is quicker than arriving on purpose: going back should feel like being let
+        // go of, not like waiting for the screen to finish withdrawing.
+        exit = fadeOut(tween(120)) +
+            slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { it / 6 },
     ) {
         Box(Modifier.fillMaxSize()) {
             Backdrop()

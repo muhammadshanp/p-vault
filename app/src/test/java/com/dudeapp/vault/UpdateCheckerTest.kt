@@ -8,8 +8,9 @@ import org.junit.Test
 class UpdateCheckerTest {
     @Test
     fun passesInstalledVersionToTheUpdatePage() {
+        // Now the release tag itself, not the separate website: one less thing to keep in sync.
         assertEquals(
-            "https://muhammadshanp.github.io/p-vault-website/update.html?v=0.4.2",
+            "https://github.com/muhammadshanp/p-vault/releases/tag/v0.4.2",
             updatePageUrl("0.4.2"),
         )
     }

@@ -19,6 +19,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -538,6 +539,34 @@ private val VaultShapes = Shapes(
  * The app background. A plain colour for Light and Dark; a picture behind a dark wash for
  * the special looks, so text and cards stay readable on top of it.
  */
+/**
+ * The backdrop picture, decoded once and shared.
+ *
+ * Every tab draws the same Backdrop(), and each copy used to decode and halve its own bitmap
+ * from disk — five decodes of the same file, on the UI thread, every time a page was built.
+ * One cached bitmap keyed by path and modified time is enough: a backdrop changes when the
+ * person picks a different picture, and not otherwise.
+ */
+private object BackdropPicture {
+    private var key: String? = null
+    private var picture: ImageBitmap? = null
+
+    fun get(file: java.io.File): ImageBitmap? {
+        val stamp = file.absolutePath + ":" + file.lastModified() + ":" + file.length()
+        if (stamp == key) return picture
+        val loaded = runCatching {
+            val full = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                ?: return@runCatching null
+            val width = (full.width / 2).coerceAtLeast(1)
+            val height = (full.height / 2).coerceAtLeast(1)
+            android.graphics.Bitmap.createScaledBitmap(full, width, height, true).asImageBitmap()
+        }.getOrNull()
+        key = stamp
+        picture = loaded
+        return loaded
+    }
+}
+
 @Composable
 fun Backdrop() {
     val preset = LocalThemePreset.current
@@ -547,17 +576,8 @@ fun Backdrop() {
     // user's. While an image is chosen the theme only supplies the colours on top of it.
     val ownImage = CardPhotoFiles.background.value
     if (ownImage != null) {
-        val picture = remember(ownImage) {
-            runCatching {
-                val full = android.graphics.BitmapFactory.decodeFile(ownImage.absolutePath)
-                val small = android.graphics.Bitmap.createScaledBitmap(
-                    full,
-                    (full.width / 2).coerceAtLeast(1),
-                    (full.height / 2).coerceAtLeast(1),
-                    true,
-                )
-                small.asImageBitmap()
-            }.getOrNull()
+        val picture = remember(ownImage, ownImage.lastModified()) {
+            BackdropPicture.get(ownImage)
         }
         Box(Modifier.fillMaxSize()) {
             if (picture != null) {
@@ -624,10 +644,8 @@ fun Backdrop() {
         }
 
         is BackdropStyle.LocalFile -> Box(Modifier.fillMaxSize()) {
-            val picture = remember(style.file) {
-                android.graphics.BitmapFactory.decodeFile(style.file.absolutePath)
-                    ?.let { android.graphics.Bitmap.createScaledBitmap(it, it.width / 2, it.height / 2, true) }
-                    ?.asImageBitmap()
+            val picture = remember(style.file, style.file.lastModified()) {
+                BackdropPicture.get(style.file)
             }
             if (picture != null) {
                 Image(

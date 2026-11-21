@@ -170,7 +170,7 @@ fun AdminScreen(
     var body by remember { mutableStateOf("") }
     var confirmOpen by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(AdminPage.MESSAGE) }
-    val adminPages = listOf(AdminPage.MESSAGE, AdminPage.PEOPLE, AdminPage.ACCOUNT)
+    val adminPages = listOf(AdminPage.MESSAGE, AdminPage.ACCESS, AdminPage.PEOPLE, AdminPage.ACCOUNT)
     // What to do with the Google pass once it arrives.
     var afterToken by remember { mutableStateOf<((String) -> Unit)?>(null) }
 
@@ -288,7 +288,12 @@ fun AdminScreen(
             ) {
                 Spacer(Modifier.height(10.dp))
 
-                if (!signedIn) {
+                // The pages are always offered: Access is opened with the owner passphrase, not
+                // with a Google account, so it has to be reachable before signing in.
+                AdminPages(pages = adminPages, selected = page, onSelect = { page = it })
+                Spacer(Modifier.height(12.dp))
+
+                if (!signedIn && page != AdminPage.ACCESS) {
                     Column(
                         Modifier
                             .fillMaxWidth()
@@ -316,10 +321,8 @@ fun AdminScreen(
                         }
                     }
                 } else {
-                    Spacer(Modifier.height(6.dp))
-                    AdminPages(pages = adminPages, selected = page, onSelect = { page = it })
-                    Spacer(Modifier.height(12.dp))
                     when (page) {
+                        AdminPage.ACCESS -> AdminAccessCard()
                         AdminPage.PEOPLE -> {
                             SpecialAccessCard(
                                 busy = busy,
@@ -397,6 +400,7 @@ fun AdminScreen(
 /** The parts of the admin panel, each on its own page. */
 enum class AdminPage(val label: String) {
     MESSAGE("Message"),
+    ACCESS("Access"),
     PEOPLE("People"),
     NAMES("Names"),
     ACCOUNT("Account"),

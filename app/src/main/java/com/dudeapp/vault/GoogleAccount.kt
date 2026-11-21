@@ -6,7 +6,10 @@ import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -197,25 +201,28 @@ fun GoogleAccountSection(
             }
     }
 
+    val preColors = preReColors()
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-            .padding(14.dp),
+            .background(preColors.page)
+            .border(1.dp, preColors.divider, RoundedCornerShape(18.dp))
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "Google account",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+        Image(
+            painter = painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
         )
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = "Optional. P Vault works the same without it. Signing in only fills in your name and picture; your files stay on this phone.",
-            color = TextSoft,
-            fontSize = 12.sp,
-        )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
+        PreReAppName()
+        Spacer(Modifier.height(24.dp))
+        PreReHeading("Create an account")
+        Spacer(Modifier.height(2.dp))
+        PreReBody("Your name and picture come from Google. Nothing else is shared.")
+        Spacer(Modifier.height(24.dp))
         val signedInAs = email
         if (signedInAs != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -245,22 +252,14 @@ fun GoogleAccountSection(
                 }
             }
         } else {
-            Button(
+            // One action, named for what it does. An email box that Google then ignored
+            // looked like a form and behaved like a decoration.
+            PreRePrimaryButton(
+                label = "Continue with Google",
                 onClick = { signIn() },
+                busy = busy,
                 enabled = !busy,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Signing in...")
-                } else {
-                    Text("Sign in with Google", fontWeight = FontWeight.SemiBold)
-                }
-            }
+            )
         }
         if (special) {
             Spacer(Modifier.height(6.dp))

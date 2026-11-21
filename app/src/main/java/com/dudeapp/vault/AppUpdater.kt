@@ -29,12 +29,12 @@ suspend fun downloadUpdate(
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val temp = File(dir, "download.tmp")
-        val target = File(dir, "P-Vault-update.apk")
+        val target = File(dir, "p-vault-update.apk")
 
         val connection = URL(update.url).openConnection() as HttpURLConnection
         connection.connectTimeout = 10_000
         connection.readTimeout = 20_000
-        connection.setRequestProperty("User-Agent", "PVault")
+        connection.setRequestProperty("User-Agent", "P Vault")
         try {
             if (connection.responseCode != 200) return@runCatching null
             val total = connection.contentLengthLong
