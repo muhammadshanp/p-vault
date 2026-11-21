@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -110,6 +111,8 @@ fun ProfileSheet(
     name: String,
     avatar: File?,
     drive: DriveBackupState,
+    /** False when this name has not been given Drive backup. */
+    backupAllowed: Boolean = true,
     onPickPhoto: () -> Unit,
     onConnectDrive: () -> Unit,
     onDisconnectDrive: () -> Unit,
@@ -117,120 +120,12 @@ fun ProfileSheet(
     onRestoreFile: () -> Unit,
     onExternal: () -> Unit,
     onGoogleSignedIn: (GoogleUser) -> Unit,
-    /** True when a Google account is signed in; without one there is no identity, so no name. */
-    signedIn: Boolean,
-    /** True when the admin has fixed names: a name already taken can no longer be changed. */
-    namesFixed: Boolean,
-    /** The username this phone has, and whether it is settled with the database. */
-    username: String,
-    usernameConfirmed: Boolean,
-    /**
-     * Checks and keeps a name, with the Google pass that lets this phone write it. Reports
-     * back in words: null when the name was taken, a sentence when it was not.
-     */
-    onChangeUsername: suspend (String, String?) -> String?,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(name) { mutableStateOf(name) }
     // Seeded from what is saved, and never reset by the sheet reopening, so a name that was
     // just typed is not pulled back to the old one by a redraw.
-    var userDraft by remember { mutableStateOf(username) }
-    var userNote by remember(username) { mutableStateOf<String?>(null) }
-    var userBusy by remember { mutableStateOf(false) }
-    var userSaved by remember { mutableStateOf(username) }
-    var savedConfirmed by remember { mutableStateOf(usernameConfirmed) }
-    val userScope = rememberCoroutineScope()
-    val sheetContext = LocalContext.current
-    // A name waiting for Google's permission to be saved, and the pass it comes back with.
-    var pendingName by remember { mutableStateOf<String?>(null) }
-    // The Google pass, kept while the session is being made from it.
-    var pendingPass by remember { mutableStateOf<String?>(null) }
-
-    // Saves the name once a pass is in hand, and says what happened either way.
-    fun keepName(wanted: String, token: String?) {
-        userBusy = true
-        userScope.launch {
-            val problem = onChangeUsername(wanted, token)
-            userBusy = false
-            if (problem == null) {
-                userSaved = wanted
-                savedConfirmed = true
-                userNote = null
-            } else {
-                userNote = problem
-                // A name that could not be checked is still kept on this phone, so the note
-                // explains rather than blocks.
-                if (problem.contains("this phone", ignoreCase = true) ||
-                    problem.contains("could not be reserved", ignoreCase = true)
-                ) {
-                    userSaved = wanted
-                    savedConfirmed = false
-                }
-            }
-        }
-    }
-
-    // The account picker; its answer holds the ID token Firebase accepts as proof of identity.
-    val signInScreen = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result ->
-        val wanted = pendingName
-        val pass = pendingPass
-        pendingName = null
-        pendingPass = null
-        val activity = sheetContext.findActivity()
-        val idToken = activity?.let { FirebaseSession.idTokenFrom(it, result.data) }
-        if (idToken == null || wanted == null) {
-            userBusy = false
-            userNote = "Google sign-in was cancelled."
-            return@rememberLauncherForActivityResult
-        }
-        userScope.launch {
-            val session = FirebaseSession.signInWithIdToken(sheetContext, idToken)
-            if (session == null) {
-                userBusy = false
-                userNote = "Firebase refused the session. Google sign-in must be enabled for " +
-                    "P Vault in the Firebase console."
-            } else {
-                keepName(wanted, pass)
-            }
-        }
-    }
-
-    // Google's sign-in screen for a name: the answer carries the pass, and the token that
-    // proves who the person is.
-    val consent = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result ->
-        val wanted = pendingName
-        val pass = tokenFromConsent(sheetContext, result.data)
-        if (wanted == null || pass == null) {
-            pendingName = null
-            userBusy = false
-            userNote = "Google sign-in was cancelled."
-            return@rememberLauncherForActivityResult
-        }
-        userScope.launch {
-            val activity = sheetContext.findActivity()
-            val sender = activity?.let { FirebaseSession.signInPendingIntent(it) }
-            if (activity == null || sender == null) {
-                pendingName = null
-                userBusy = false
-                userNote = "Google could not confirm the account. Sign out and in, then try again."
-            } else {
-                pendingPass = pass
-                runCatching {
-                    signInScreen.launch(IntentSenderRequest.Builder(sender).build())
-                }.onFailure {
-                    pendingName = null
-                    userBusy = false
-                    userNote = "Google's sign-in screen could not be opened."
-                }
-            }
-        }
-    }
-
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -254,7 +149,7 @@ fun ProfileSheet(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Stored on this phone. Google sign-in and Drive backup are optional.",
+                text = "Your name and photo stay on this phone. Only the name below is registered.",
                 color = TextSoft,
                 fontSize = 13.sp,
                 modifier = Modifier.align(Alignment.Start),
@@ -299,112 +194,22 @@ fun ProfileSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            // Usernames are unique and checked as they are typed; the name is kept only when
-            // the check passes, and the verdict is always said in words.
-            Spacer(Modifier.height(14.dp))
-            // A username belongs to a person, so it is only offered once a Google account is
-            // signed in: that is the only way to keep a name for someone and check it again
-            // on their next phone.
-            if (!signedIn) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Outlined.AlternateEmail,
-                        contentDescription = null,
-                        tint = TextSoft,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "Usernames need a Google account. Sign in below to pick yours.",
-                        color = TextSoft,
-                        fontSize = 12.sp,
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-            }
-            if (signedIn) OutlinedTextField(
-                value = userDraft,
-                onValueChange = { typed ->
-                    userDraft = normalizeUsername(typed).take(20)
-                    userNote = null
-                },
-                label = { Text("Username") },
-                // A fixed name is read-only: the field is shown, but there is nothing to change.
-                readOnly = namesFixed && userSaved.isNotEmpty(),
-                supportingText = {
-                    val clean = normalizeUsername(userDraft)
-                    val rule = nameProblemText(usernameProblem(clean))
-                    when {
-                        rule != null -> Text(rule, color = MaterialTheme.colorScheme.error)
-                        namesFixed && userSaved.isNotEmpty() ->
-                            Text("Fixed — this username cannot be changed.")
-                        clean == userSaved -> Text("Yours — tap it to pick a different name.")
-                        userNote != null -> Text(userNote.orEmpty(), color = MaterialTheme.colorScheme.error)
-                        else -> Text("Tap Keep to take this name.")
-                    }
-                },
-                isError = userNote != null || usernameProblem(normalizeUsername(userDraft)) != null,
-                singleLine = true,
-                leadingIcon = { Text("@", color = TextSoft) },
-                trailingIcon = {
-                    if (userBusy) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else if (!(namesFixed && userSaved.isNotEmpty()) &&
-                        normalizeUsername(userDraft).isNotEmpty() &&
-                        (normalizeUsername(userDraft) != userSaved || !savedConfirmed)
-                    ) {
-                        TextButton(
-                            onClick = {
-                                val wanted = normalizeUsername(userDraft)
-                                userBusy = true
-                                userNote = null
-                                userScope.launch {
-                                    // Google may need to ask first; that answer arrives through
-                                    // the launcher below, and the name is kept from there.
-                                    when (val answer = requestToken(sheetContext)) {
-                                        is TokenAnswer.Ready -> {
-                                            userBusy = false
-                                            keepName(wanted, answer.accessToken)
-                                        }
-                                        is TokenAnswer.Consent -> {
-                                            pendingName = wanted
-                                            runCatching {
-                                                consent.launch(
-                                                    IntentSenderRequest.Builder(answer.intentSender).build(),
-                                                )
-                                            }.onFailure {
-                                                userBusy = false
-                                                userNote = "Google sign-in could not be opened."
-                                            }
-                                        }
-                                        TokenAnswer.Failed -> {
-                                            userBusy = false
-                                            userNote = "Sign in with Google below, then tap Keep again."
-                                        }
-                                    }
-                                }
-                            },
-                        ) { Text("Keep") }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
             Spacer(Modifier.height(18.dp))
+            PreReNameCard()
+            Spacer(Modifier.height(12.dp))
             GoogleAccountSection(onExternal = onExternal, onSignedIn = onGoogleSignedIn)
             Spacer(Modifier.height(12.dp))
-            DriveBackupSection(
-                drive = drive,
-                onConnect = onConnectDrive,
-                onDisconnect = onDisconnectDrive,
-                onBackupNow = { onBackupNow(draft.trim()) },
-                onRestoreFile = onRestoreFile,
-            )
+            if (backupAllowed) {
+                DriveBackupSection(
+                    drive = drive,
+                    onConnect = onConnectDrive,
+                    onDisconnect = onDisconnectDrive,
+                    onBackupNow = { onBackupNow(draft.trim()) },
+                    onRestoreFile = onRestoreFile,
+                )
+            } else {
+                LockedFeature("Drive backup", "This name has not been given backup access.")
+            }
             Spacer(Modifier.height(18.dp))
             Button(
                 onClick = { onSave(draft.trim()) },
@@ -416,6 +221,31 @@ fun ProfileSheet(
             ) {
                 Text("Save profile", fontWeight = FontWeight.SemiBold)
             }
+        }
+    }
+}
+
+/** A feature that exists but has not been granted to this name. */
+@Composable
+private fun LockedFeature(title: String, detail: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Lock,
+            contentDescription = null,
+            tint = TextSoft,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(detail, color = TextSoft, fontSize = 12.sp)
         }
     }
 }

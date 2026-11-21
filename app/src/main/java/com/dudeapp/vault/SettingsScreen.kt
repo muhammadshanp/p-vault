@@ -277,7 +277,7 @@ fun SettingsScreen(
                     )
                 }
 
-                if (access.advanced) {
+                run {
                     SettingsGroup("Themes") {
                         SettingsItem(
                             icon = Icons.Outlined.Palette,

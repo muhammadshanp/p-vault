@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -100,8 +104,14 @@ fun ThemesScreen(
 
     AnimatedVisibility(
         visibleState = visible,
-        enter = fadeIn(tween(200)) + slideInHorizontally(tween(240)) { it / 5 },
-        exit = fadeOut(tween(140)) + slideOutHorizontally(tween(180)) { it / 5 },
+        enter = fadeIn(tween(180)) +
+            slideInHorizontally(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)) {
+                it / 4
+            },
+        // Leaving is quicker than arriving on purpose: going back should feel like being let
+        // go of, not like waiting for the screen to finish withdrawing.
+        exit = fadeOut(tween(120)) +
+            slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { it / 6 },
     ) {
         Box(Modifier.fillMaxSize()) {
             Backdrop()
@@ -120,6 +130,18 @@ fun ThemesScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                     Text("Themes", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // The same page tabs the admin panel uses, so the two screens read the same way.
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.Screen)
+                        .padding(top = 2.dp, bottom = 6.dp),
+                ) {
+                    ThemeTab(label = "Looks", active = true, enabled = true) {}
+                    ThemeTab(label = "Advanced", active = false, enabled = advancedOn, onClick = onAdvanced)
                 }
 
                 LazyVerticalGrid(
@@ -143,8 +165,8 @@ fun ThemesScreen(
                                 fontSize = 13.sp,
                             )
                             // Backgrounds and card pictures, kept apart, on their own page.
-                            // The page is the admin's own, so the entry is hidden for everyone else.
-                            if (access.advanced) {
+                            // Open to everyone: it is part of P Vault, not a privilege.
+                            run {
                             Spacer(Modifier.height(10.dp))
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
@@ -504,4 +526,47 @@ private fun SectionHeading(text: String) {
         color = TextSoft,
         modifier = Modifier.padding(top = 6.dp),
     )
+}
+
+/** One page tab, drawn exactly like the ones in the admin panel. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ThemeTab(
+    label: String,
+    active: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (active) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = if (enabled) 1f else 0.5f)
+        },
+        border = BorderStroke(
+            1.dp,
+            if (active) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+            },
+        ),
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            color = if (active) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.45f)
+            },
+            modifier = Modifier.padding(vertical = 9.dp),
+        )
+    }
 }

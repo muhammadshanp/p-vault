@@ -33,7 +33,7 @@ import org.json.JSONObject
  */
 
 internal const val THEME_CATALOGUE_URL =
-    "https://muhammadshanp.github.io/p-vault-website/themes.json"
+    "https://raw.githubusercontent.com/muhammadshanp/Pre-release-/main/android/theme-catalog/themes.json"
 
 /** A look that came from the catalogue rather than from this build. */
 data class DownloadedTheme(

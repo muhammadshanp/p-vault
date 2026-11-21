@@ -38,10 +38,10 @@ android {
         applicationId = "com.dudeapp.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 78
+        versionCode = 91
         // Kept a literal: release.yml reads this line to find the version. A name carrying
         // a dash ("0.5.48-pro") is published as a pre-release, so the app never offers it.
-        versionName = "0.5.48-pro"
+        versionName = "0.6.7-pro"
         // The pro build gets its own name under the icon, so the two are told apart at a
         // glance. Normal releases keep "P Vault".
         resValue("string", "app_name", if (versionName.orEmpty().contains('-')) "P Vault Pro" else "P Vault")

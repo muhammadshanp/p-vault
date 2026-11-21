@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,7 +69,6 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -439,6 +439,7 @@ fun ChatScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val preColors = preReColors()
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var messages by remember(chat.dir.absolutePath) { mutableStateOf<List<ChatMessage>>(emptyList()) }
@@ -670,41 +671,80 @@ fun ChatScreen(
                 .statusBarsPadding()
                 .imePadding(),
         ) {
+            // Header from the design: 56dp, chevron, 32dp avatar, name over a 50% line.
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .height(56.dp)
+                    .background(preColors.page)
+                    .padding(start = 4.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = preColors.ink,
+                        modifier = Modifier.size(24.dp),
+                    )
                 }
-                ChatAvatar(chat, 38.dp)
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
+                ChatAvatar(chat, 32.dp)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = chat.name,
-                        style = MaterialTheme.typography.titleMedium,
+                        color = preColors.ink,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = "Local chat",
-                        color = TextSoft,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    // The name this phone claimed, with the owner's tick when it has one.
+                    val identityPrefs = remember {
+                        context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE)
+                    }
+                    var identity by remember {
+                        mutableStateOf(identityPrefs.getString("claimed_name", null) to identityPrefs.getBoolean("verified", false))
+                    }
+                    DisposableEffect(identityPrefs) {
+                        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                            if (key == "claimed_name" || key == "verified") {
+                                identity = identityPrefs.getString("claimed_name", null) to identityPrefs.getBoolean("verified", false)
+                            }
+                        }
+                        identityPrefs.registerOnSharedPreferenceChangeListener(listener)
+                        onDispose { identityPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = identity.first?.let { "@$it" } ?: "On this phone",
+                            color = preColors.ink.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (identity.first != null && identity.second) {
+                            Spacer(Modifier.width(3.dp))
+                            VerifiedTick(12.dp)
+                        }
+                    }
                 }
                 IconButton(onClick = { pictureDialogOpen = true }) {
                     Icon(
                         imageVector = Icons.Outlined.AddAPhoto,
                         contentDescription = "Edit chat picture",
+                        tint = preColors.ink,
                         modifier = Modifier.size(20.dp),
                     )
                 }
             }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(preColors.divider),
+            )
 
             val selectedMessage = selected
             if (selectedMessage != null) {
@@ -804,9 +844,24 @@ fun ChatScreen(
                         .weight(1f)
                         .fillMaxWidth(),
                 ) {
-                    items(messages, key = { it.file.absolutePath }) { message ->
+                    itemsIndexed(messages, key = { _, m -> m.file.absolutePath }) { index, message ->
+                        val previous = messages.getOrNull(index - 1)
+                        val next = messages.getOrNull(index + 1)
+                        if (previous == null || dayStamp(previous.stamp) != dayStamp(message.stamp)) {
+                            Text(
+                                text = dayLabel(context, message.stamp),
+                                color = preColors.ink.copy(alpha = 0.45f),
+                                fontSize = 12.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp, bottom = 2.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                        }
                         MessageBubble(
                             message = message,
+                            first = previous == null || dayStamp(previous.stamp) != dayStamp(message.stamp),
+                            last = next == null || dayStamp(next.stamp) != dayStamp(message.stamp),
                             selected = selected?.file == message.file,
                             playing = playingFile?.absolutePath == message.attachment?.absolutePath,
                             onPlayVoice = { toggleVoice(message) },
@@ -861,30 +916,41 @@ fun ChatScreen(
                 }
             }
 
+            // The design's footer: a hairline rule, then field and actions on one 40dp line.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(preColors.divider),
+            )
             Row(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.Bottom,
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (editing == null) {
-                    IconButton(
+                    ComposerIcon(
+                        icon = Icons.Outlined.Image,
+                        description = "Share a photo",
+                        enabled = !recording,
                         onClick = {
                             onExternal()
                             photoPicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        enabled = !recording,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Image,
-                            contentDescription = "Share a photo",
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    IconButton(
+                    )
+                    ComposerIcon(
+                        icon = if (recording) Icons.Default.Stop else Icons.Outlined.Mic,
+                        description = if (recording) {
+                            "Stop and send voice note"
+                        } else {
+                            "Record a voice note"
+                        },
+                        enabled = !sending,
+                        tint = if (recording) MaterialTheme.colorScheme.error else null,
                         onClick = {
                             when {
                                 recording -> stopRecording(true)
@@ -893,40 +959,27 @@ fun ChatScreen(
                                 else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         },
-                        enabled = !sending,
-                    ) {
-                        Icon(
-                            imageVector = if (recording) Icons.Default.Stop else Icons.Outlined.Mic,
-                            contentDescription = if (recording) {
-                                "Stop and send voice note"
-                            } else {
-                                "Record a voice note"
-                            },
-                            tint = if (recording) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
+                    )
+                    Spacer(Modifier.width(4.dp))
                 }
-                OutlinedTextField(
+                PreReChatField(
                     value = draft,
                     onValueChange = { draft = it },
-                    placeholder = { Text(if (editing != null) "Edit message" else "Message") },
-                    maxLines = 4,
+                    placeholder = if (editing != null) "Edit message" else "Message...",
                     enabled = !recording,
-                    shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(focusRequester),
                 )
                 Spacer(Modifier.width(8.dp))
-                FilledIconButton(
-                    onClick = { send() },
-                    enabled = draft.isNotBlank() && !sending && !recording,
-                    modifier = Modifier.size(48.dp),
+                val canSend = draft.isNotBlank() && !sending && !recording
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(PreReControlShape)
+                        .background(if (canSend) preColors.primaryFill else preColors.border)
+                        .clickable(enabled = canSend) { send() },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = if (editing != null) {
@@ -935,6 +988,8 @@ fun ChatScreen(
                             Icons.AutoMirrored.Filled.Send
                         },
                         contentDescription = if (editing != null) "Save edit" else "Send",
+                        tint = if (canSend) preColors.onPrimaryFill else preColors.muted,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
@@ -1056,6 +1111,8 @@ fun ChatScreen(
 @Composable
 private fun MessageBubble(
     message: ChatMessage,
+    first: Boolean,
+    last: Boolean,
     selected: Boolean,
     playing: Boolean,
     onPlayVoice: () -> Unit,
@@ -1063,7 +1120,8 @@ private fun MessageBubble(
     onSelect: () -> Unit,
 ) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
+    val preColors = preReColors()
+    val shape = preReBubbleShape(mine = true, first = first, last = last)
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End,
@@ -1080,22 +1138,12 @@ private fun MessageBubble(
         }
         Column(
             Modifier
-                .widthIn(max = 300.dp)
+                .widthIn(max = 280.dp)
                 .clip(shape)
-                .background(
-                    if (selected) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    },
-                )
+                .background(preColors.bubbleMine)
                 .border(
-                    width = if (selected) 1.5.dp else 1.dp,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                    },
+                    width = if (selected) 2.dp else 0.dp,
+                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
                     shape = shape,
                 )
                 .combinedClickable(onClick = onSelect, onLongClick = onSelect)
@@ -1141,43 +1189,39 @@ private fun MessageBubble(
                             Icon(
                                 imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = if (playing) "Pause voice note" else "Play voice note",
+                                tint = preColors.onBubbleMine,
                             )
                         }
                         Spacer(Modifier.width(4.dp))
                         Column {
                             Text(
                                 text = "Voice message",
+                                color = preColors.onBubbleMine,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
                                 text = formatDuration(message.durationMs),
-                                color = TextSoft,
+                                color = preColors.onBubbleMine.copy(alpha = 0.65f),
                                 fontSize = 11.sp,
                             )
                         }
                     }
                 }
 
-                else -> Text(message.text, fontSize = 15.sp)
+                else -> Text(message.text, fontSize = 15.sp, color = preColors.onBubbleMine)
             }
             Spacer(Modifier.height(2.dp))
-            Row(
+            if (last) Row(
                 modifier = Modifier.align(Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = listTimeOf(context, message.stamp),
-                    color = TextSoft,
+                    color = preColors.onBubbleMine.copy(alpha = 0.6f),
                     fontSize = 10.sp,
                 )
-                Spacer(Modifier.width(3.dp))
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Saved on device",
-                    tint = TextSoft,
-                    modifier = Modifier.size(12.dp),
-                )
+
             }
         }
     }
@@ -1232,6 +1276,57 @@ private fun listTimeOf(context: Context, stamp: Long): String {
         timeOf(context, stamp)
     } else {
         DateFormat.getDateFormat(context).format(Date(stamp))
+    }
+}
+
+/** Midnight of the day a message was written, for grouping. */
+private fun dayStamp(stamp: Long): Long {
+    val calendar = Calendar.getInstance()
+    calendar.timeInMillis = stamp
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    calendar.set(Calendar.MILLISECOND, 0)
+    return calendar.timeInMillis
+}
+
+/** "Today", "Yesterday", or the date — the divider above a day's messages. */
+private fun dayLabel(context: android.content.Context, stamp: Long): String {
+    val today = dayStamp(System.currentTimeMillis())
+    return when (dayStamp(stamp)) {
+        today -> "Today"
+        today - 86_400_000L -> "Yesterday"
+        else -> DateUtils.formatDateTime(
+            context,
+            stamp,
+            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_ALL,
+        )
+    }
+}
+
+/** A composer action: 36dp tap target, 20dp glyph, ink at 70% unless told otherwise. */
+@Composable
+private fun ComposerIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    enabled: Boolean,
+    tint: Color? = null,
+    onClick: () -> Unit,
+) {
+    val colors = preReColors()
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = tint ?: colors.ink.copy(alpha = if (enabled) 0.7f else 0.25f),
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

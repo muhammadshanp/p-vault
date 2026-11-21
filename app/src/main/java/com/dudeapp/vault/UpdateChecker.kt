@@ -36,7 +36,7 @@ suspend fun checkForUpdate(currentVersion: String): AppUpdate? = withContext(Dis
 }
 
 internal fun updatePageUrl(currentVersion: String): String =
-    "https://muhammadshanp.github.io/p-vault-website/update.html?v=${URLEncoder.encode(currentVersion, "UTF-8")}"
+    "https://github.com/muhammadshanp/p-vault/releases/tag/v${URLEncoder.encode(currentVersion, "UTF-8")}"
 
 /** Direct APK download from the release; falls back to the /latest/download link. */
 internal fun apkDownloadUrl(json: JSONObject): String {
