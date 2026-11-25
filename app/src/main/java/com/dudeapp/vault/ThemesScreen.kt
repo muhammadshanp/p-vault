@@ -86,6 +86,11 @@ fun ThemesScreen(
     onAdvancedChange: (Boolean) -> Unit = {},
     /** Something advanced is in use, so the row can say so. */
     advancedInUse: Boolean = false,
+    /**
+     * Whether this account may see Advanced at all: the admin and people given
+     * "Theme + Advanced" or "Everything". Everyone else never learns it exists.
+     */
+    advancedAllowed: Boolean = true,
     /** The looks from the catalogue, already filtered to the ones this account may use. */
     catalogThemes: List<DownloadedTheme>,
     /** True while the catalogue is being fetched. */
@@ -141,7 +146,11 @@ fun ThemesScreen(
                         .padding(top = 2.dp, bottom = 6.dp),
                 ) {
                     ThemeTab(label = "Looks", active = true, enabled = true) {}
-                    ThemeTab(label = "Advanced", active = false, enabled = advancedOn, onClick = onAdvanced)
+                    // Advanced is not offered to an ordinary account at all: not greyed, not
+                    // explained, simply absent, as the owner asked.
+                    if (advancedAllowed) {
+                        ThemeTab(label = "Advanced", active = false, enabled = advancedOn, onClick = onAdvanced)
+                    }
                 }
 
                 LazyVerticalGrid(
@@ -165,8 +174,8 @@ fun ThemesScreen(
                                 fontSize = 13.sp,
                             )
                             // Backgrounds and card pictures, kept apart, on their own page.
-                            // Open to everyone: it is part of P Vault, not a privilege.
-                            run {
+                            // Only an account with Advanced access sees this entry.
+                            if (advancedAllowed) run {
                             Spacer(Modifier.height(10.dp))
                             Surface(
                                 shape = RoundedCornerShape(20.dp),

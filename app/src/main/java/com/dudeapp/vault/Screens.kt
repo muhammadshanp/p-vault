@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.filled.MoreVert
@@ -539,23 +540,39 @@ private fun ImageViewer(file: File, active: Boolean = true) {
             Modifier
                 .fillMaxSize()
                 .padding(horizontal = 48.dp)
-                .pointerInput(Unit) {
-                    // Two fingers zoom; one finger pans only while zoomed in. A one-finger
-                    // drag at normal size is left alone, so it swipes to the next photo.
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        do {
-                            val event = awaitPointerEvent()
-                            val fingers = event.changes.count { it.pressed }
-                            if (fingers >= 2 || scale > 1.01f) {
-                                scale = (scale * event.calculateZoom()).coerceIn(1f, 6f)
-                                offset = if (scale <= 1.01f) Offset.Zero else offset + event.calculatePan()
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
-                            }
-                        } while (event.changes.any { it.pressed })
-                    }
-                },
+                .pinchToZoom(
+                    onZoom = { factor -> scale = (scale * factor).coerceIn(1f, 6f) },
+                    onPan = { delta ->
+                        offset = if (scale <= 1.01f) Offset.Zero else offset + delta
+                    },
+                    // A one-finger drag at normal size is left alone, so a pager above can
+                    // still swipe to the next photo or page.
+                    panning = { scale > 1.01f },
+                ),
         )
+    }
+}
+
+/**
+ * Two fingers zoom; one finger pans only while [panning] says so. Used by the photo viewer
+ * and every PDF page, so a document zooms exactly the way a photo does.
+ */
+private fun Modifier.pinchToZoom(
+    onZoom: (Float) -> Unit,
+    onPan: (Offset) -> Unit,
+    panning: () -> Boolean,
+): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        do {
+            val event = awaitPointerEvent()
+            val fingers = event.changes.count { it.pressed }
+            if (fingers >= 2 || panning()) {
+                onZoom(event.calculateZoom())
+                onPan(event.calculatePan())
+                event.changes.forEach { if (it.positionChanged()) it.consume() }
+            }
+        } while (event.changes.any { it.pressed })
     }
 }
 
@@ -629,16 +646,52 @@ private fun PdfPage(file: File, index: Int) {
         }
     }
 
+    // Each page keeps its own zoom, so scrolling away and back does not reset it.
+    var scale by remember(file, index) { mutableFloatStateOf(1f) }
+    var offset by remember(file, index) { mutableStateOf(Offset.Zero) }
+
     val pageBitmap = bitmap
     if (pageBitmap != null) {
-        Image(
-            bitmap = pageBitmap.asImageBitmap(),
-            contentDescription = "Page ${index + 1}",
-            contentScale = ContentScale.FillWidth,
-            modifier = Modifier
+        Box(
+            Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp)),
-        )
+                .clip(RoundedCornerShape(10.dp))
+                .clipToBounds(),
+        ) {
+            Image(
+                bitmap = pageBitmap.asImageBitmap(),
+                contentDescription = "Page ${index + 1}",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+            )
+            // A double tap puts the page back to full width, the quickest way out of a zoom.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .pinchToZoom(
+                        onZoom = { factor -> scale = (scale * factor).coerceIn(1f, 6f) },
+                        onPan = { delta ->
+                            offset = if (scale <= 1.01f) Offset.Zero else offset + delta
+                        },
+                        panning = { scale > 1.01f },
+                    )
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                scale = 1f
+                                offset = Offset.Zero
+                            },
+                        )
+                    },
+            )
+        }
     } else {
         Box(
             Modifier

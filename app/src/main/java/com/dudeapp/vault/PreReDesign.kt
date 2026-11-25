@@ -147,6 +147,9 @@ internal fun PreReChatField(
  */
 internal val PreReVerifiedBlue = Color(0xFF1D9BF0)
 
+/** The partner tick. Black, so a partner is never mistaken for the owner. */
+internal val PreRePartnerBlack = Color(0xFF111111)
+
 @Composable
 internal fun VerifiedTick(size: androidx.compose.ui.unit.Dp = 14.dp) {
     Icon(
@@ -155,6 +158,26 @@ internal fun VerifiedTick(size: androidx.compose.ui.unit.Dp = 14.dp) {
         tint = PreReVerifiedBlue,
         modifier = Modifier.size(size),
     )
+}
+
+@Composable
+internal fun PartnerTick(size: androidx.compose.ui.unit.Dp = 14.dp) {
+    Icon(
+        imageVector = androidx.compose.material.icons.Icons.Filled.Verified,
+        contentDescription = "Partner",
+        tint = PreRePartnerBlack,
+        modifier = Modifier.size(size),
+    )
+}
+
+/** Draws whichever tick this account holds, if any. */
+@Composable
+internal fun AccessTickMark(tick: AccessTick, size: androidx.compose.ui.unit.Dp = 14.dp) {
+    when (tick) {
+        AccessTick.Blue -> VerifiedTick(size)
+        AccessTick.Black -> PartnerTick(size)
+        AccessTick.None -> Unit
+    }
 }
 
 /** 8dp everywhere in the design's controls: fields, buttons, cards. */

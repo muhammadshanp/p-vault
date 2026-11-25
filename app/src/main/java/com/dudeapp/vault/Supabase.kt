@@ -137,6 +137,7 @@ internal object Supabase {
         val level: String,
         val features: List<String>,
         val verified: Boolean = false,
+        val partner: Boolean = false,
     )
 
     /** Every claimed name. Null means the passphrase was wrong or the server was unreachable. */
@@ -155,6 +156,7 @@ internal object Supabase {
                         (0 until list.length()).mapNotNull { list.optString(it).takeIf(String::isNotEmpty) }
                     }.orEmpty(),
                     verified = row.optBoolean("verified"),
+                    partner = row.optBoolean("partner"),
                 )
             }
         }
@@ -185,6 +187,7 @@ internal object Supabase {
         val features: List<String>,
         val granted: Boolean,
         val verified: Boolean = false,
+        val partner: Boolean = false,
     )
 
     suspend fun myAccess(context: Context, username: String): RemoteAccess? =
@@ -201,7 +204,81 @@ internal object Supabase {
                 }.orEmpty(),
                 granted = row.optBoolean("granted"),
                 verified = row.optBoolean("verified"),
+                partner = row.optBoolean("partner"),
             )
+        }
+
+    /** What the name this phone holds may do, with both ticks. One call, used at startup. */
+    suspend fun myGrant(context: Context): RemoteAccess? = withContext(Dispatchers.IO) {
+        val json = rpc("pre_re_my_grant", JSONObject().put("p_device", deviceId(context)))
+            ?: return@withContext null
+        val row = json.optJSONArray("value")?.optJSONObject(0) ?: json
+        RemoteAccess(
+            level = row.optString("level").ifBlank { "NONE" },
+            features = row.optJSONArray("features")?.let { list ->
+                (0 until list.length()).mapNotNull { list.optString(it).takeIf(String::isNotEmpty) }
+            }.orEmpty(),
+            granted = row.optBoolean("granted"),
+            verified = row.optBoolean("verified"),
+            partner = row.optBoolean("partner"),
+        )
+    }
+
+    /** Blue for the admin role, black for a partner, none to clear both. */
+    suspend fun adminSetTick(
+        context: Context,
+        passphrase: String,
+        name: String,
+        tick: String,
+    ): String? = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+            .put("p_key", keyHash(passphrase))
+            .put("p_username", normalizeUsername(name))
+            .put("p_tick", tick)
+        rpc("pre_re_admin_set_tick", body)?.optString("status")?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * Whether this address may open the admin panel. A plain yes/no, so the app needs no
+     * passphrase to know, and the owner list is never handed out to a signed-in account.
+     */
+    suspend fun isOwner(context: Context, email: String): Boolean = withContext(Dispatchers.IO) {
+        if (email.isBlank()) return@withContext false
+        val json = rpc("pre_re_is_owner", JSONObject().put("p_email", email.trim().lowercase()))
+            ?: return@withContext false
+        json.optBoolean("value") || json.optBoolean("pre_re_is_owner")
+    }
+
+    data class Owner(val email: String, val note: String)
+
+    /** The Google addresses that may open the admin panel. */
+    suspend fun adminOwners(context: Context, passphrase: String): Pair<List<Owner>, Boolean> =
+        withContext(Dispatchers.IO) {
+            val json = rpc("pre_re_admin_owners", JSONObject().put("p_key", keyHash(passphrase)))
+                ?: return@withContext emptyList<Owner>() to false
+            if (json.optString("status") == "bad_key") return@withContext emptyList<Owner>() to false
+            val rows = json.optJSONArray("owners") ?: org.json.JSONArray()
+            val owners = (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                Owner(row.optString("email"), row.optString("note"))
+            }
+            owners to true
+        }
+
+    suspend fun adminAddOwner(context: Context, passphrase: String, email: String): String? =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject()
+                .put("p_key", keyHash(passphrase))
+                .put("p_email", email.trim().lowercase())
+            rpc("pre_re_admin_owner_add", body)?.optString("status")?.takeIf { it.isNotEmpty() }
+        }
+
+    suspend fun adminRemoveOwner(context: Context, passphrase: String, email: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject()
+                .put("p_key", keyHash(passphrase))
+                .put("p_email", email.trim().lowercase())
+            rpc("pre_re_admin_owner_remove", body)?.optString("status") == "ok"
         }
 
     /** The name this phone holds, as the server knows it. Null when it holds none. */

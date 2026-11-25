@@ -53,6 +53,22 @@ import org.json.JSONObject
 /** What Google tells the app about the account that signed in. */
 data class GoogleUser(val email: String, val name: String, val picture: String)
 
+/**
+ * Forgets the account Google last used with this app, so the next sign-in shows the account
+ * picker instead of replaying the previous account. `AuthorizationRequest` in this version
+ * has no prompt option, so the cached choice is cleared with the sign-in client instead.
+ */
+internal fun forgetGoogleChoice(context: Context) {
+    runCatching {
+        val options = com.google.android.gms.auth.api.signin.GoogleSignInOptions
+            .Builder(com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .build()
+        com.google.android.gms.auth.api.signin.GoogleSignIn
+            .getClient(context, options)
+            .signOut()
+    }
+}
+
 /** Reads Google's answer to "who is this". Null when it holds no email address. */
 internal fun parseGoogleUser(json: String): GoogleUser? = runCatching {
     val data = JSONObject(json)

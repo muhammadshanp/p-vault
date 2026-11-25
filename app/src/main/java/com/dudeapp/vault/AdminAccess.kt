@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +63,8 @@ internal fun AdminAccessCard() {
     var reserved by remember { mutableStateOf<List<Supabase.ReservedName>>(emptyList()) }
     var saving by remember { mutableStateOf<String?>(null) }
     var reserveDraft by remember { mutableStateOf("") }
+    var owners by remember { mutableStateOf<List<Supabase.Owner>>(emptyList()) }
+    var ownerDraft by remember { mutableStateOf("") }
     var reserveNote by remember { mutableStateOf("") }
     // The name being changed, and the field it is being changed to.
     var renameTarget by remember { mutableStateOf<Supabase.RemoteName?>(null) }
@@ -74,6 +77,7 @@ internal fun AdminAccessCard() {
             val valid = Supabase.isAdminKey(context, passphrase)
             val list = if (valid) Supabase.adminNames(context, passphrase) else null
             val held = if (valid) Supabase.adminReserved(context, passphrase) else null
+            val adminList = if (valid) Supabase.adminOwners(context, passphrase) else null
             busy = false
             if (list == null || held == null) {
                 problem = "The passphrase was not accepted, or the server could not be reached."
@@ -81,6 +85,7 @@ internal fun AdminAccessCard() {
             } else {
                 names = list
                 reserved = held
+                if (adminList != null && adminList.second) owners = adminList.first
                 unlocked = true
             }
         }
@@ -159,17 +164,29 @@ internal fun AdminAccessCard() {
                         renameDraft = name.username
                         problem = null
                     },
-                    onVerify = { wanted ->
+                    onTick = { tick ->
+                        val wanted = when (tick) {
+                            AccessTick.Blue -> "blue"
+                            AccessTick.Black -> "black"
+                            AccessTick.None -> "none"
+                        }
                         scope.launch {
-                            val ok = Supabase.adminVerify(context, passphrase, name.username, wanted)
-                            if (ok) {
+                            val status = Supabase.adminSetTick(context, passphrase, name.username, wanted)
+                            if (status == "ok") {
                                 names = names.map {
-                                    if (it.username == name.username) it.copy(verified = wanted) else it
+                                    if (it.username == name.username) {
+                                        it.copy(
+                                            verified = tick == AccessTick.Blue,
+                                            partner = tick == AccessTick.Black,
+                                        )
+                                    } else {
+                                        it
+                                    }
                                 }
-                                problem = if (wanted) {
-                                    "@${name.username} now wears the tick."
-                                } else {
-                                    "The tick was taken off @${name.username}."
+                                problem = when (tick) {
+                                    AccessTick.Blue -> "@${name.username} wears the blue tick."
+                                    AccessTick.Black -> "@${name.username} wears the black tick."
+                                    AccessTick.None -> "The tick was taken off @${name.username}."
                                 }
                             } else {
                                 problem = "Could not change the tick. Check the connection."
@@ -300,6 +317,85 @@ internal fun AdminAccessCard() {
                     }
                 }
             }
+
+            // ---- who may open the admin panel ----
+            Spacer(Modifier.height(18.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            Spacer(Modifier.height(14.dp))
+            Text("Admin accounts", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "A Google address on this list sees the admin panel the moment it signs in, and " +
+                    "loses it when it signs out. Nothing else is needed.",
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = ownerDraft,
+                    onValueChange = { ownerDraft = it.trim().take(80); problem = null },
+                    label = { Text("Google address") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val wanted = cleanEmail(ownerDraft)
+                        if (wanted == null) {
+                            problem = "That does not look like an email address."
+                            return@Button
+                        }
+                        busy = true
+                        scope.launch {
+                            val status = Supabase.adminAddOwner(context, passphrase, wanted)
+                            busy = false
+                            problem = when (status) {
+                                "ok" -> {
+                                    ownerDraft = ""
+                                    owners = owners.filterNot { it.email == wanted } + Supabase.Owner(wanted, "")
+                                    "@$wanted can open the admin panel now."
+                                }
+                                null -> "Could not reach the server."
+                                else -> "That address was refused ($status)."
+                            }
+                        }
+                    },
+                    enabled = ownerDraft.isNotBlank() && !busy,
+                    shape = RoundedCornerShape(14.dp),
+                ) { Text("Add") }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (owners.isEmpty()) {
+                Text("No admin addresses yet.", color = TextSoft, fontSize = 12.sp)
+            } else {
+                owners.forEach { owner ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(owner.email, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val ok = Supabase.adminRemoveOwner(context, passphrase, owner.email)
+                                    if (ok) {
+                                        owners = owners.filterNot { it.email == owner.email }
+                                        problem = "${owner.email} can no longer open the admin panel."
+                                    } else {
+                                        problem = "Could not remove ${owner.email}."
+                                    }
+                                }
+                            },
+                        ) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Remove this admin")
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -374,7 +470,7 @@ private fun NameAccessRow(
     name: Supabase.RemoteName,
     saving: Boolean,
     onRename: () -> Unit,
-    onVerify: (Boolean) -> Unit,
+    onTick: (AccessTick) -> Unit,
     onSave: (String, List<String>) -> Unit,
 ) {
     var level by remember(name.username, name.level) { mutableStateOf(name.level) }
@@ -391,9 +487,12 @@ private fun NameAccessRow(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("@${name.username}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        if (name.verified) {
+                        if (name.verified || name.partner) {
                             Spacer(Modifier.width(4.dp))
-                            VerifiedTick(14.dp)
+                            TickBadge(
+                                if (name.verified) AccessTick.Blue else AccessTick.Black,
+                                14.dp,
+                            )
                         }
                     }
                     Text(
@@ -461,15 +560,24 @@ private fun NameAccessRow(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Blue tick", fontSize = 13.sp)
+                    Text("Tick", fontSize = 13.sp)
                     Text(
-                        "Marks this name as the owner's.",
+                        "Blue for the admin role, black for a partner.",
                         color = TextSoft,
                         fontSize = 11.sp,
                     )
                 }
-                Switch(checked = name.verified, onCheckedChange = onVerify)
             }
+            Spacer(Modifier.height(6.dp))
+            TickChooser(
+                selected = when {
+                    name.verified -> AccessTick.Blue
+                    name.partner -> AccessTick.Black
+                    else -> AccessTick.None
+                },
+                enabled = !saving,
+                onSelect = onTick,
+            )
 
             AccessFeature.entries.forEach { feature ->
                 Row(

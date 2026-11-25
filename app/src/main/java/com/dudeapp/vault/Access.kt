@@ -87,6 +87,9 @@ enum class AccessLevel(val label: String, val detail: String) {
     }
 }
 
+/** The mark beside a name. Blue is the owner's role, black is a partner. */
+enum class AccessTick { None, Blue, Black }
+
 /** The switches that can be given one name at a time; more can be added over time. */
 enum class AccessFeature(val label: String, val detail: String) {
     BACKUP("Drive backup", "Back up to a Drive folder and restore from it."),
@@ -241,9 +244,25 @@ data class MyAccess(
     val looks: Set<String> = emptySet(),
     /** The admin keeps everything, whatever the list says. */
     val admin: Boolean = false,
+    /** The name this phone holds, as the name service knows it. */
+    val username: String? = null,
+    /** The blue tick (admin role) and the black tick (partner), as granted by the owner. */
+    val verified: Boolean = false,
+    val partner: Boolean = false,
 ) {
     val theme: Boolean get() = admin || level.allows(AccessLevel.THEME)
     val advanced: Boolean get() = admin || level.allows(AccessLevel.ADVANCED)
+
+    /**
+     * Which tick to draw beside the name: blue for the admin role, black for a partner,
+     * nothing otherwise. Blue wins when both are set, so two ticks never compete.
+     */
+    val tick: AccessTick
+        get() = when {
+            verified -> AccessTick.Blue
+            partner -> AccessTick.Black
+            else -> AccessTick.None
+        }
 
     fun has(feature: AccessFeature): Boolean = admin || feature in features
 
@@ -331,7 +350,46 @@ class AccessStore(private val context: Context) {
         val features = prefs.getStringSet("features", emptySet()).orEmpty()
             .mapNotNull(AccessFeature::of).toSet()
         val looks = prefs.getStringSet("looks", emptySet()).orEmpty()
-        return MyAccess(level = level, features = features, looks = looks, admin = admin)
+        return MyAccess(
+            level = level,
+            features = features,
+            looks = looks,
+            admin = admin,
+            username = prefs.getString("username", null),
+            verified = prefs.getBoolean("verified", false),
+            partner = prefs.getBoolean("partner", false),
+        )
+    }
+
+    /** The name this phone holds, and what the owner granted it. One call on startup. */
+    suspend fun refreshGrant(): MyAccess = withContext(Dispatchers.IO) {
+        val grant = Supabase.myGrant(context)
+        if (grant != null && grant.granted) {
+            prefs.edit()
+                .putString("level", grant.level)
+                .putStringSet("features", grant.features.toSet())
+                .putBoolean("verified", grant.verified)
+                .putBoolean("partner", grant.partner)
+                .apply()
+        } else if (grant != null) {
+            // Not held by this phone: nothing to grant. Offline keeps the last answer.
+            prefs.edit().remove("level").remove("features").remove("verified").remove("partner").apply()
+        }
+        val name = runCatching { Supabase.myName(context) }.getOrNull()
+        if (name != null) prefs.edit().putString("username", name).apply()
+        access()
+    }
+
+    /** Re-read the ticks alone, for the moments after the owner changes one. */
+    suspend fun refreshTicks(): MyAccess {
+        val grant = Supabase.myGrant(context)
+        if (grant != null && grant.granted) {
+            prefs.edit()
+                .putBoolean("verified", grant.verified)
+                .putBoolean("partner", grant.partner)
+                .apply()
+        }
+        return access()
     }
 
     /** True for the admin and for a signed-in address on the admin's list. */

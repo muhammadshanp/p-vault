@@ -51,11 +51,12 @@ internal object FirebaseSession {
                         .GoogleIdTokenRequestOptions.builder()
                         .setSupported(true)
                         .setServerClientId(WEB_CLIENT_ID)
-                        // The account already signed in to the phone is the one offered.
-                        .setFilterByAuthorizedAccounts(true)
+                        // Every account on the phone, not only the one used last time: after
+                        // a sign-out the app must be able to take a different account.
+                        .setFilterByAuthorizedAccounts(false)
                         .build(),
                 )
-                .setAutoSelectEnabled(true)
+                .setAutoSelectEnabled(false)
                 .build()
             com.google.android.gms.auth.api.identity.Identity.getSignInClient(activity)
                 .beginSignIn(request)

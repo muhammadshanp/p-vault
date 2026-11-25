@@ -16,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileDownload
@@ -104,6 +105,8 @@ fun SettingsScreen(
     onExport: () -> Unit,
     onImport: () -> Unit,
     onClearData: () -> Unit,
+    /** Opens the account page; the settings sheet points at it rather than repeating it. */
+    onProfile: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -166,17 +169,17 @@ fun SettingsScreen(
 
                 // App card: version at a glance, and the update button when there is one.
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
+                    shape = RoundedCornerShape(22.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(Modifier.padding(18.dp)) {
+                    Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(14.dp))
                                     .background(MaterialTheme.colorScheme.primary),
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -188,185 +191,65 @@ fun SettingsScreen(
                             }
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("P Vault", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("P Vault", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                                 Text(
                                     if (update != null) "Version $version · ${update.version} is available" else "Version $version · up to date",
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                 )
                             }
-                        }
-                        if (update != null) {
-                            Spacer(Modifier.height(14.dp))
-                            Button(onClick = onUpdate, modifier = Modifier.fillMaxWidth()) {
-                                Text("Update to ${update.version}")
+                            if (update != null) {
+                                TextButton(onClick = onUpdate) { Text("Update") }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(22.dp))
 
-                SettingsGroup("Appearance") {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        FREE_THEMES.forEach { preset ->
-                            ThemeCard(
-                                preset = preset,
-                                selected = preset == theme,
-                                onClick = { onTheme(preset) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                    // The picture themes live on their own page; it is in the menu for
-                    // people with special access, and reachable from here too.
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable(onClick = onThemes)
-                            .padding(horizontal = Spacing.Screen, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Outlined.Palette,
-                            contentDescription = null,
-                            tint = TextSoft,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("More themes", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                            Text(
-                                if (access.theme) {
-                                    "Picture themes: Grand Line, Racing, Shinobi and more."
-                                } else {
-                                    "Picture themes are locked. Ask the admin for special access."
-                                },
-                                color = TextSoft,
-                                fontSize = 12.sp,
-                            )
-                        }
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = TextSoft,
-                        )
-                    }
+                SheetGap(18.dp)
+                SettingsSheetLabel("Account")
+                SettingsSheet {
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.AccountCircle,
+                        title = "Profile",
+                        value = access.username?.let { "@$it" },
+                        onClick = onProfile,
+                    )
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Palette,
+                        title = "Theme",
+                        value = theme.label,
+                        onClick = onThemes,
+                    )
                 }
 
-                SettingsGroup("Photos and PDFs") {
-                    SettingsItem(
+                SheetGap()
+                SettingsSheetLabel("Preferences")
+                SettingsSheet {
+                    SettingsSheetRow(
                         icon = Icons.Outlined.ViewAgenda,
-                        tint = Accent.Pdf,
-                        title = "Show as cards or list",
-                        subtitle = if (settings.cardsAsList) {
-                            "One row per item, with its name and date."
-                        } else {
-                            "Cards in a grid, two across."
-                        },
-                        trailing = {
-                            OnOffSwitch(
-                                checked = settings.cardsAsList,
-                                onCheckedChange = { onSettings(settings.copy(cardsAsList = it)) },
-                            )
-                        },
-                    )
-                }
-
-                run {
-                    SettingsGroup("Themes") {
-                        SettingsItem(
-                            icon = Icons.Outlined.Palette,
-                            tint = Accent.Reel,
-                            title = "Advanced mode",
-                            subtitle = if (settings.advancedMode) {
-                                "The Advanced page and bundles are in the Theme page."
-                            } else {
-                                "Hidden: the theme's own background and cards are used."
-                            },
-                            trailing = {
-                                OnOffSwitch(
-                                    checked = settings.advancedMode,
-                                    onCheckedChange = { onSettings(settings.copy(advancedMode = it)) },
-                                )
-                            },
+                        title = "Photos and PDFs",
+                        value = if (settings.cardsAsList) "List" else "Cards",
+                    ) {
+                        OnOffSwitch(
+                            checked = settings.cardsAsList,
+                            onCheckedChange = { onSettings(settings.copy(cardsAsList = it)) },
                         )
                     }
-                }
-
-                SettingsGroup("Security") {
-                    SettingsItem(
-                        icon = Icons.Outlined.Lock,
-                        tint = Accent.Photo,
-                        title = "App lock",
-                        subtitle = "Ask for your PIN when P Vault opens.",
-                        trailing = {
-                            OnOffSwitch(
-                                checked = settings.appLock,
-                                onCheckedChange = { onSettings(settings.copy(appLock = it)) },
-                            )
-                        },
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Palette,
+                        title = "Advanced mode",
+                        value = if (settings.advancedMode) "On" else "Off",
                     ) {
-                        if (!settings.appLock) {
-                            Text(
-                                "App lock is off. Anyone with this phone can open the vault.",
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = 12.sp,
-                            )
-                        }
-                    }
-                    SettingsDivider()
-                    SettingsItem(
-                        icon = Icons.Outlined.Key,
-                        tint = Accent.Photo,
-                        title = "Change PIN",
-                        subtitle = "Use 4 to 6 digits.",
-                        onClick = { changePinOpen = true },
-                    )
-                    SettingsDivider()
-                    SettingsItem(
-                        icon = Icons.Outlined.Fingerprint,
-                        tint = Accent.Photo,
-                        title = "Fingerprint unlock",
-                        subtitle = if (biometricsAvailable) {
-                            "Unlock with your fingerprint."
-                        } else {
-                            "No fingerprint is set up on this device."
-                        },
-                        trailing = {
-                            OnOffSwitch(
-                                checked = settings.biometricUnlock && biometricsAvailable,
-                                onCheckedChange = { onSettings(settings.copy(biometricUnlock = it)) },
-                                enabled = biometricsAvailable,
-                            )
-                        },
-                    )
-                    SettingsDivider()
-                    SettingsItem(
-                        icon = Icons.Outlined.Timer,
-                        tint = Accent.Photo,
-                        title = "Auto-lock after",
-                        subtitle = "Lock the app after you leave it. Shorter is safer.",
-                    ) {
-                        ChoiceChips(
-                            options = LOCK_DELAY_OPTIONS,
-                            selected = settings.lockDelaySeconds,
-                            label = ::lockDelayLabel,
-                            onSelect = { onSettings(settings.copy(lockDelaySeconds = it)) },
+                        OnOffSwitch(
+                            checked = settings.advancedMode,
+                            onCheckedChange = { onSettings(settings.copy(advancedMode = it)) },
                         )
                     }
-                }
-
-                SettingsGroup("Notifications") {
-                    SettingsItem(
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Notifications,
-                        tint = Accent.Reel,
-                        title = "Push notifications",
-                        subtitle = "News from the P Vault team and update alerts. Tap to turn them on or off in Android's settings.",
+                        title = "Notifications",
                         onClick = {
                             runCatching {
                                 context.startActivity(
@@ -379,131 +262,154 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsGroup("Backup") {
-                    SettingsItem(
+                SheetGap()
+                SettingsSheetLabel("Privacy and security")
+                SettingsSheet {
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Lock,
+                        title = "App lock",
+                        value = if (settings.appLock) "On" else "Off",
+                    ) {
+                        OnOffSwitch(
+                            checked = settings.appLock,
+                            onCheckedChange = { onSettings(settings.copy(appLock = it)) },
+                        )
+                    }
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Key,
-                        tint = Accent.Chat,
+                        title = "Change PIN",
+                        onClick = { changePinOpen = true },
+                    )
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Fingerprint,
+                        title = "Fingerprint unlock",
+                        value = if (!biometricsAvailable) "Unavailable" else if (settings.biometricUnlock) "On" else "Off",
+                    ) {
+                        OnOffSwitch(
+                            checked = settings.biometricUnlock && biometricsAvailable,
+                            onCheckedChange = { onSettings(settings.copy(biometricUnlock = it)) },
+                            enabled = biometricsAvailable,
+                        )
+                    }
+                }
+                Column(Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
+                    Text("Auto-lock", color = TextSoft, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    ChoiceChips(
+                        options = LOCK_DELAY_OPTIONS,
+                        selected = settings.lockDelaySeconds,
+                        label = ::lockDelayLabel,
+                        onSelect = { onSettings(settings.copy(lockDelaySeconds = it)) },
+                    )
+                }
+
+                SheetGap()
+                SettingsSheetLabel("Backup")
+                SettingsSheet {
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Key,
                         title = "Backup password",
-                        subtitle = if (backupProtected) {
-                            "On. Backups and exports are encrypted. Tap to change or turn off."
-                        } else {
-                            "Off. Anyone who can open your Drive folder can read the backups."
-                        },
+                        value = if (backupProtected) "On" else "Off",
                         onClick = { backupPasswordOpen = true },
                     )
-                    SettingsDivider()
-                    SettingsItem(
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Backup,
-                        tint = Accent.Chat,
                         title = "Auto-backup",
-                        subtitle = "Back up shortly after a change while P Vault is open.",
-                        trailing = {
-                            OnOffSwitch(
-                                checked = settings.autoBackup,
-                                onCheckedChange = { onSettings(settings.copy(autoBackup = it)) },
-                            )
-                        },
-                    )
-                    SettingsDivider()
-                    SettingsItem(
+                        value = if (settings.autoBackup) "On" else "Off",
+                    ) {
+                        OnOffSwitch(
+                            checked = settings.autoBackup,
+                            onCheckedChange = { onSettings(settings.copy(autoBackup = it)) },
+                        )
+                    }
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Schedule,
-                        tint = Accent.Chat,
                         title = "Backup reminder",
-                        subtitle = "Ask me when my newest backup is older than this.",
-                    ) {
-                        ChoiceChips(
-                            options = REMINDER_DAY_OPTIONS,
-                            selected = settings.reminderDays,
-                            label = ::reminderLabel,
-                            onSelect = { onSettings(settings.copy(reminderDays = it)) },
-                        )
-                    }
-                    SettingsDivider()
-                    SettingsItem(
+                        value = reminderLabel(settings.reminderDays),
+                        onClick = null,
+                    )
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Inventory2,
-                        tint = Accent.Chat,
                         title = "Backups kept",
-                        subtitle = "Delete older P Vault backups from the connected Drive folder.",
-                    ) {
-                        ChoiceChips(
-                            options = KEEP_BACKUP_OPTIONS,
-                            selected = settings.keepBackups,
-                            label = { it.toString() },
-                            onSelect = { onSettings(settings.copy(keepBackups = it)) },
-                        )
-                    }
-                    SettingsDivider()
-                    SettingsItem(
+                        value = settings.keepBackups.toString(),
+                    )
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Storage,
-                        tint = Accent.Chat,
                         title = "Backup size limit",
-                        subtitle = "The most Drive space P Vault's backups may use." +
-                            if (lastBackupBytes > 0L) " Your last backup was ${sizeLabel(lastBackupBytes)}." else "",
-                    ) {
-                        ChoiceChips(
-                            options = BACKUP_LIMIT_OPTIONS,
-                            selected = settings.backupLimitGb,
-                            label = { if (it == 0) "No limit" else "$it GB" },
-                            onSelect = { onSettings(settings.copy(backupLimitGb = it)) },
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        val limit = settings.backupLimitGb
-                        val beyondFree = limit == 0 || limit > FREE_DRIVE_GB
-                        Text(
-                            text = when {
-                                beyondFree ->
-                                    "A free Google account has $FREE_DRIVE_GB GB in total, shared with Gmail and " +
-                                        "Google Photos. A limit above that only works with a paid Google One plan."
-                                limit == FREE_DRIVE_GB ->
-                                    "This is all the space a free Google account has ($FREE_DRIVE_GB GB), and Gmail and " +
-                                        "Google Photos share it. Backups may fail if Drive is full."
-                                else ->
-                                    "A free Google account has $FREE_DRIVE_GB GB in total, shared with Gmail and Google Photos."
-                            },
-                            color = if (beyondFree) MaterialTheme.colorScheme.error else TextSoft,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                        )
+                        value = if (settings.backupLimitGb == 0) "No limit" else "${settings.backupLimitGb} GB",
+                    )
+                }
+                Column(Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
+                    ChoiceChips(
+                        options = KEEP_BACKUP_OPTIONS,
+                        selected = settings.keepBackups,
+                        label = { it.toString() },
+                        onSelect = { onSettings(settings.copy(keepBackups = it)) },
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    ChoiceChips(
+                        options = BACKUP_LIMIT_OPTIONS,
+                        selected = settings.backupLimitGb,
+                        label = { if (it == 0) "No limit" else "$it GB" },
+                        onSelect = { onSettings(settings.copy(backupLimitGb = it)) },
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val limit = settings.backupLimitGb
+                    val beyondFree = limit == 0 || limit > FREE_DRIVE_GB
+                    Text(
+                        text = when {
+                            beyondFree ->
+                                "A free Google account has $FREE_DRIVE_GB GB in total, shared with Gmail and " +
+                                    "Google Photos. A limit above that only works with a paid Google One plan."
+                            limit == FREE_DRIVE_GB ->
+                                "This is all the space a free Google account has ($FREE_DRIVE_GB GB), and Gmail and " +
+                                    "Google Photos share it. Backups may fail if Drive is full."
+                            else ->
+                                "A free Google account has $FREE_DRIVE_GB GB in total, shared with Gmail and Google Photos."
+                        },
+                        color = if (beyondFree) MaterialTheme.colorScheme.error else TextSoft,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                    )
+                    if (lastBackupBytes > 0L) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "If a backup would be larger than the limit it is not made, and P Vault tells you. " +
-                                "Older backups are removed first when the kept ones would not fit together.",
+                            "Your last backup was ${sizeLabel(lastBackupBytes)}.",
                             color = TextSoft,
                             fontSize = 12.sp,
-                            lineHeight = 16.sp,
                         )
                     }
                 }
 
-                SettingsGroup("Data") {
-                    SettingsItem(
+                SheetGap()
+                SettingsSheetLabel("Data")
+                SettingsSheet {
+                    SettingsSheetRow(
                         icon = Icons.Outlined.FileUpload,
-                        tint = Accent.Note,
                         title = "Export vault",
-                        subtitle = if (backupProtected) {
-                            "Save a password-protected copy of your vault."
-                        } else {
-                            "Save a copy of your vault as a zip file."
-                        },
                         onClick = onExport,
                     )
-                    SettingsDivider()
-                    SettingsItem(
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
                         icon = Icons.Outlined.FileDownload,
-                        tint = Accent.Note,
                         title = "Import backup",
-                        subtitle = "Add a P Vault backup to this vault. Files already here are kept.",
                         onClick = onImport,
                     )
                 }
 
-                SettingsGroup("Danger zone", danger = true) {
-                    SettingsItem(
+                SheetGap()
+                SettingsSheetLabel("Danger zone")
+                SettingsSheet {
+                    SettingsSheetRow(
                         icon = Icons.Outlined.Delete,
-                        tint = MaterialTheme.colorScheme.error,
                         title = "Clear vault data",
-                        titleColor = MaterialTheme.colorScheme.error,
-                        subtitle = "Delete local photos, PDFs, notes, reels, chats and your profile. Drive backups stay.",
+                        valueColor = MaterialTheme.colorScheme.error,
                         onClick = { clearOpen = true },
                     )
                 }
@@ -557,181 +463,6 @@ fun SettingsScreen(
             dismissButton = { TextButton(onClick = { clearOpen = false }) { Text("Cancel") } },
         )
     }
-}
-
-/** The looks on the Settings page; the rest are on the Themes page. */
-private val FREE_THEMES = listOf(ThemePreset.WHITE, ThemePreset.DARK)
-
-/** A small picture of the theme: page colour, a card, an accent dot. */
-@Composable
-private fun ThemeCard(
-    preset: ThemePreset,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(18.dp)
-    Column(
-        modifier
-            .clip(shape)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                shape = shape,
-            )
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(10.dp),
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(preset.background)
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(preset.primary),
-                )
-                Spacer(Modifier.width(6.dp))
-                Box(
-                    Modifier
-                        .height(6.dp)
-                        .width(36.dp)
-                        .clip(CircleShape)
-                        .background(preset.onBackground.copy(alpha = 0.6f)),
-                )
-            }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(preset.surface)
-                    .border(1.dp, preset.outline, RoundedCornerShape(8.dp)),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                preset.label,
-                fontSize = 14.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                modifier = Modifier.weight(1f),
-            )
-            if (selected) {
-                Icon(
-                    Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsGroup(
-    title: String,
-    danger: Boolean = false,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val accent = if (danger) MaterialTheme.colorScheme.error else TextSoft
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(bottom = 20.dp),
-    ) {
-        Text(
-            text = title,
-            color = accent,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
-        )
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(
-                1.dp,
-                if (danger) accent.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-            ),
-        ) {
-            Column(Modifier.fillMaxWidth(), content = content)
-        }
-    }
-}
-
-/**
- * One row: tinted icon tile, title and subtitle, then either a control ([trailing]) or,
- * for rows that open something ([onClick]), an arrow. The whole row is the tap target.
- */
-@Composable
-private fun SettingsItem(
-    icon: ImageVector,
-    tint: Color,
-    title: String,
-    subtitle: String? = null,
-    titleColor: Color = Color.Unspecified,
-    onClick: (() -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null,
-    content: (@Composable ColumnScope.() -> Unit)? = null,
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(tint.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, color = titleColor, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                if (subtitle != null) {
-                    Text(subtitle, color = TextSoft, fontSize = 12.sp, lineHeight = 16.sp)
-                }
-            }
-            if (trailing != null) {
-                Spacer(Modifier.width(12.dp))
-                trailing()
-            } else if (onClick != null) {
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = TextSoft,
-                )
-            }
-        }
-        if (content != null) {
-            Spacer(Modifier.height(10.dp))
-            // Lines up with the text, past the icon tile.
-            Column(Modifier.padding(start = 52.dp), content = content)
-        }
-    }
-}
-
-@Composable
-private fun SettingsDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 66.dp, end = 14.dp),
-        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-    )
 }
 
 @Composable
