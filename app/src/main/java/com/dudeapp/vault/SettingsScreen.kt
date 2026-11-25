@@ -16,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileDownload
@@ -207,7 +208,7 @@ fun SettingsScreen(
                 SettingsSheetLabel("Account")
                 SettingsSheet {
                     SettingsSheetRow(
-                        icon = Icons.Outlined.Person,
+                        icon = Icons.Outlined.AccountCircle,
                         title = "Profile",
                         value = access.username?.let { "@$it" },
                         onClick = onProfile,
@@ -218,12 +219,6 @@ fun SettingsScreen(
                         title = "Theme",
                         value = theme.label,
                         onClick = onThemes,
-                    )
-                    SettingsSheetDivider()
-                    SettingsSheetRow(
-                        icon = Icons.Outlined.Settings,
-                        title = "Settings path",
-                        value = if (settings.cardsAsList) "List" else "Cards",
                     )
                 }
 

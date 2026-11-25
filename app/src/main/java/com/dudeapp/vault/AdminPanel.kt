@@ -129,7 +129,7 @@ class AdminStore(private val context: Context) {
      * The owner list, readable only with the passphrase. When no list has been created yet
      * this returns null so the caller can say so rather than claiming a wrong passphrase.
      */
-    suspend fun owners(passphrase: String): List<Supabase.Owner>? =
+    internal suspend fun owners(passphrase: String): List<Supabase.Owner>? =
         Supabase.adminOwners(context, passphrase).let { (owners, ok) -> if (ok) owners else null }
 
     suspend fun addOwner(passphrase: String, email: String): String? =
