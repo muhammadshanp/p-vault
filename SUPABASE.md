@@ -22,3 +22,19 @@ The owner passphrase is hashed in the app before it is sent. That hash is effect
 ## Messaging
 
 The green tick and online messages to the owner are **not implemented**. Existing Chats are local. A separate online messaging feature would require users' informed consent, server-verified identities and access controls; only messages sent using that feature should be uploaded. Supabase Google sign-in was not configured when last checked.
+
+## 0.6.8: roles and admin owners
+
+`supabase/0.6.8-roles-owners.sql` is the migration for this release. It adds:
+
+- `username_grants.partner` — the black tick. `verified` stays the blue tick (admin role).
+- `admin_owners` — the Google addresses that may open the admin panel. Filled from
+  **Admin panel → Access → Admin accounts**.
+- `pre_re_is_owner(email)` — a yes/no the app asks on sign-in, so an owner never needs the
+  passphrase and the list is never handed out.
+- `pre_re_my_grant(device)` — name, level, features and both ticks in one call at startup.
+- `pre_re_admin_set_tick(key, name, tick)` — `blue`, `black` or `none`.
+- `pre_re_admin_owners`, `pre_re_admin_owner_add`, `pre_re_admin_owner_remove`.
+
+Run it in the Supabase SQL editor before installing 0.6.8-pro. It is safe to run twice and
+changes no existing signature, so an older phone keeps working.
