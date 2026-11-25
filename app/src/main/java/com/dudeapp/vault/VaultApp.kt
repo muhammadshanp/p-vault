@@ -168,6 +168,15 @@ fun VaultApp(
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull().orEmpty()
     }
+    // Seen-once screens. Welcome comes before anything else on a new install; the name
+    // step only appears for a signed-in person who has not claimed one yet.
+    val introPrefs = remember { context.getSharedPreferences("dude_intro", Context.MODE_PRIVATE) }
+    var showWelcome by remember { mutableStateOf(!introPrefs.getBoolean("welcome_done", false)) }
+    var showNameStep by remember { mutableStateOf(false) }
+    fun finishIntro() {
+        introPrefs.edit().putBoolean("welcome_done", true).apply()
+        showWelcome = false
+    }
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -357,6 +366,16 @@ fun VaultApp(
         }
     }
     LaunchedEffect(Unit) { loadCatalogue(lookOnline = true) }
+    LaunchedEffect(signedIn, showWelcome) {
+        if (showWelcome) return@LaunchedEffect
+        if (!signedIn) return@LaunchedEffect
+        // Signing in is the whole sign-up: the only thing left is the display name, and the
+        // server is asked rather than a local flag, so a reinstall does not ask twice.
+        val held = withContext(Dispatchers.IO) {
+            runCatching { Supabase.myName(context) }.getOrNull()
+        }
+        showNameStep = held == null
+    }
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
         // The name this phone holds, its level and both ticks, in one call. A name is not
@@ -1189,6 +1208,33 @@ fun VaultApp(
             // Preserve the user's chat/notes mode across tab switches; the toggle only
             // appears on the Notes tab, so resetting it here would discard their choice.
         }
+    }
+
+    // Before the vault: the welcome page, then the name, each only once.
+    if (showWelcome) {
+        WelcomeScreen(
+            onSignedIn = { user ->
+                GoogleAccountStore(context).save(user)
+                signedIn = true
+                finishIntro()
+            },
+            onSkip = {
+                finishIntro()
+                signedIn = GoogleAccountStore(context).email() != null
+            },
+            onExternal = onExternal,
+        )
+        return
+    }
+    if (showNameStep) {
+        ChooseNameScreen(
+            onDone = {
+                showNameStep = false
+                scope.launch { access = AccessStore(context).refreshGrant() }
+            },
+            onSkip = { showNameStep = false },
+        )
+        return
     }
 
     val detail = open

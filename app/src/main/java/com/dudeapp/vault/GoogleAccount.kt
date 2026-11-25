@@ -180,6 +180,9 @@ fun GoogleAccountSection(
         error = null
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope("email"), Scope("profile")))
+            // Always the account chooser: after a sign-out this app must be able to take a
+            // different Google account, not quietly replay the previous one.
+            .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
             .build()
         Identity.getAuthorizationClient(host).authorize(request)
             .addOnSuccessListener { result ->
