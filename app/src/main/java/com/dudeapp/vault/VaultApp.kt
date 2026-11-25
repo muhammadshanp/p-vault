@@ -381,7 +381,9 @@ fun VaultApp(
         // The name this phone holds, its level and both ticks, in one call. A name is not
         // re-registered here: signing in is the only thing that ever claims one.
         access = AccessStore(context).refreshGrant()
-        isAdmin = AdminStore(context).isAdmin()
+        // An owner address lights the panel up by itself: no held tap, no passphrase, no
+        // sign-in twice. Anyone else never sees the entry.
+        isAdmin = AdminStore(context).refreshFromServer()
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
@@ -2091,6 +2093,7 @@ fun VaultApp(
                         profileSheetKey += 1
                     },
                     onGoogleSignedIn = { user ->
+                        scope.launch { isAdmin = AdminStore(context).refreshFromServer() }
                         // Only fills gaps: a name or picture the user already chose is kept.
                         var changed = false
                         if (profile.name.isBlank() && user.name.isNotBlank()) {

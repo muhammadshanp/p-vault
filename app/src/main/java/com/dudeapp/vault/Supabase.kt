@@ -238,6 +238,17 @@ internal object Supabase {
         rpc("pre_re_admin_set_tick", body)?.optString("status")?.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * Whether this address may open the admin panel. A plain yes/no, so the app needs no
+     * passphrase to know, and the owner list is never handed out to a signed-in account.
+     */
+    suspend fun isOwner(context: Context, email: String): Boolean = withContext(Dispatchers.IO) {
+        if (email.isBlank()) return@withContext false
+        val json = rpc("pre_re_is_owner", JSONObject().put("p_email", email.trim().lowercase()))
+            ?: return@withContext false
+        json.optBoolean("value") || json.optBoolean("pre_re_is_owner")
+    }
+
     data class Owner(val email: String, val note: String)
 
     /** The Google addresses that may open the admin panel. */

@@ -107,3 +107,21 @@ end $f$;
 
 -- The addresses below are examples: the app adds real ones from Admin panel -> Access,
 -- once the passphrase is in. Nothing here grants anything on its own.
+
+-- 6. "Is this address an owner?" — asked by the app on every sign-in ---------------
+-- Deliberately a yes/no only: it never lists the owners, so a stolen publishable key
+-- cannot enumerate them, and the answer is only useful if you already know the address.
+create or replace function public.pre_re_is_owner(p_email text)
+returns boolean language sql stable security definer set search_path = public as $f$
+  select exists (
+    select 1 from public.admin_owners o
+     where o.email = lower(btrim(coalesce(p_email, '')))
+  );
+$f$;
+
+grant execute on function public.pre_re_is_owner(text) to anon, authenticated;
+grant execute on function public.pre_re_my_grant(text) to anon, authenticated;
+grant execute on function public.pre_re_admin_owners(text) to anon, authenticated;
+grant execute on function public.pre_re_admin_owner_add(text, text) to anon, authenticated;
+grant execute on function public.pre_re_admin_owner_remove(text, text) to anon, authenticated;
+grant execute on function public.pre_re_admin_set_tick(text, text, text) to anon, authenticated;

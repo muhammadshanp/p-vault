@@ -115,6 +115,22 @@ class AdminStore(private val context: Context) {
         prefs.edit().clear().apply()
     }
 
+    /**
+     * What the app calls on start and after a sign-in: if the signed-in address is on the
+     * owner list, the panel is on from that moment; if it is not, the panel is not offered.
+     * Offline keeps the last answer, so an owner is not locked out in a tunnel.
+     */
+    suspend fun refreshFromServer(): Boolean {
+        val signedIn = GoogleAccountStore(context).email() ?: run {
+            clear()
+            return false
+        }
+        val answered = runCatching { Supabase.isOwner(context, signedIn) }.getOrNull()
+            ?: return isAdmin()
+        if (answered) save(signedIn) else clear()
+        return answered
+    }
+
     /** Asks the owner list whether this address is on it. Keeps the last answer offline. */
     suspend fun confirm(passphrase: String): Boolean {
         val signedIn = GoogleAccountStore(context).email() ?: return false
