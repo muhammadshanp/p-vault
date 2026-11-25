@@ -2078,6 +2078,9 @@ fun VaultApp(
                     email = GoogleAccountStore(context).email().orEmpty(),
                     tick = access.tick,
                     onSignOut = {
+                        // The next sign-in must offer every account on the phone, not the
+                        // one that just signed out.
+                        forgetGoogleChoice(context)
                         GoogleAccountStore(context).clear()
                         AdminStore(context).clear()
                         AccessStore(context).clear()
