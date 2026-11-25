@@ -359,7 +359,10 @@ fun VaultApp(
     LaunchedEffect(Unit) { loadCatalogue(lookOnline = true) }
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
-        access = AccessStore(context).refresh()
+        // The name this phone holds, its level and both ticks, in one call. A name is not
+        // re-registered here: signing in is the only thing that ever claims one.
+        access = AccessStore(context).refreshGrant()
+        isAdmin = AdminStore(context).isAdmin()
         // The chosen look may need a permission this phone no longer has, and a look from
         // the catalogue is only known once its copy has been read.
         catalogThemes = catalogue.cached()
@@ -1273,6 +1276,9 @@ fun VaultApp(
             // The switch is on the Theme page itself, so advanced mode is turned on and off
             // where the Advanced page lives.
             advancedOn = settings.advancedMode,
+            // Advanced is hidden outright for an ordinary account: only the admin and names
+            // the owner gave Theme + Advanced (or Everything) ever see the entry.
+            advancedAllowed = access.advanced,
             onAdvancedChange = { on ->
                 settings = settings.copy(advancedMode = on)
                 settingsStore.save(settings)
@@ -1348,6 +1354,10 @@ fun VaultApp(
                 )
             },
             onClearData = { clearVaultData() },
+            onProfile = {
+                settingsOpen = false
+                profileOpen = true
+            },
             onBack = { settingsOpen = false },
         )
     } else if (chatDetail != null) {
@@ -1407,6 +1417,7 @@ fun VaultApp(
                     canTheme = access.theme,
                     onThemes = { closeMenu { themesOpen = true } },
                     signedIn = signedIn,
+                    tick = access.tick,
                     onSignIn = { closeMenu { adminOpen = true } },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
@@ -2018,6 +2029,18 @@ fun VaultApp(
                         )
                     },
                     onExternal = onExternal,
+                    email = GoogleAccountStore(context).email().orEmpty(),
+                    tick = access.tick,
+                    onSignOut = {
+                        GoogleAccountStore(context).clear()
+                        AdminStore(context).clear()
+                        AccessStore(context).clear()
+                        FirebaseSession.signOut()
+                        signedIn = false
+                        access = MyAccess()
+                        profileOpen = false
+                        profileSheetKey += 1
+                    },
                     onGoogleSignedIn = { user ->
                         // Only fills gaps: a name or picture the user already chose is kept.
                         var changed = false
@@ -2062,7 +2085,7 @@ fun VaultApp(
                         // Signing in or out on the sheet can change this.
                         signedIn = GoogleAccountStore(context).email() != null
                         scope.launch {
-                            access = AccessStore(context).refresh()
+                            access = AccessStore(context).refreshTicks()
                                             }
                     },
                 )
@@ -3022,6 +3045,8 @@ private fun MenuDrawer(
     onThemes: () -> Unit,
     /** A Google account is signed in on this phone. */
     signedIn: Boolean,
+    /** The tick this account holds, if any. */
+    tick: AccessTick = AccessTick.None,
     /** Starts Google's own sign-in screen for the admin panel. */
     onSignIn: () -> Unit,
     onBackup: () -> Unit,
@@ -3042,11 +3067,17 @@ private fun MenuDrawer(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = "Private vault · on this device",
-                color = TextSoft,
-                fontSize = 13.sp,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Private vault · on this device",
+                    color = TextSoft,
+                    fontSize = 13.sp,
+                )
+                if (tick != AccessTick.None) {
+                    Spacer(Modifier.width(5.dp))
+                    TickBadge(tick, 14.dp)
+                }
+            }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f))
         Spacer(Modifier.height(10.dp))
@@ -3073,11 +3104,7 @@ private fun MenuDrawer(
             text = "Version $version",
             color = TextSoft,
             fontSize = 12.sp,
-            // Press and hold the version to open the admin sign-in. It is kept out of
-            // sight because only the owner of P Vault can use it.
-            modifier = Modifier
-                .pointerInput(Unit) { detectTapGestures(onLongPress = { onAdmin() }) }
-                .padding(horizontal = 28.dp, vertical = 16.dp),
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
         )
     }
 }

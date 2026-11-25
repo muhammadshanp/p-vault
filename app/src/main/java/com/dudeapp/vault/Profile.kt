@@ -20,10 +20,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Login
+import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -113,6 +121,10 @@ fun ProfileSheet(
     drive: DriveBackupState,
     /** False when this name has not been given Drive backup. */
     backupAllowed: Boolean = true,
+    /** The signed-in Google address, empty when nobody is signed in. */
+    email: String = "",
+    /** The tick this account holds, if any. */
+    tick: AccessTick = AccessTick.None,
     onPickPhoto: () -> Unit,
     onConnectDrive: () -> Unit,
     onDisconnectDrive: () -> Unit,
@@ -120,6 +132,7 @@ fun ProfileSheet(
     onRestoreFile: () -> Unit,
     onExternal: () -> Unit,
     onGoogleSignedIn: (GoogleUser) -> Unit,
+    onSignOut: () -> Unit,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -127,99 +140,209 @@ fun ProfileSheet(
     // Seeded from what is saved, and never reset by the sheet reopening, so a name that was
     // just typed is not pulled back to the old one by a redraw.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val accent = LocalThemePreset.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color.Transparent,
+        dragHandle = null,
     ) {
+        // The header sits on the theme's darkest colour, like the reference's account page,
+        // so the sheet below it reads as a raised panel rather than a continuation.
         Column(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 36.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(bottom = 28.dp),
         ) {
-            Text(
-                text = "Your profile",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.align(Alignment.Start),
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Your name and photo stay on this phone. Only the name below is registered.",
-                color = TextSoft,
-                fontSize = 13.sp,
-                modifier = Modifier.align(Alignment.Start),
-            )
-            Spacer(Modifier.height(24.dp))
-
-            Box(
+            Column(
                 Modifier
-                    .size(104.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                    .clickable(onClick = onPickPhoto),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .background(accent.background)
+                    .padding(horizontal = Spacing.Screen)
+                    .padding(top = 10.dp, bottom = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (avatar != null) {
-                    AsyncImage(
-                        model = avatar,
-                        contentDescription = "Profile photo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                SettingsHeader(title = "Account", onBack = onDismiss)
+                Spacer(Modifier.height(6.dp))
+
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        Modifier
+                            .size(92.dp)
+                            .clip(CircleShape)
+                            .background(accent.surfaceVariant)
+                            .border(2.dp, accent.onBackground.copy(alpha = 0.25f), CircleShape)
+                            .clickable(onClick = onPickPhoto),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (avatar != null) {
+                            AsyncImage(
+                                model = avatar,
+                                contentDescription = "Profile photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = null,
+                                tint = accent.onBackground.copy(alpha = 0.6f),
+                                modifier = Modifier.size(40.dp),
+                            )
+                        }
+                    }
+                    // The camera dot: the one affordance for changing the picture.
+                    Box(
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(accent.primary)
+                            .clickable(onClick = onPickPhoto),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.PhotoCamera,
+                            contentDescription = "Change photo",
+                            tint = accent.onPrimary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = name.trim().ifBlank { "Your name" },
+                        color = accent.onBackground,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(46.dp),
+                    if (tick != AccessTick.None) {
+                        Spacer(Modifier.width(5.dp))
+                        TickBadge(tick, 17.dp)
+                    }
+                }
+                Text(
+                    text = if (email.isBlank()) "Not signed in" else email,
+                    color = accent.onBackground.copy(alpha = 0.6f),
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 24.dp,
+                            topEnd = 24.dp,
+                            bottomStart = 0.dp,
+                            bottomEnd = 0.dp,
+                        ),
+                    )
+                    .background(accent.background)
+                    .padding(horizontal = Spacing.Screen)
+                    .padding(top = 6.dp),
+            ) {
+                SettingsSheet {
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Badge,
+                        title = "Profile name",
+                        value = name.trim().ifBlank { "Not set" },
+                    )
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.Email,
+                        title = "Email",
+                        value = email.ifBlank { "None" },
                     )
                 }
-            }
-            TextButton(onClick = onPickPhoto) {
-                Text(if (avatar == null) "Add photo" else "Change photo")
-            }
+                Column(Modifier.padding(horizontal = 4.dp, vertical = 10.dp)) {
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it.take(40) },
+                        label = { Text("Profile name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
 
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it.take(40) },
-                label = { Text("Profile name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+                SheetGap()
+                PreReNameCard()
 
-            Spacer(Modifier.height(18.dp))
-            PreReNameCard()
-            Spacer(Modifier.height(12.dp))
-            GoogleAccountSection(onExternal = onExternal, onSignedIn = onGoogleSignedIn)
-            Spacer(Modifier.height(12.dp))
-            if (backupAllowed) {
-                DriveBackupSection(
-                    drive = drive,
-                    onConnect = onConnectDrive,
-                    onDisconnect = onDisconnectDrive,
-                    onBackupNow = { onBackupNow(draft.trim()) },
-                    onRestoreFile = onRestoreFile,
-                )
-            } else {
-                LockedFeature("Drive backup", "This name has not been given backup access.")
-            }
-            Spacer(Modifier.height(18.dp))
-            Button(
-                onClick = { onSave(draft.trim()) },
-                enabled = draft.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-            ) {
-                Text("Save profile", fontWeight = FontWeight.SemiBold)
+                SheetGap()
+                SettingsSheetLabel("Account")
+                SettingsSheet {
+                    SettingsSheetRow(
+                        icon = Icons.Outlined.PhotoCamera,
+                        title = if (avatar == null) "Add photo" else "Change photo",
+                        onClick = onPickPhoto,
+                    )
+                    SettingsSheetDivider()
+                    if (backupAllowed) {
+                        SettingsSheetRow(
+                            icon = Icons.Outlined.CloudUpload,
+                            title = "Google Drive backup",
+                            value = if (drive.connected) "On" else "Off",
+                            onClick = null,
+                        )
+                    } else {
+                        SettingsSheetRow(
+                            icon = Icons.Outlined.Lock,
+                            title = "Drive backup",
+                            value = "Locked",
+                            onClick = null,
+                        )
+                    }
+                    SettingsSheetDivider()
+                    SettingsSheetRow(
+                        icon = if (email.isBlank()) Icons.Outlined.Login else Icons.Outlined.Logout,
+                        title = if (email.isBlank()) "Sign in with Google" else "Sign out",
+                        value = if (email.isBlank()) null else "Signed in",
+                        onClick = { if (email.isBlank()) onExternal() else onSignOut() },
+                    )
+                }
+
+                SheetGap()
+                if (email.isBlank()) {
+                    GoogleAccountSection(onExternal = onExternal, onSignedIn = onGoogleSignedIn)
+                } else {
+                    SettingsSheetLabel("Signed in as $email")
+                    if (backupAllowed) {
+                        DriveBackupSection(
+                            drive = drive,
+                            onConnect = onConnectDrive,
+                            onDisconnect = onDisconnectDrive,
+                            onBackupNow = { onBackupNow(draft.trim()) },
+                            onRestoreFile = onRestoreFile,
+                        )
+                    } else {
+                        SettingsSheetLabel("Drive backup has not been given to this name.")
+                    }
+                }
+
+                SheetGap()
+                Button(
+                    onClick = { onSave(draft.trim()) },
+                    enabled = draft.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = accent.primary,
+                        contentColor = accent.onPrimary,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) {
+                    Text("Save profile", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }

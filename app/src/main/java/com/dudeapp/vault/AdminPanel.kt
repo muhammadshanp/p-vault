@@ -81,20 +81,62 @@ internal fun pushRequestJson(title: String, body: String, validateOnly: Boolean 
 }
 
 /** Remembers on this phone that an admin signed in, so the menu can show the panel. */
-class AdminStore(context: Context) {
+/**
+ * Which phone may open the admin panel.
+ *
+ * It is not a flag this app can set: an address is an admin only when it appears in the
+ * owner list in Supabase (filled from Admin panel -> Access), and the panel then follows
+ * the account that is signed in — sign out, and the panel is gone. The older Firestore
+ * route is kept as the fallback for the first sign-in, before any owner list exists.
+ */
+class AdminStore(private val context: Context) {
     private val prefs = context.getSharedPreferences("dude_admin", Context.MODE_PRIVATE)
 
     fun email(): String? = prefs.getString("email", null)
 
-    fun isAdmin(): Boolean = prefs.getBoolean("admin", false)
-
-    fun save(email: String) {
-        prefs.edit().putBoolean("admin", true).putString("email", email).apply()
+    /**
+     * True when the signed-in address may open the panel. A cached yes is not enough on its
+     * own: the moment the account signs out, this says no.
+     */
+    fun isAdmin(): Boolean {
+        val signedIn = GoogleAccountStore(context).email() ?: return false
+        val knownAs = prefs.getString("email", null)
+        if (knownAs != null && !knownAs.equals(signedIn, ignoreCase = true)) return false
+        return prefs.getBoolean("admin", false)
     }
 
+    /** Remembers that this address was confirmed as an owner. */
+    fun save(email: String) {
+        prefs.edit().putBoolean("admin", true).putString("email", email.trim().lowercase()).apply()
+    }
+
+    /** Called on sign-out and on a different account: the panel is not inherited. */
     fun clear() {
         prefs.edit().clear().apply()
     }
+
+    /** Asks the owner list whether this address is on it. Keeps the last answer offline. */
+    suspend fun confirm(passphrase: String): Boolean {
+        val signedIn = GoogleAccountStore(context).email() ?: return false
+        val (owners, answered) = Supabase.adminOwners(context, passphrase)
+        if (!answered) return isAdmin()
+        val listed = owners.any { it.email.equals(signedIn, ignoreCase = true) }
+        if (listed) save(signedIn) else clear()
+        return listed
+    }
+
+    /**
+     * The owner list, readable only with the passphrase. When no list has been created yet
+     * this returns null so the caller can say so rather than claiming a wrong passphrase.
+     */
+    suspend fun owners(passphrase: String): List<Supabase.Owner>? =
+        Supabase.adminOwners(context, passphrase).let { (owners, ok) -> if (ok) owners else null }
+
+    suspend fun addOwner(passphrase: String, email: String): String? =
+        Supabase.adminAddOwner(context, passphrase, email)
+
+    suspend fun removeOwner(passphrase: String, email: String) =
+        Supabase.adminRemoveOwner(context, passphrase, email)
 }
 
 /** Status code and response text, or null when there is no connection. */
