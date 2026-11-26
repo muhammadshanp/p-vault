@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
  * side — a name, the install holding it, nothing else.
  */
 @Composable
-fun PreReNameCard() {
+fun PreReNameCard(onChanged: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE) }
@@ -102,6 +102,33 @@ fun PreReNameCard() {
         }
     }
 
+    fun rename(held: String) {
+        val wanted = typing.trim()
+        if (wanted.isEmpty()) {
+            good = false
+            message = "Type a name first."
+            return
+        }
+        busy = true
+        message = null
+        scope.launch {
+            val status = Supabase.renameSelf(context, wanted)
+            busy = false
+            if (status == "ok" || status == "already_yours") {
+                val stored = normalizeUsername(wanted)
+                prefs.edit().putString("claimed_name", stored).apply()
+                claimed = stored
+                typing = ""
+                good = true
+                message = "@$stored is yours."
+                onChanged()
+            } else {
+                good = false
+                message = Supabase.claimProblem(status)
+            }
+        }
+    }
+
     Column(
         Modifier
             .fillMaxWidth()
@@ -128,7 +155,6 @@ fun PreReNameCard() {
 
         val held = claimed
         if (held != null) {
-            // Claimed once, and that is the end of it: the owner changes names, not the phone.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "@$held",
@@ -143,9 +169,31 @@ fun PreReNameCard() {
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "This is your name. Only the owner can change it.",
+                text = if (held.startsWith("user_")) {
+                    "This is the automatic name you were given. Change it to anything you like."
+                } else {
+                    "This is your name. It can be changed here, and no one else can take it."
+                },
                 color = colors.ink.copy(alpha = 0.6f),
                 fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            PreReField(
+                value = typing,
+                onValueChange = {
+                    typing = it
+                    message = null
+                },
+                placeholder = "new name",
+                enabled = !busy,
+            )
+            Spacer(Modifier.height(10.dp))
+            PreRePrimaryButton(
+                label = "Change name",
+                onClick = { rename(held) },
+                busy = busy,
+                busyLabel = "Saving…",
+                enabled = !busy && typing.isNotBlank(),
             )
         } else {
             PreReField(

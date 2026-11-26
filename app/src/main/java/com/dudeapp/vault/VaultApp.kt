@@ -366,7 +366,10 @@ fun VaultApp(
         }
     }
     LaunchedEffect(Unit) { loadCatalogue(lookOnline = true) }
-    LaunchedEffect(signedIn, showWelcome) {
+    // Someone who signed in with an earlier build has been waiting without a name: they are
+    // allowed to defer it. Anyone signing in now is a new account and must leave with one.
+    var nameStepMayDefer by remember { mutableStateOf(introPrefs.getBoolean("signed_in_before", true)) }
+    LaunchedEffect(signedIn, showWelcome, profileSheetKey) {
         if (showWelcome) return@LaunchedEffect
         if (!signedIn) return@LaunchedEffect
         // Signing in is the whole sign-up: the only thing left is the display name, and the
@@ -374,7 +377,21 @@ fun VaultApp(
         val held = withContext(Dispatchers.IO) {
             runCatching { Supabase.myName(context) }.getOrNull()
         }
-        showNameStep = held == null
+        if (held == null) {
+            // A person who was signed in before this update gets the choice to defer; a
+            // fresh sign-in does not, because their account must end up with a name.
+            nameStepMayDefer = GoogleAccountStore(context).email() != null &&
+                introPrefs.getBoolean("signed_in_before", true)
+            showNameStep = true
+        } else {
+            showNameStep = false
+        }
+    }
+
+    // Marks the end of the "already signed in before this build" state, once the name step
+    // has settled. Everything after this point treats a missing name as a new account.
+    LaunchedEffect(Unit) {
+        introPrefs.edit().putBoolean("signed_in_before", false).apply()
     }
     LaunchedEffect(Unit) {
         AccessStore(context).refresh()
@@ -1230,11 +1247,15 @@ fun VaultApp(
     }
     if (showNameStep) {
         ChooseNameScreen(
+            allowLater = nameStepMayDefer,
             onDone = {
                 showNameStep = false
                 scope.launch { access = AccessStore(context).refreshGrant() }
             },
-            onSkip = { showNameStep = false },
+            onSkip = {
+                showNameStep = false
+                scope.launch { access = AccessStore(context).refreshGrant() }
+            },
         )
         return
     }
@@ -2119,6 +2140,11 @@ fun VaultApp(
                                 }
                             }
                         }
+                    },
+                    onNameChanged = {
+                        // The server name moved: pick the new one up for the header and the
+                        // settings rows without waiting for a restart.
+                        scope.launch { access = AccessStore(context).refreshGrant() }
                     },
                     onSave = { name ->
                         val changed = name != profile.name

@@ -361,6 +361,33 @@ internal object Supabase {
         )
     }
 
+    /**
+     * Replaces the name this phone already holds. Used to correct an automatic name or a
+     * name claimed in a hurry; only the device that holds a name may change it.
+     */
+    suspend fun renameSelf(context: Context, name: String): String? = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+            .put("p_device", deviceId(context))
+            .put("p_username", normalizeUsername(name))
+        rpc("pre_re_rename_self", body)?.optString("status")?.takeIf { it.isNotEmpty() }
+    }
+
+    /** A free automatic name: user_ plus digits, retried when the server says taken. */
+    suspend fun automaticName(context: Context): String? {
+        repeat(5) {
+            val candidate = "user_" + (100000..999999).random()
+            when (Supabase.checkName(context, candidate)) {
+                Supabase.NameCheck.Free -> {
+                    val status = claimName(context, candidate)
+                    if (status == "ok" || status == "already_yours") return candidate
+                }
+                Supabase.NameCheck.Offline -> return null
+                else -> Unit
+            }
+        }
+        return null
+    }
+
     /** Turns the server's terse codes into something a person can act on. */
     fun claimProblem(status: String?): String = when (status) {
         null -> "Could not reach the name service. Check your connection and try again."
@@ -373,6 +400,7 @@ internal object Supabase {
         "empty" -> "Type a name first."
         "bad_device" -> "This install could not be identified. Restart P Vault and try again."
         "bad_key" -> "The owner passphrase was not accepted."
+        "no_name" -> "This phone does not hold a name yet. Claim one first."
         "no_such_name" -> "That name is not on the server any more. Reload the list."
         "same" -> "That is already the name."
         "length" -> "Keep it between 2 and 24 characters."

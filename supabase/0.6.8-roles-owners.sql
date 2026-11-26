@@ -125,3 +125,36 @@ grant execute on function public.pre_re_admin_owners(text) to anon, authenticate
 grant execute on function public.pre_re_admin_owner_add(text, text) to anon, authenticated;
 grant execute on function public.pre_re_admin_owner_remove(text, text) to anon, authenticated;
 grant execute on function public.pre_re_admin_set_tick(text, text, text) to anon, authenticated;
+
+-- 7. A person changing their own name ----------------------------------------------
+-- The name this device holds may be replaced by the same device, so an automatic
+-- "user_123456" is not a life sentence, and a name claimed in a hurry can be corrected.
+-- Uniqueness and the reserved list are enforced exactly as in pre_re_claim.
+create or replace function public.pre_re_rename_self(p_device text, p_username text)
+returns jsonb language plpgsql security definer set search_path = public as $f$
+declare v_new text := public.pre_re_normalise(p_username); holder text; reason text;
+begin
+  if p_device is null or length(btrim(p_device)) < 8 then
+    return jsonb_build_object('status','bad_device');
+  end if;
+  reason := public.pre_re_reason(p_username);
+  if reason <> 'ok' then return jsonb_build_object('status', reason); end if;
+  perform pg_advisory_xact_lock(hashtextextended('pre_re_names', 0));
+  select username into holder from public.usernames where device_id = p_device;
+  if not found then return jsonb_build_object('status','no_name'); end if;
+  if holder = v_new then return jsonb_build_object('status','already_yours','name',v_new); end if;
+  if exists (select 1 from public.reserved_names r where r.name = v_new) then
+    return jsonb_build_object('status','reserved');
+  end if;
+  if exists (select 1 from public.usernames u where u.username = v_new) then
+    return jsonb_build_object('status','taken');
+  end if;
+  begin
+    update public.usernames set username = v_new where device_id = p_device;
+    update public.username_grants set username = v_new where username = holder;
+  exception when unique_violation then return jsonb_build_object('status','taken');
+  end;
+  return jsonb_build_object('status','ok','name',v_new);
+end $f$;
+
+grant execute on function public.pre_re_rename_self(text, text) to anon, authenticated;
