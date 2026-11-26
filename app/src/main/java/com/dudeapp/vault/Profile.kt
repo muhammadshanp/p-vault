@@ -133,6 +133,8 @@ fun ProfileSheet(
     onExternal: () -> Unit,
     onGoogleSignedIn: (GoogleUser) -> Unit,
     onSignOut: () -> Unit,
+    /** Called after the name this phone holds was replaced. */
+    onNameChanged: () -> Unit = {},
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -275,7 +277,7 @@ fun ProfileSheet(
                 }
 
                 SheetGap()
-                PreReNameCard()
+                PreReNameCard(onChanged = onNameChanged)
 
                 SheetGap()
                 SettingsSheetLabel("Account")

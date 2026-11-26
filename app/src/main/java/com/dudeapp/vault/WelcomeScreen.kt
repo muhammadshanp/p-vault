@@ -200,14 +200,20 @@ private fun WelcomePoint(
 }
 
 /**
- * "Choose your name", shown once to a signed-in person who has no name yet.
+ * "Choose your name", shown to a signed-in person who has no name yet.
  *
- * The name is not an account: it is a display name, claimed once through the name service,
- * and the phone that claims it is the phone it belongs to. That is why this asks nothing
- * but the name — there is no password, and signing up is what the welcome page did.
+ * The name is not an account: it is a display name, claimed through the name service, and
+ * the phone that claims it is the phone it belongs to. That is why this asks nothing but
+ * the name — there is no password, and signing up is what the welcome page did.
+ *
+ * The name is required: a new account leaves this page with a name. [onLater] is only
+ * offered to a person who signed in earlier, and leaving with it means an automatic
+ * `user_123456` was taken instead, which can be changed later from the Account page.
  */
 @Composable
 fun ChooseNameScreen(
+    /** True for someone who had already signed in before this build: they may defer. */
+    allowLater: Boolean,
     onDone: () -> Unit,
     onSkip: () -> Unit,
 ) {
@@ -332,8 +338,34 @@ fun ChooseNameScreen(
             }
         }
         Spacer(Modifier.height(6.dp))
-        TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
-            Text("Later", color = ink.copy(alpha = 0.7f))
+        if (allowLater) {
+            TextButton(
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        // Leaving without choosing still needs a name: the server gets an
+                        // automatic one, so nothing in the app is ever nameless.
+                        val automatic = Supabase.automaticName(context)
+                        busy = false
+                        if (automatic != null) {
+                            context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE)
+                                .edit().putString("claimed_name", automatic).apply()
+                        }
+                        onSkip()
+                    }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Later", color = ink.copy(alpha = 0.7f))
+            }
+            Text(
+                text = "Later gives you an automatic name, which you can change from the Account page.",
+                color = ink.copy(alpha = 0.4f),
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
