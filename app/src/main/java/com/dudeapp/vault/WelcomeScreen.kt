@@ -344,14 +344,21 @@ fun ChooseNameScreen(
                     busy = true
                     scope.launch {
                         // Leaving without choosing still needs a name: the server gets an
-                        // automatic one, so nothing in the app is ever nameless.
+                        // automatic one, so nothing in the app is ever nameless. If that
+                        // fails the person stays here and is told, rather than landing in a
+                        // vault with no name.
                         val automatic = Supabase.automaticName(context)
                         busy = false
                         if (automatic != null) {
                             context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE)
                                 .edit().putString("claimed_name", automatic).apply()
+                            good = true
+                            message = "You are @$automatic. You can change it from the Account page."
+                            onSkip()
+                        } else {
+                            good = false
+                            message = "Could not reach the name service. Claim a name, or try Later again."
                         }
-                        onSkip()
                     }
                 },
                 enabled = !busy,

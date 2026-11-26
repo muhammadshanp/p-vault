@@ -81,6 +81,22 @@ internal fun parseGoogleUser(json: String): GoogleUser? = runCatching {
 }.getOrNull()
 
 /**
+ * Signs the account out everywhere, in one place.
+ *
+ * Every door out of an account used to do a different subset of this: one cleared the
+ * address but kept admin rights. Anything that signs out calls this, so the app cannot be
+ * left half-signed-in.
+ */
+fun signOutOfAccount(context: Context) {
+    // The next sign-in must offer every account on the phone.
+    forgetGoogleChoice(context)
+    GoogleAccountStore(context).clear()
+    AdminStore(context).clear()
+    AccessStore(context).clear()
+    runCatching { FirebaseSession.signOut() }
+}
+
+/**
  * Remembers on this phone which Google account signed in. Signing in is optional and
  * only identifies the user; no password or long-lived pass is kept.
  */
@@ -275,11 +291,10 @@ fun GoogleAccountSection(
                 }
                 TextButton(
                     onClick = {
-                        account.clear()
-                        // The Firebase session belongs to the same account, so it goes too.
-                        FirebaseSession.signOut()
-                        access.clear()
-                        special = access.isSpecial()
+                        // One sign-out path for the whole app, so the panel, the grants and
+                        // the login page cannot disagree about whether anyone is signed in.
+                        signOutOfAccount(context)
+                        special = false
                         email = null
                         error = null
                     },

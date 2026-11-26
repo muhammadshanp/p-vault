@@ -1137,8 +1137,9 @@ fun VaultApp(
                 val ok = store.clearAll()
                 if (ok) Reminders.cancelAll(context)
                 if (ok) profileStore.clear()
-                if (ok) GoogleAccountStore(context).clear()
-                if (ok) AccessStore(context).clear()
+                // Clearing the vault is a fresh start: account, grants and panel go too,
+                // through the same sign-out as everywhere else.
+                if (ok) signOutOfAccount(context)
                 if (ok) access = MyAccess()
                 ok
             }
@@ -2113,13 +2114,7 @@ fun VaultApp(
                     tick = access.tick,
                     username = access.username,
                     onSignOut = {
-                        // The next sign-in must offer every account on the phone, not the
-                        // one that just signed out.
-                        forgetGoogleChoice(context)
-                        GoogleAccountStore(context).clear()
-                        AdminStore(context).clear()
-                        AccessStore(context).clear()
-                        FirebaseSession.signOut()
+                        signOutOfAccount(context)
                         signedIn = false
                         access = MyAccess()
                         profileOpen = false
