@@ -723,7 +723,7 @@ private fun PickerRow(
 }
 
 /** The look of a theme made on this phone, so the whole app can show it. */
-fun OwnTheme.toPreset(base: ThemePreset = ThemePreset.NIGHTFALL): ThemePreset = base.copy(
+fun OwnTheme.toPreset(base: ThemePreset = ThemePreset.DARK): ThemePreset = base.copy(
     label = name,
     backdrop = background?.let { BackdropStyle.LocalFile(it, scrim = 0.42f) } ?: base.backdrop,
     glass = false,

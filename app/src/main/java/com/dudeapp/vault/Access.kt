@@ -375,8 +375,18 @@ class AccessStore(private val context: Context) {
             // Not held by this phone: nothing to grant. Offline keeps the last answer.
             prefs.edit().remove("level").remove("features").remove("verified").remove("partner").apply()
         }
-        val name = runCatching { Supabase.myName(context) }.getOrNull()
-        if (name != null) prefs.edit().putString("username", name).apply()
+        // The name follows the account: the email is stored with it, so a new phone gets
+        // the same name, level and ticks back instead of starting as a stranger.
+        val email = GoogleAccountStore(context).email()
+        var name = runCatching { Supabase.myName(context) }.getOrNull()
+        if (name == null && email != null) {
+            // This install has no name but the account does: claim it back on this phone.
+            name = runCatching { Supabase.nameForEmail(context, email) }.getOrNull()
+        }
+        if (name != null) {
+            prefs.edit().putString("username", name).apply()
+            if (email != null) runCatching { Supabase.linkEmail(context, name, email) }
+        }
         access()
     }
 

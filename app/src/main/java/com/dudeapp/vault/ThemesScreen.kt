@@ -285,7 +285,7 @@ fun ThemesScreen(
                             }
                         }
                     }
-                    item(span = { GridItemSpan(2) }) { SectionHeading("Light and Dark") }
+                    item(span = { GridItemSpan(2) }) { SectionHeading("Colour themes") }
                     items(ThemePreset.all.filter { !it.special }) { preset ->
                         ThemeOption(
                             preset = preset,
@@ -297,6 +297,9 @@ fun ThemesScreen(
                             },
                         )
                     }
+                    // Nothing to show while the app is colour-only; the section comes back
+                    // by itself when a picture look is shipped again.
+                    if (ThemePreset.all.any { it.special }) {
                     item(span = { GridItemSpan(2) }) { SectionHeading("Picture looks") }
                     items(ThemePreset.all.filter { it.special }) { preset ->
                         ThemeOption(
@@ -310,6 +313,7 @@ fun ThemesScreen(
                                 }
                             },
                         )
+                    }
                     }
                     if (catalogThemes.isNotEmpty()) {
                         item(span = { GridItemSpan(2) }) { SectionHeading("Downloaded") }

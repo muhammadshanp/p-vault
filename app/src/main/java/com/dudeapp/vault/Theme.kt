@@ -88,7 +88,10 @@ data class ThemePreset(
 
         /** Every look inside this build, in the order the theme page shows them. */
         val all: List<ThemePreset>
-            get() = listOf(WHITE, DARK, NIGHTFALL, MOONLIT, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
+            // Colour-only for now: the picture looks (a backdrop image plus card pictures)
+            // are not listed, because the app is being kept to colour themes until the
+            // owner brings picture looks back through a Theme Store update.
+            get() = listOf(WHITE, DARK, MIDNIGHT, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
 
         val WHITE = ThemePreset(
         label = "Light",
