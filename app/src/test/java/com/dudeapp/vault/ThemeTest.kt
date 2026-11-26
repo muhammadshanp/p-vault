@@ -24,8 +24,11 @@ class ThemeTest {
     @Test
     fun everyShippedLookIsAColourTheme() {
         ThemePreset.all.forEach { preset ->
-            // A colour look is a palette: a gradient pair and nothing drawn behind it.
-            assertEquals(preset.label, 2, preset.gradient?.size)
+            // A colour look is a palette: a gradient pair, or the plain Light and Dark pair.
+            val gradient = preset.gradient
+            assertTrue(preset.label, gradient == null || gradient.size == 2)
+            // Always a real pair of colours to draw: page and card.
+            assertTrue(preset.label, preset.background != preset.surface)
         }
     }
 
