@@ -338,6 +338,30 @@ internal object Supabase {
         rpc("pre_re_admin_verify", body)?.optBoolean("value") ?: false
     }
 
+    /**
+     * Whether people may change the name they hold. A **server-side switch**, so it is
+     * changed from Admin panel -> Access and takes effect on every phone without one of them
+     * installing anything: the check happens on the server, not in the app.
+     */
+    suspend fun canRename(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val json = rpc("pre_re_public_settings", JSONObject()) ?: return@withContext true
+        val row = json.optJSONArray("value")?.optJSONObject(0) ?: json
+        // Offline keeps the app usable; the server still refuses a rename when it is off.
+        if (row.isNull("rename_allowed")) true else row.optBoolean("rename_allowed", true)
+    }
+
+    /** Turns name changes on or off for everyone. Takes effect immediately. */
+    suspend fun adminSetRenameAllowed(
+        context: Context,
+        passphrase: String,
+        allowed: Boolean,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+            .put("p_key", keyHash(passphrase))
+            .put("p_allowed", allowed)
+        rpc("pre_re_admin_set_rename", body)?.optBoolean("value") ?: false
+    }
+
     data class RenameResult(val status: String, val name: String?)
 
     /**
@@ -400,6 +424,7 @@ internal object Supabase {
         "empty" -> "Type a name first."
         "bad_device" -> "This install could not be identified. Restart P Vault and try again."
         "bad_key" -> "The owner passphrase was not accepted."
+        "rename_off" -> "The owner has turned name changes off. Only they can change a name now."
         "no_name" -> "This phone does not hold a name yet. Claim one first."
         "no_such_name" -> "That name is not on the server any more. Reload the list."
         "same" -> "That is already the name."

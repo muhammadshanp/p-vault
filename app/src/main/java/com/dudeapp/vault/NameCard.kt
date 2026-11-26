@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,12 @@ fun PreReNameCard(onChanged: () -> Unit = {}) {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     var typing by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
+    // Read from the server, so turning it off there reaches this page without an update.
+    var renameAllowed by remember { mutableStateOf(true) }
+    LaunchedEffect(claimed) {
+        renameAllowed = Supabase.canRename(context)
+    }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var good by remember { mutableStateOf(false) }
@@ -119,6 +126,7 @@ fun PreReNameCard(onChanged: () -> Unit = {}) {
                 prefs.edit().putString("claimed_name", stored).apply()
                 claimed = stored
                 typing = ""
+                editing = false
                 good = true
                 message = "@$stored is yours."
                 onChanged()
@@ -169,32 +177,57 @@ fun PreReNameCard(onChanged: () -> Unit = {}) {
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = if (held.startsWith("user_")) {
-                    "This is the automatic name you were given. Change it to anything you like."
-                } else {
-                    "This is your name. It can be changed here, and no one else can take it."
+                text = when {
+                    !renameAllowed -> "The owner has turned name changes off. Only they can move a name now."
+                    held.startsWith("user_") ->
+                        "This is the automatic name you were given. You can change it once."
+                    else -> "No one else can take this name."
                 },
                 color = colors.ink.copy(alpha = 0.6f),
                 fontSize = 13.sp,
             )
-            Spacer(Modifier.height(12.dp))
-            PreReField(
-                value = typing,
-                onValueChange = {
-                    typing = it
-                    message = null
-                },
-                placeholder = "new name",
-                enabled = !busy,
-            )
-            Spacer(Modifier.height(10.dp))
-            PreRePrimaryButton(
-                label = "Change name",
-                onClick = { rename(held) },
-                busy = busy,
-                busyLabel = "Saving…",
-                enabled = !busy && typing.isNotBlank(),
-            )
+
+            // The name is read-only until Edit is pressed, the way every account page works:
+            // a field sitting open invites a change nobody meant to make.
+            if (renameAllowed && !editing) {
+                Spacer(Modifier.height(10.dp))
+                PreReSecondaryButton(
+                    label = "Edit",
+                    onClick = {
+                        editing = true
+                        typing = held
+                        message = null
+                    },
+                )
+            } else if (renameAllowed) {
+                Spacer(Modifier.height(12.dp))
+                PreReField(
+                    value = typing,
+                    onValueChange = {
+                        typing = it
+                        message = null
+                    },
+                    placeholder = "new name",
+                    enabled = !busy,
+                )
+                Spacer(Modifier.height(10.dp))
+                PreRePrimaryButton(
+                    label = "Save name",
+                    onClick = { rename(held) },
+                    busy = busy,
+                    busyLabel = "Saving…",
+                    enabled = !busy && typing.isNotBlank() && normalizeUsername(typing) != held,
+                )
+                Spacer(Modifier.height(4.dp))
+                PreReSecondaryButton(
+                    label = "Cancel",
+                    onClick = {
+                        editing = false
+                        typing = ""
+                        message = null
+                    },
+                )
+            }
         } else {
             PreReField(
                 value = typing,

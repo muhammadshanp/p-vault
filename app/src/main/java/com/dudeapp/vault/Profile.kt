@@ -125,6 +125,8 @@ fun ProfileSheet(
     email: String = "",
     /** The tick this account holds, if any. */
     tick: AccessTick = AccessTick.None,
+    /** The name this phone holds on the server, if any. */
+    username: String? = null,
     onPickPhoto: () -> Unit,
     onConnectDrive: () -> Unit,
     onDisconnectDrive: () -> Unit,
@@ -216,7 +218,9 @@ fun ProfileSheet(
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = name.trim().ifBlank { "Your name" },
+                        // No name yet is its own state, not an invitation to type here: the
+                        // name is set from the name card below, and only when asked.
+                        text = username?.let { "@$it" } ?: "No username yet",
                         color = accent.onBackground,
                         fontSize = 19.sp,
                         fontWeight = FontWeight.SemiBold,

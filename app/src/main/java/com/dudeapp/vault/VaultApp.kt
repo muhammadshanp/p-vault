@@ -398,6 +398,11 @@ fun VaultApp(
         // The name this phone holds, its level and both ticks, in one call. A name is not
         // re-registered here: signing in is the only thing that ever claims one.
         access = AccessStore(context).refreshGrant()
+        // Signing in is remembered: the app never asks Google again after the first time.
+        // A stored address that the owner list no longer knows simply stops being an admin.
+        access.username?.let { name ->
+            introPrefs.edit().putString("last_name", name).apply()
+        }
         // An owner address lights the panel up by itself: no held tap, no passphrase, no
         // sign-in twice. Anyone else never sees the entry.
         isAdmin = AdminStore(context).refreshFromServer()
@@ -2100,6 +2105,7 @@ fun VaultApp(
                     onExternal = onExternal,
                     email = GoogleAccountStore(context).email().orEmpty(),
                     tick = access.tick,
+                    username = access.username,
                     onSignOut = {
                         // The next sign-in must offer every account on the phone, not the
                         // one that just signed out.
