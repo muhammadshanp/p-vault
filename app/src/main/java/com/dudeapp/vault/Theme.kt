@@ -142,10 +142,8 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFFA0A0B4),
         outline = Color(0xFF26263A),
         error = Color(0xFFFF6B6B),
-        special = true,
         gradient = listOf(Color(0xFF6C4BFF), Color(0xFF1B1038)),
         glow = Color(0xFF4B33D6),
-        backdrop = BackdropStyle.Picture(R.drawable.bg_animegirl, scrim = 0.45f),
         )
 
         val RACING = ThemePreset(

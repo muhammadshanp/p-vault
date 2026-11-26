@@ -100,7 +100,8 @@ class ThemeTest {
         ThemePreset.GRAND_LINE.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
         ThemePreset.RACING.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
         ThemePreset.SHINOBI.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
-        ThemePreset.MIDNIGHT.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
+        // Midnight is a colour look now: its picture was what made it special.
+        assertTrue(ThemePreset.MIDNIGHT.backdrop is BackdropStyle.Plain)
         assertTrue(ThemePreset.DARK.backdrop is BackdropStyle.Plain)
     }
 
