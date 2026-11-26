@@ -22,8 +22,9 @@ class ThemeTest {
     }
 
     @Test
-    fun everyLookIsAColourTheme() {
+    fun everyShippedLookIsAColourTheme() {
         ThemePreset.all.forEach { preset ->
+            // A colour look is a palette: a gradient pair and nothing drawn behind it.
             assertEquals(preset.label, 2, preset.gradient?.size)
         }
     }
@@ -39,12 +40,9 @@ class ThemeTest {
         assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(admin = true)))
         // An owner with no level at all still has everything.
         assertEquals(ThemePreset.MOONLIT, ThemePreset.MOONLIT.forAccess(MyAccess(), admin = true))
-        // Exactly these two are admin-only, and both also need special access.
-        assertEquals(
-            listOf("Moonlit"),
-            ThemePreset.all.filter { it.adminOnly }.map { it.label }.sorted(),
-        )
-        assertTrue(ThemePreset.all.filter { it.adminOnly }.all { it.special })
+        // Nothing shipped is admin-only any more; Moonlit keeps the flag for its return.
+        assertTrue(ThemePreset.all.none { it.adminOnly })
+        assertTrue(ThemePreset.MOONLIT.special)
     }
 
     /** Nightfall is out of the shipped list but stays as the base an own theme is built on. */
