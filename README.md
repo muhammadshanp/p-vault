@@ -10,6 +10,7 @@ Latest APK: **https://github.com/muhammadshanp/p-vault/releases/latest/download/
 
 ## What's new
 
+- **0.6.11** — Backend switches, and a quieter account page. The owner can turn **People can change their name** off in Admin panel → Access, and every phone obeys at once because the check is on the server (`supabase/0.6.11-settings-switches.sql`) — no install needed. The account page shows the name as text and offers **Edit** only when you ask, and says "No username yet" instead of inviting a field. Signing in with Google is remembered after the first time, so the account picker is never shown again on launch; the owner list still decides who is an admin.
 - **0.6.10** — The first stable release of the rebuilt app, and the one every phone is offered. Everything from 0.6.7–0.6.9, now released properly instead of as a hidden pre-release:
   - **Accounts and names.** Signing in with Google is the whole sign-up. A new account must leave the name page with a name; an account that signed in before this build gets one more chance with **Later**, which takes an automatic `user_123456` rather than leaving the phone nameless. The Account page can change the name afterwards.
   - **Ticks.** The blue tick is the admin role, the black tick is a partner. The owner sets both in **Admin panel → Access**.

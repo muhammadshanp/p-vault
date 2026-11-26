@@ -89,8 +89,29 @@ class GoogleAccountStore(context: Context) {
 
     fun email(): String? = prefs.getString("email", null)
 
+    /**
+     * Makes this phone remember the address without making Google's account picker appear.
+     *
+     * Signing in with Google needs an account on the phone and shows a chooser, which is the
+     * right thing once but the wrong thing on every launch. So the address is kept and
+     * re-confirmed daily against `pre_re_is_owner` — the owner list decides who is an admin,
+     * not this file. Set on a first sign-in, and dropped on sign-out.
+     */
+    fun remember(email: String) {
+        prefs.edit()
+            .putString("email", email.trim().lowercase())
+            .putLong("last_seen", System.currentTimeMillis())
+            .apply()
+    }
+
+    fun lastSeen(): Long = prefs.getLong("last_seen", 0L)
+
     fun save(user: GoogleUser) {
-        prefs.edit().putString("email", user.email).putString("name", user.name).apply()
+        prefs.edit()
+            .putString("email", user.email)
+            .putString("name", user.name)
+            .putLong("last_seen", System.currentTimeMillis())
+            .apply()
     }
 
     fun clear() {

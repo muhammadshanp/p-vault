@@ -266,6 +266,29 @@ internal fun PreReField(
     )
 }
 
+/** The quiet twin of the primary button: outline, same height. For Edit and Cancel. */
+@Composable
+internal fun PreReSecondaryButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val colors = preReColors()
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = PreReControlShape,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp),
+    ) {
+        Text(label, color = colors.ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
 /** The design's Continue button: solid ink, 8dp corners, 40dp tall, 14sp medium. */
 @Composable
 internal fun PreRePrimaryButton(

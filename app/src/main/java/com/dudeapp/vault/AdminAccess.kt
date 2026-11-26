@@ -64,6 +64,7 @@ internal fun AdminAccessCard() {
     var saving by remember { mutableStateOf<String?>(null) }
     var reserveDraft by remember { mutableStateOf("") }
     var owners by remember { mutableStateOf<List<Supabase.Owner>>(emptyList()) }
+    var renameAllowed by remember { mutableStateOf(true) }
     var ownerDraft by remember { mutableStateOf("") }
     var reserveNote by remember { mutableStateOf("") }
     // The name being changed, and the field it is being changed to.
@@ -86,6 +87,7 @@ internal fun AdminAccessCard() {
                 names = list
                 reserved = held
                 if (adminList != null && adminList.second) owners = adminList.first
+                renameAllowed = Supabase.canRename(context)
                 unlocked = true
             }
         }
@@ -316,6 +318,51 @@ internal fun AdminAccessCard() {
                         }
                     }
                 }
+            }
+
+            // ---- switches that need no update ----
+            Spacer(Modifier.height(18.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            Spacer(Modifier.height(14.dp))
+            Text("Switches", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "These are read from the server by every phone, so changing one here takes " +
+                    "effect without anyone installing an update.",
+                color = TextSoft,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("People can change their name", fontSize = 13.sp)
+                    Text(
+                        "Off: the name a person holds is fixed, and only the owner can move it " +
+                            "from this page.",
+                        color = TextSoft,
+                        fontSize = 11.sp,
+                    )
+                }
+                Switch(
+                    checked = renameAllowed,
+                    enabled = !busy,
+                    onCheckedChange = { on ->
+                        renameAllowed = on
+                        scope.launch {
+                            val ok = Supabase.adminSetRenameAllowed(context, passphrase, on)
+                            if (!ok) {
+                                renameAllowed = !on
+                                problem = "Could not change that switch. Check the connection."
+                            } else {
+                                problem = if (on) {
+                                    "People can change their own name again."
+                                } else {
+                                    "Name changes are off for everyone."
+                                }
+                            }
+                        }
+                    },
+                )
             }
 
             // ---- who may open the admin panel ----
