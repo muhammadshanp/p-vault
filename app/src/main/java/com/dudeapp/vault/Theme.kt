@@ -88,7 +88,10 @@ data class ThemePreset(
 
         /** Every look inside this build, in the order the theme page shows them. */
         val all: List<ThemePreset>
-            get() = listOf(WHITE, DARK, NIGHTFALL, MOONLIT, MIDNIGHT, RACING, GRAND_LINE, SHINOBI, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
+            // Colour-only for now: the picture looks (a backdrop image plus card pictures)
+            // are not listed, because the app is being kept to colour themes until the
+            // owner brings picture looks back through a Theme Store update.
+            get() = listOf(WHITE, DARK, MIDNIGHT, SAKURA, FOREST, GOLD, MINIMAL, NEON, OCEAN)
 
         val WHITE = ThemePreset(
         label = "Light",
@@ -139,10 +142,8 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFFA0A0B4),
         outline = Color(0xFF26263A),
         error = Color(0xFFFF6B6B),
-        special = true,
         gradient = listOf(Color(0xFF6C4BFF), Color(0xFF1B1038)),
         glow = Color(0xFF4B33D6),
-        backdrop = BackdropStyle.Picture(R.drawable.bg_animegirl, scrim = 0.45f),
         )
 
         val RACING = ThemePreset(
@@ -223,7 +224,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF7A6670),
         outline = Color(0xFFEFD9E2),
         error = Color(0xFFC0392B),
-        special = true,
         gradient = listOf(Color(0xFFF06A9B), Color(0xFFE8457A)),
         glow = Color(0xFFF2A7C3),
         )
@@ -243,7 +243,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF97AC9D),
         outline = Color(0xFF1F2E24),
         error = Color(0xFFFF6B6B),
-        special = true,
         gradient = listOf(Color(0xFF2FB86F), Color(0xFF0B2A18)),
         glow = Color(0xFF1E7A47),
         )
@@ -263,7 +262,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFFA9A395),
         outline = Color(0xFF2A2722),
         error = Color(0xFFFF6B5E),
-        special = true,
         gradient = listOf(Color(0xFFD9A83A), Color(0xFF6B4E10)),
         glow = Color(0xFF8A6A1E),
         )
@@ -283,7 +281,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF767676),
         outline = Color(0xFFE8E8E8),
         error = Color(0xFFB3261E),
-        special = true,
         gradient = listOf(Color(0xFF2B2B2B), Color(0xFF0E0E0E)),
         glow = Color(0xFF9E9E9E),
         )
@@ -303,7 +300,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFFAF9ECC),
         outline = Color(0xFF2A1B45),
         error = Color(0xFFFF5C7A),
-        special = true,
         gradient = listOf(Color(0xFFFF2BD6), Color(0xFF1B0B3A)),
         glow = Color(0xFFCE00AE),
         )
@@ -323,7 +319,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF93A8B6),
         outline = Color(0xFF1B2A36),
         error = Color(0xFFFF6B6B),
-        special = true,
         gradient = listOf(Color(0xFF1C9EC9), Color(0xFF062A45)),
         glow = Color(0xFF0F6E8C),
         )

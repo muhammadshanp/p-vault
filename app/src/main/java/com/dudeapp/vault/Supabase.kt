@@ -396,6 +396,32 @@ internal object Supabase {
         rpc("pre_re_rename_self", body)?.optString("status")?.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * Stores the address this name belongs to.
+     *
+     * The name used to belong to the install only, so a new phone could not recover it and
+     * the same person on a second phone was a stranger. The email is the account key: it
+     * travels with the name, and the app reads back the name, level and ticks for it.
+     * Only the device that holds the name may set it, so a name cannot be re-pointed.
+     */
+    suspend fun linkEmail(context: Context, name: String, email: String): Boolean =
+        withContext(Dispatchers.IO) {
+            if (email.isBlank()) return@withContext false
+            val body = JSONObject()
+                .put("p_device", deviceId(context))
+                .put("p_username", normalizeUsername(name))
+                .put("p_email", email.trim().lowercase())
+            rpc("pre_re_link_email", body)?.optString("status") == "ok"
+        }
+
+    /** The name this address holds, so a new phone gets its old name back. */
+    suspend fun nameForEmail(context: Context, email: String): String? = withContext(Dispatchers.IO) {
+        if (email.isBlank()) return@withContext null
+        val json = rpc("pre_re_name_for_email", JSONObject().put("p_email", email.trim().lowercase()))
+            ?: return@withContext null
+        if (json.isNull("value")) null else json.optString("value").takeIf { it.isNotBlank() }
+    }
+
     /** A free automatic name: user_ plus digits, retried when the server says taken. */
     suspend fun automaticName(context: Context): String? {
         repeat(5) {
@@ -424,6 +450,7 @@ internal object Supabase {
         "empty" -> "Type a name first."
         "bad_device" -> "This install could not be identified. Restart P Vault and try again."
         "bad_key" -> "The owner passphrase was not accepted."
+        "email_taken" -> "This Google account already holds a different name."
         "rename_off" -> "The owner has turned name changes off. Only they can change a name now."
         "no_name" -> "This phone does not hold a name yet. Claim one first."
         "no_such_name" -> "That name is not on the server any more. Reload the list."

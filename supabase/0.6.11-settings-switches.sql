@@ -73,3 +73,50 @@ end $f$;
 grant execute on function public.pre_re_public_settings() to anon, authenticated;
 grant execute on function public.pre_re_admin_set_rename(text, boolean) to anon, authenticated;
 grant execute on function public.pre_re_rename_self(text, text) to anon, authenticated;
+
+-- 5. The name belongs to the email ---------------------------------------------------
+-- Until now a name belonged to the install. The email is the account key: the name,
+-- the access level and both ticks follow it, so the same person gets the same name on a
+-- new phone, and the owner's list can be read by address rather than guessed at.
+alter table public.usernames
+  add column if not exists email text;
+
+create unique index if not exists usernames_email_unique
+  on public.usernames (lower(email))
+  where email is not null;
+
+-- Only the device that holds the name may attach an address to it, so one phone cannot
+-- re-point someone else's name, and one address cannot hold two names.
+create or replace function public.pre_re_link_email(p_device text, p_username text, p_email text)
+returns jsonb language plpgsql security definer set search_path = public as $f$
+declare v_name text := public.pre_re_normalise(p_username); v_email text := lower(btrim(coalesce(p_email,'')));
+begin
+  if p_device is null or length(btrim(p_device)) < 8 then
+    return jsonb_build_object('status','bad_device');
+  end if;
+  if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+    return jsonb_build_object('status','bad_email');
+  end if;
+  if not exists (select 1 from public.usernames u where u.username = v_name and u.device_id = p_device) then
+    return jsonb_build_object('status','not_yours');
+  end if;
+  if exists (
+    select 1 from public.usernames u
+     where lower(u.email) = v_email and u.username <> v_name
+  ) then
+    return jsonb_build_object('status','email_taken');
+  end if;
+  update public.usernames set email = v_email where username = v_name and device_id = p_device;
+  return jsonb_build_object('status','ok');
+end $f$;
+
+-- The name an address holds. A display name only; nothing else about the person.
+create or replace function public.pre_re_name_for_email(p_email text)
+returns text language sql stable security definer set search_path = public as $f$
+  select u.username from public.usernames u
+   where lower(u.email) = lower(btrim(coalesce(p_email, '')))
+   limit 1;
+$f$;
+
+grant execute on function public.pre_re_link_email(text, text, text) to anon, authenticated;
+grant execute on function public.pre_re_name_for_email(text) to anon, authenticated;

@@ -177,6 +177,12 @@ fun VaultApp(
         introPrefs.edit().putBoolean("welcome_done", true).apply()
         showWelcome = false
     }
+    // A signed-out phone goes back to the login page rather than dropping into the vault
+    // as a stranger. Home stays reachable from it with Skip.
+    fun requireSignIn() {
+        introPrefs.edit().putBoolean("welcome_done", false).apply()
+        showWelcome = true
+    }
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -2118,6 +2124,9 @@ fun VaultApp(
                         access = MyAccess()
                         profileOpen = false
                         profileSheetKey += 1
+                        // Straight to the login page: a signed-out phone should not land in
+                        // the vault as a stranger.
+                        requireSignIn()
                     },
                     onGoogleSignedIn = { user ->
                         scope.launch { isAdmin = AdminStore(context).refreshFromServer() }

@@ -41,8 +41,8 @@ android {
         // The first stable 0.6 release: everything from the 0.6.7–0.6.9 pre-releases, now
         // published properly. No dash, so release.yml marks it latest and every phone is
         // offered the update.
-        versionCode = 95
-        versionName = "0.6.11"
+        versionCode = 96
+        versionName = "0.6.12"
         // The pro build gets its own name under the icon, so the two are told apart at a
         // glance. Normal releases keep "P Vault".
         resValue("string", "app_name", if (versionName.orEmpty().contains('-')) "P Vault Pro" else "P Vault")
