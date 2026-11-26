@@ -8,31 +8,24 @@ import org.junit.Test
 
 class ThemeTest {
     @Test
-    fun onlyLightAndDarkAreFree() {
-        assertEquals(
-            listOf(ThemePreset.WHITE, ThemePreset.DARK),
-            ThemePreset.all.filter { !it.special },
-        )
-        assertTrue(ThemePreset.all.count { it.special } >= 4)
-    }
-
-    @Test
-    fun everySpecialLookHasAGradient() {
-        ThemePreset.all.filter { it.special }.forEach { preset ->
-            assertEquals(2, preset.gradient?.size)
+    fun theAppShipsColourThemesOnly() {
+        // Colour-only for now: no shipped look carries a picture backdrop or card pictures.
+        // Nightfall and the picture looks are deliberately out of the list; they come back
+        // through the Theme Store when the owner says so.
+        ThemePreset.all.forEach { preset ->
+            assertTrue(preset.label, preset.backdrop is BackdropStyle.Plain)
+            assertTrue(preset.label, preset.cardPictures.isEmpty())
         }
+        assertEquals(9, ThemePreset.all.size)
+        assertTrue(ThemePreset.all.none { it.label == "Nightfall" })
+        assertTrue(ThemePreset.all.none { it.special })
     }
 
     @Test
-    fun aThemeNeedingAccessFallsBackToDark() {
-        // A picture look that is open to everyone with the theme level (not one shared by hand).
-        val special = ThemePreset.all.first { it.special && !it.adminOnly && it.cardPictures.isEmpty() }
-        val member = MyAccess(level = AccessLevel.THEME, looks = setOf(special.shareId()))
-        assertEquals(special, special.forAccess(member))
-        assertEquals(ThemePreset.DARK, special.forAccess(MyAccess()))
-        assertEquals(ThemePreset.DARK, special.forAccess(member.copy(level = AccessLevel.NONE)))
-        assertEquals(ThemePreset.DARK, special.withoutAccess())
-        assertEquals(ThemePreset.WHITE, ThemePreset.WHITE.withoutAccess())
+    fun everyLookIsAColourTheme() {
+        ThemePreset.all.forEach { preset ->
+            assertEquals(preset.label, 2, preset.gradient?.size)
+        }
     }
 
     @Test
@@ -54,22 +47,17 @@ class ThemeTest {
         assertTrue(ThemePreset.all.filter { it.adminOnly }.all { it.special })
     }
 
+    /** Nightfall is out of the shipped list but stays as the base an own theme is built on. */
     @Test
-    fun nightfallKeepsBackgroundAndCardsApart() {
+    fun nightfallStillKeepsBackgroundAndCardsApart() {
         val look = ThemePreset.NIGHTFALL
-        // A background behind the screen...
         assertTrue(look.backdrop is BackdropStyle.Picture)
-        // ...and a different picture inside every card.
-        assertEquals(
-            CardPicture.entries.toSet(),
-            look.cardPictures.keys,
-        )
+        assertEquals(CardPicture.entries.toSet(), look.cardPictures.keys)
         assertTrue(look.cardPictures.values.all { it != 0 })
-        // Shared by hand, look by look, not admin-only any more.
         assertFalse(look.adminOnly)
         assertEquals("nightfall", look.shareId())
-        // No other look has card pictures, so nothing else can change by accident.
-        ThemePreset.all.filter { it != look }.forEach { assertTrue(it.label, it.cardPictures.isEmpty()) }
+        // Nothing that ships carries card pictures, so no visible look can change by accident.
+        ThemePreset.all.forEach { assertTrue(it.label, it.cardPictures.isEmpty()) }
     }
 
     @Test
@@ -91,15 +79,14 @@ class ThemeTest {
     }
 
     @Test
-    fun onlyTheMoonlitLookIsGlassy() {
-        val glassy = ThemePreset.all.filter { it.glass }.map { it.label }.sorted()
-        assertEquals(listOf("Moonlit", "Nightfall"), glassy)
-        // The extras belong together: glassy cards, tinted tiles and artwork in the hero.
+    fun noShippedLookIsGlassy() {
+        // Glass cards belong to the picture looks, and none of those ship for now.
+        assertTrue(ThemePreset.all.none { it.glass })
+        assertTrue(ThemePreset.all.none { it.tileTints || it.heroArt })
+        // The extras still belong together on the look that has them.
+        assertTrue(ThemePreset.MOONLIT.glass)
         assertTrue(ThemePreset.MOONLIT.tileTints)
         assertTrue(ThemePreset.MOONLIT.heroArt)
-        ThemePreset.all.filter { !it.glass }.forEach { preset ->
-            assertFalse(preset.label, preset.tileTints || preset.heroArt)
-        }
     }
 
     @Test
@@ -109,7 +96,7 @@ class ThemeTest {
     }
 
     @Test
-    fun pictureLooksHaveABackdrop() {
+    fun pictureLooksKeepTheirBackdropsForWhenTheyReturn() {
         ThemePreset.GRAND_LINE.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
         ThemePreset.RACING.backdrop.let { assertTrue(it is BackdropStyle.Picture) }
         ThemePreset.SHINOBI.backdrop.let { assertTrue(it is BackdropStyle.Picture) }

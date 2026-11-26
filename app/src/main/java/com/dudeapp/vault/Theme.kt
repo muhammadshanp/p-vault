@@ -226,7 +226,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF7A6670),
         outline = Color(0xFFEFD9E2),
         error = Color(0xFFC0392B),
-        special = true,
         gradient = listOf(Color(0xFFF06A9B), Color(0xFFE8457A)),
         glow = Color(0xFFF2A7C3),
         )
@@ -246,7 +245,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF97AC9D),
         outline = Color(0xFF1F2E24),
         error = Color(0xFFFF6B6B),
-        special = true,
         gradient = listOf(Color(0xFF2FB86F), Color(0xFF0B2A18)),
         glow = Color(0xFF1E7A47),
         )
@@ -266,7 +264,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFFA9A395),
         outline = Color(0xFF2A2722),
         error = Color(0xFFFF6B5E),
-        special = true,
         gradient = listOf(Color(0xFFD9A83A), Color(0xFF6B4E10)),
         glow = Color(0xFF8A6A1E),
         )
@@ -286,7 +283,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF767676),
         outline = Color(0xFFE8E8E8),
         error = Color(0xFFB3261E),
-        special = true,
         gradient = listOf(Color(0xFF2B2B2B), Color(0xFF0E0E0E)),
         glow = Color(0xFF9E9E9E),
         )
@@ -306,7 +302,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFFAF9ECC),
         outline = Color(0xFF2A1B45),
         error = Color(0xFFFF5C7A),
-        special = true,
         gradient = listOf(Color(0xFFFF2BD6), Color(0xFF1B0B3A)),
         glow = Color(0xFFCE00AE),
         )
@@ -326,7 +321,6 @@ data class ThemePreset(
         onSurfaceVariant = Color(0xFF93A8B6),
         outline = Color(0xFF1B2A36),
         error = Color(0xFFFF6B6B),
-        special = true,
         gradient = listOf(Color(0xFF1C9EC9), Color(0xFF062A45)),
         glow = Color(0xFF0F6E8C),
         )
