@@ -422,17 +422,21 @@ internal object Supabase {
         if (json.isNull("value")) null else json.optString("value").takeIf { it.isNotBlank() }
     }
 
-    /** A free automatic name: user_ plus digits, retried when the server says taken. */
+    /**
+     * A free automatic name: `user_` plus digits.
+     *
+     * Goes straight to claimName rather than pre-checking with checkName: the claim already
+     * refuses a taken or reserved name, so the extra round trip only added a race — the
+     * name could be taken between the check and the claim, which is what a null return
+     * used to mean, and a person could end up with no name at all.
+     */
     suspend fun automaticName(context: Context): String? {
         repeat(5) {
             val candidate = "user_" + (100000..999999).random()
-            when (Supabase.checkName(context, candidate)) {
-                Supabase.NameCheck.Free -> {
-                    val status = claimName(context, candidate)
-                    if (status == "ok" || status == "already_yours") return candidate
-                }
-                Supabase.NameCheck.Offline -> return null
-                else -> Unit
+            when (claimName(context, candidate)) {
+                "ok", "already_yours" -> return candidate
+                null -> return null // offline: no point trying four more
+                else -> Unit // taken or reserved: another number
             }
         }
         return null
