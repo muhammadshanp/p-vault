@@ -281,7 +281,7 @@ fun ProfileSheet(
                 }
 
                 SheetGap()
-                PreReNameCard(onChanged = onNameChanged)
+                PreReNameCard(onChanged = onNameChanged, accountName = username)
 
                 SheetGap()
                 SettingsSheetLabel("Account")

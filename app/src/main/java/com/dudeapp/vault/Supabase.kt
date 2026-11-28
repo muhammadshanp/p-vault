@@ -72,6 +72,10 @@ internal object Supabase {
             if (text.trim().startsWith("{")) JSONObject(text) else JSONObject("{\"value\":$text}")
         } catch (e: IOException) {
             null
+        } catch (e: org.json.JSONException) {
+            // A body the parser cannot read is a null answer, not a crash: this call runs on
+            // launch, so throwing here would take the app down before it draws.
+            null
         } finally {
             connection.disconnect()
         }
@@ -246,7 +250,41 @@ internal object Supabase {
         if (email.isBlank()) return@withContext false
         val json = rpc("pre_re_is_owner", JSONObject().put("p_email", email.trim().lowercase()))
             ?: return@withContext false
-        json.optBoolean("value") || json.optBoolean("pre_re_is_owner")
+        // A scalar boolean comes back as {"value":true}; a table-shaped answer as a row.
+        json.optBoolean("value") || json.optBoolean("pre_re_is_owner") ||
+            json.optJSONArray("value")?.optBoolean(0) == true
+    }
+
+    /** What the address holds: its name, level, both ticks, and whether it may open the panel. */
+    data class Account(
+        val name: String?,
+        val level: String?,
+        val verified: Boolean,
+        val partner: Boolean,
+        val admin: Boolean,
+    )
+
+    /**
+     * The whole account, read by email.
+     *
+     * One call on launch and after a sign-in. The email is the account key, so this is what
+     * makes a new phone arrive with the old name and badges, and what lets the panel open
+     * for an owner address without re-signing in.
+     */
+    suspend fun account(context: Context, email: String): Account? = withContext(Dispatchers.IO) {
+        if (email.isBlank()) return@withContext null
+        val json = rpc("pre_re_account", JSONObject().put("p_email", email.trim().lowercase()))
+            ?: return@withContext null
+        val row = json.optJSONArray("value")?.optJSONObject(0)
+        val body = if (row != null) row else json.optJSONObject("value") ?: json
+        if (body.isNull("name") && body.isNull("admin")) return@withContext null
+        Account(
+            name = body.optString("name").takeIf { it.isNotBlank() && it != "null" },
+            level = body.optString("level").takeIf { it.isNotBlank() && it != "null" },
+            verified = body.optBoolean("verified", false),
+            partner = body.optBoolean("partner", false),
+            admin = body.optBoolean("admin", false),
+        )
     }
 
     data class Owner(val email: String, val note: String)
@@ -393,7 +431,15 @@ internal object Supabase {
         val body = JSONObject()
             .put("p_device", deviceId(context))
             .put("p_username", normalizeUsername(name))
-        rpc("pre_re_rename_self", body)?.optString("status")?.takeIf { it.isNotEmpty() }
+        // The signed-in address travels with it: the name belongs to the account, so the
+        // person can change it from any phone, not only the one that first claimed it.
+        GoogleAccountStore(context).email()?.let { body.put("p_email", it.trim().lowercase()) }
+        // The email-aware version is the one that moves the whole account. A project that
+        // has not had 0.6.13-account.sql run yet answers nothing, so fall back to the
+        // device-only call rather than failing the rename outright.
+        val json = rpc("pre_re_rename_self_email", body) ?: rpc("pre_re_rename_self", body)
+            ?: return@withContext null
+        json.optString("status").takeIf { it.isNotEmpty() }
     }
 
     /**
@@ -411,7 +457,7 @@ internal object Supabase {
                 .put("p_device", deviceId(context))
                 .put("p_username", normalizeUsername(name))
                 .put("p_email", email.trim().lowercase())
-            rpc("pre_re_link_email", body)?.optString("status") == "ok"
+            rpc("pre_re_link_email", body)?.optString("status") in setOf("ok", "already_linked")
         }
 
     /** The name this address holds, so a new phone gets its old name back. */
@@ -455,6 +501,7 @@ internal object Supabase {
         "bad_device" -> "This install could not be identified. Restart P Vault and try again."
         "bad_key" -> "The owner passphrase was not accepted."
         "email_taken" -> "This Google account already holds a different name."
+        "not_yours" -> "This name belongs to another Google account."
         "rename_off" -> "The owner has turned name changes off. Only they can change a name now."
         "no_name" -> "This phone does not hold a name yet. Claim one first."
         "no_such_name" -> "That name is not on the server any more. Reload the list."
