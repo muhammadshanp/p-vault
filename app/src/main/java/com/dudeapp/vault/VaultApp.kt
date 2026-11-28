@@ -1248,6 +1248,12 @@ fun VaultApp(
                 GoogleAccountStore(context).save(user)
                 signedIn = true
                 finishIntro()
+                // The whole account is read here as well: this is the very first moment the
+                // address is known, and it is what decides the panel, the name and the badges.
+                scope.launch {
+                    access = AccessStore(context).refreshGrant()
+                    isAdmin = AdminStore(context).refreshFromServer()
+                }
             },
             onSkip = {
                 finishIntro()
@@ -1499,7 +1505,14 @@ fun VaultApp(
                     onThemes = { closeMenu { themesOpen = true } },
                     signedIn = signedIn,
                     tick = access.tick,
-                    onSignIn = { closeMenu { adminOpen = true } },
+                    // Signing in and the panel used to be the same menu row, so an owner
+                    // who was already signed in could not reach the account page from here.
+                    onSignIn = {
+                        closeMenu {
+                            profileOpen = true
+                            profileSheetKey += 1
+                        }
+                    },
                     onBackup = { closeMenu { backupNow() } },
                     onCheckUpdates = { closeMenu { checkUpdatesNow() } },
                     onAbout = { closeMenu { aboutOpen = true } },
@@ -2124,7 +2137,13 @@ fun VaultApp(
                         requireSignIn()
                     },
                     onGoogleSignedIn = { user ->
-                        scope.launch { isAdmin = AdminStore(context).refreshFromServer() }
+                        // Signing in can be the moment the address becomes an owner: read
+                        // the name, the badges, the level and the panel right then, so no
+                        // second sign-in or restart is needed.
+                        scope.launch {
+                            access = AccessStore(context).refreshGrant()
+                            isAdmin = AdminStore(context).refreshFromServer()
+                        }
                         // Only fills gaps: a name or picture the user already chose is kept.
                         var changed = false
                         if (profile.name.isBlank() && user.name.isNotBlank()) {
@@ -3173,9 +3192,14 @@ private fun MenuDrawer(
         MenuDrawerItem(Icons.Outlined.Settings, "Settings", onSettings)
         // The Theme page itself is for everyone; only its picture looks need special access.
         MenuDrawerItem(Icons.Outlined.Palette, "Theme", onThemes)
-        if (!signedIn) {
-            MenuDrawerItem(Icons.Outlined.Login, "Sign in with Google", onSignIn)
-        }
+        // Always offered: it is the account row of every app's menu — "Sign in" when there
+        // is no account, "Account" when there is one. It used to vanish after signing in,
+        // leaving no way back to the account except Profile.
+        MenuDrawerItem(
+            icon = Icons.Outlined.Login,
+            label = if (signedIn) "Account" else "Sign in with Google",
+            onClick = onSignIn,
+        )
         MenuDrawerItem(Icons.Outlined.CloudUpload, "Back up now", onBackup)
         MenuDrawerItem(
             icon = Icons.Outlined.SystemUpdateAlt,

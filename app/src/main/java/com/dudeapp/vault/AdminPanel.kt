@@ -125,7 +125,13 @@ class AdminStore(private val context: Context) {
             clear()
             return false
         }
-        val answered = runCatching { Supabase.isOwner(context, signedIn) }.getOrNull()
+        // The address is the account, so the question is asked again on every launch and
+        // after every sign-in. It used to be asked once, so a phone that first started
+        // signed out — or before the address was added to the owner list — never saw the
+        // panel until it signed in again. Now being on the list is enough, immediately.
+        val answer = runCatching { Supabase.account(context, signedIn) }.getOrNull()
+        val answered = answer?.admin
+            ?: runCatching { Supabase.isOwner(context, signedIn) }.getOrNull()
             ?: return isAdmin()
         if (answered) save(signedIn) else clear()
         return answered

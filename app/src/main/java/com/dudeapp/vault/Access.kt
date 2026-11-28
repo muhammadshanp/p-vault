@@ -375,17 +375,29 @@ class AccessStore(private val context: Context) {
             // Not held by this phone: nothing to grant. Offline keeps the last answer.
             prefs.edit().remove("level").remove("features").remove("verified").remove("partner").apply()
         }
-        // The name follows the account: the email is stored with it, so a new phone gets
-        // the same name, level and ticks back instead of starting as a stranger.
+        // The account is the email, so the name, level and both ticks are read back by
+        // address. That is what makes a new phone arrive as the same person, and what lets
+        // an owner address open the panel without a stored admin flag.
         val email = GoogleAccountStore(context).email()
         var name = runCatching { Supabase.myName(context) }.getOrNull()
-        if (name == null && email != null) {
-            // This install has no name but the account does: claim it back on this phone.
-            name = runCatching { Supabase.nameForEmail(context, email) }.getOrNull()
-        }
-        if (name != null) {
-            prefs.edit().putString("username", name).apply()
-            if (email != null) runCatching { Supabase.linkEmail(context, name, email) }
+        if (email != null) {
+            val account = runCatching { Supabase.account(context, email) }.getOrNull()
+            if (name == null) {
+                // This install has no name but the account does: it holds it here now.
+                name = account?.name ?: runCatching { Supabase.nameForEmail(context, email) }.getOrNull()
+            }
+            if (name != null) {
+                prefs.edit()
+                    .putString("username", name)
+                    .putBoolean("verified", account?.verified ?: prefs.getBoolean("verified", false))
+                    .putBoolean("partner", account?.partner ?: prefs.getBoolean("partner", false))
+                    .apply()
+                if (account?.level != null) prefs.edit().putString("level", account.level).apply()
+                // A phone that read the name from the account has no need to re-point it;
+                // the server accepts the same-person re-link anyway, and answers
+                // not_yours for anyone else, so this is safe to call every time.
+                runCatching { Supabase.linkEmail(context, name, email) }
+            }
         }
         access()
     }

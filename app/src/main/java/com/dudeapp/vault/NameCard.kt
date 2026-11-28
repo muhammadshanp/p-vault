@@ -36,13 +36,23 @@ import kotlinx.coroutines.launch
  * side — a name, the install holding it, nothing else.
  */
 @Composable
-fun PreReNameCard(onChanged: () -> Unit = {}) {
+fun PreReNameCard(
+    onChanged: () -> Unit = {},
+    /**
+     * The name the account holds, if the caller already read it. When the profile sheet
+     * knows the name but this phone's storage does not, passing it keeps the card from
+     * saying "no name" and offering to claim one that already exists.
+     */
+    accountName: String? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE) }
     val colors = preReColors()
 
-    var claimed by remember { mutableStateOf(prefs.getString("claimed_name", null)) }
+    var claimed by remember {
+        mutableStateOf(prefs.getString("claimed_name", null) ?: accountName?.takeIf { it.isNotBlank() })
+    }
     var verified by remember { mutableStateOf(prefs.getBoolean("verified", false)) }
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -58,6 +68,16 @@ fun PreReNameCard(onChanged: () -> Unit = {}) {
     var renameAllowed by remember { mutableStateOf(true) }
     LaunchedEffect(claimed) {
         renameAllowed = Supabase.canRename(context)
+        // The name belongs to the address, not to this phone's storage: the account is
+        // asked, so a name claimed on another phone shows up here and can be changed here.
+        val signedIn = GoogleAccountStore(context).email()
+        if (signedIn != null) {
+            val held = runCatching { Supabase.account(context, signedIn) }.getOrNull()?.name
+            if (!held.isNullOrBlank()) {
+                prefs.edit().putString("claimed_name", held).apply()
+                claimed = held
+            }
+        }
     }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -90,6 +110,11 @@ fun PreReNameCard(onChanged: () -> Unit = {}) {
                     val status = Supabase.claimName(context, wanted)
                     if (status == "ok" || status == "already_yours") {
                         val stored = normalizeUsername(wanted)
+                        // The account key goes on the name immediately: from now on the
+                        // name follows the address, on any phone.
+                        GoogleAccountStore(context).email()?.let { address ->
+                            runCatching { Supabase.linkEmail(context, stored, address) }
+                        }
                         prefs.edit().putString("claimed_name", stored).apply()
                         claimed = stored
                         // The tick travels with the grant, not with the claim.
