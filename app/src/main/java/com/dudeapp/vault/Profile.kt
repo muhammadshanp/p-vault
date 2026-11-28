@@ -1,6 +1,7 @@
 package com.dudeapp.vault
 
 import android.content.Context
+import android.widget.Toast
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Email
@@ -134,12 +136,18 @@ fun ProfileSheet(
     onSignOut: () -> Unit,
     /** Called after the name this phone holds was replaced. */
     onNameChanged: () -> Unit = {},
+    /** Called when the owner unlock dialog reports success, so the panel appears at once. */
+    onOwnerUnlocked: () -> Unit = {},
+    /** True once this address is an owner: the unlock row has nothing left to do. */
+    onOwner: Boolean = false,
     onDismiss: () -> Unit,
 ) {
     // Seeded from what is saved, and never reset by the sheet reopening, so a name that was
     // just typed is not pulled back to the old one by a redraw.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val accent = LocalThemePreset.current
+    val context = LocalContext.current
+    var ownerDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -257,6 +265,18 @@ fun ProfileSheet(
                         title = "Email",
                         value = email.ifBlank { "None" },
                     )
+                    // The way back in when the panel is not in the menu: the owner
+                    // passphrase adds this address to the owner list. Only useful before
+                    // the panel appears, so it hides itself once the panel is there.
+                    if (email.isNotBlank() && !onOwner) {
+                        SettingsSheetDivider()
+                        SettingsSheetRow(
+                            icon = Icons.Outlined.AdminPanelSettings,
+                            title = "Make this account an owner",
+                            value = "Needs the passphrase",
+                            onClick = { ownerDialog = true },
+                        )
+                    }
                 }
                 SheetGap()
                 PreReNameCard(onChanged = onNameChanged, accountName = username)
@@ -316,6 +336,20 @@ fun ProfileSheet(
 
             }
         }
+    }
+
+    if (ownerDialog) {
+        OwnerUnlockDialog(
+            email = email,
+            onDone = { ok, message ->
+                if (ok) {
+                    ownerDialog = false
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    onOwnerUnlocked()
+                }
+            },
+            onDismiss = { ownerDialog = false },
+        )
     }
 }
 

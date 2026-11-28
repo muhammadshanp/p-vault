@@ -376,9 +376,24 @@ fun VaultApp(
         if (!signedIn) return@LaunchedEffect
         // Signing in is the whole sign-up: the only thing left is the display name, and the
         // server is asked rather than a local flag, so a reinstall does not ask twice.
-        val held = withContext(Dispatchers.IO) {
-            runCatching { Supabase.myName(context) }.getOrNull()
+        val known = withContext(Dispatchers.IO) {
+            val onPhone = runCatching { Supabase.myName(context) }.getOrNull()
+            if (onPhone != null) {
+                onPhone
+            } else {
+                // The name belongs to the Google address: a phone that has just signed in,
+                // or just read its account, must not be asked for a name it already has.
+                GoogleAccountStore(context).email()?.let { address ->
+                    runCatching { Supabase.account(context, address) }.getOrNull()?.name
+                }
+            }
         }
+        if (known != null) {
+            // Remember it here, so the next start answers from the phone.
+            context.getSharedPreferences("pre_re_supabase", android.content.Context.MODE_PRIVATE)
+                .edit().putString("claimed_name", known).apply()
+        }
+        val held = known
         if (held == null) {
             // A person who was signed in before this update gets the choice to defer; a
             // fresh sign-in does not, because their account must end up with a name.
@@ -2165,6 +2180,12 @@ fun VaultApp(
                             }
                         }
                     },
+                    onOwnerUnlocked = {
+                        // The unlock just put this address on the owner list: the menu row
+                        // is there in the same moment, without a restart.
+                        scope.launch { isAdmin = AdminStore(context).refreshFromServer() }
+                    },
+                    onOwner = isAdmin,
                     onNameChanged = {
                         // The server name moved: pick the new one up for the header and the
                         // settings rows without waiting for a restart.
