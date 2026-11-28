@@ -286,12 +286,8 @@ fun VaultApp(
     var profileOpen by remember { mutableStateOf(false) }
     // Whether a Google account is signed in on this phone, for the menu's sign-in item.
     var signedIn by remember { mutableStateOf(GoogleAccountStore(context).email() != null) }
-    // Whether usernames may still be changed, as the admin last set it. Read from the public
-    // document when the access list refreshes, so it is right without opening a screen.
-    var namesFixed by remember { mutableStateOf(AccessStore(context).namesFixed()) }
     // Bumped whenever the profile changes, to reopen the sheet with the saved values.
     var profileSheetKey by remember { mutableIntStateOf(0) }
-    val usernameStore = remember { UsernameStore(context) }
     var chatAvatarTarget by remember { mutableStateOf<ChatThread?>(null) }
     var drive by remember { mutableStateOf(driveStore.state()) }
     LaunchedEffect(Unit) { backupProtected = withContext(Dispatchers.IO) { driveStore.isEncrypted() } }
@@ -375,7 +371,7 @@ fun VaultApp(
     // Someone who signed in with an earlier build has been waiting without a name: they are
     // allowed to defer it. Anyone signing in now is a new account and must leave with one.
     var nameStepMayDefer by remember { mutableStateOf(introPrefs.getBoolean("signed_in_before", true)) }
-    LaunchedEffect(signedIn, showWelcome, profileSheetKey) {
+    LaunchedEffect(signedIn, showWelcome) {
         if (showWelcome) return@LaunchedEffect
         if (!signedIn) return@LaunchedEffect
         // Signing in is the whole sign-up: the only thing left is the display name, and the
@@ -1491,11 +1487,8 @@ fun VaultApp(
                     version = currentVersion,
                     updateReady = availableUpdate != null,
                     onProfile = {
-                        // The admin may have fixed names since this phone last looked.
-                        scope.launch {
-                            AccessStore(context).refresh()
-                            namesFixed = AccessStore(context).namesFixed()
-                        }
+                        // The admin may have changed access since this phone last looked.
+                        scope.launch { AccessStore(context).refresh() }
                         closeMenu { profileOpen = true }
                     },
                     onSettings = { closeMenu { settingsOpen = true } },

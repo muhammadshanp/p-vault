@@ -165,6 +165,66 @@ internal object Supabase {
             }
         }
 
+    /** One person on the user list: the name, the address behind it, and what it may do. */
+    data class AdminUser(
+        val username: String,
+        val email: String?,
+        val claimedAt: String,
+        val level: String,
+        val features: List<String>,
+        val verified: Boolean,
+        val partner: Boolean,
+    )
+
+    /**
+     * Every registered user, newest first.
+     *
+     * One call for the owner's user list. Null means the passphrase was not accepted or the
+     * server could not be reached, so the screen can say which instead of showing "nobody".
+     * A project without 0.6.16-admin-users.sql answers nothing, so the older names call is
+     * used instead and the list is still shown (without addresses).
+     */
+    suspend fun adminUsers(context: Context, passphrase: String): List<AdminUser>? =
+        withContext(Dispatchers.IO) {
+            val json = rpc("pre_re_admin_users", JSONObject().put("p_key", keyHash(passphrase)))
+            if (json != null && json.optString("status") == "bad_key") return@withContext null
+            val rows = when {
+                json == null -> null
+                json.optJSONArray("users") != null -> json.optJSONArray("users")
+                json.optJSONArray("value") != null -> json.optJSONArray("value")
+                else -> null
+            }
+            if (rows != null) {
+                return@withContext (0 until rows.length()).mapNotNull { index ->
+                    val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                    AdminUser(
+                        username = row.optString("username"),
+                        email = row.optString("email").takeIf { it.isNotBlank() && it != "null" },
+                        claimedAt = row.optString("created_at"),
+                        level = row.optString("level").ifBlank { "NONE" },
+                        features = row.optJSONArray("features")?.let { list ->
+                            (0 until list.length())
+                                .mapNotNull { list.optString(it).takeIf(String::isNotEmpty) }
+                        }.orEmpty(),
+                        verified = row.optBoolean("verified"),
+                        partner = row.optBoolean("partner"),
+                    )
+                }
+            }
+            // Older project: the names call still knows every row.
+            adminNames(context, passphrase)?.map {
+                AdminUser(
+                    username = it.username,
+                    email = null,
+                    claimedAt = it.claimedAt,
+                    level = it.level,
+                    features = it.features,
+                    verified = it.verified,
+                    partner = it.partner,
+                )
+            }
+        }
+
     /** Gives one name a level and its switches. False means the key was wrong. */
     suspend fun setAccess(
         context: Context,
