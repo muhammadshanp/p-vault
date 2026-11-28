@@ -1298,6 +1298,18 @@ fun VaultApp(
     }
     if (inboxOpen) {
         InboxScreen(onBack = { inboxOpen = false })
+    } else if (adminOpen && !isAdmin) {
+        // The panel is not a screen anyone can wander into: it is drawn only for an owner
+        // address. Reaching it another way (a stale state, a deep link, a back stack entry
+        // from a signed-out session) closes it instead of opening it.
+        LaunchedEffect(Unit) {
+            adminOpen = false
+            Toast.makeText(
+                context,
+                "The admin panel opens with an owner Google address.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     } else if (adminOpen) {
         AdminScreen(
             shareableLooks = (

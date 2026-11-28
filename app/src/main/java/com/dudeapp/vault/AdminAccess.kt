@@ -95,6 +95,12 @@ internal fun AdminAccessCard(
                 renameAllowed = Supabase.canRename(context)
                 unlocked = true
                 onUnlocked(passphrase)
+                // Holding the owner passphrase is proof this address is the owner. The
+                // panel flag is set locally as well, so the entry is there on the next
+                // start even before the server answers, and works offline.
+                GoogleAccountStore(context).email()?.let { address ->
+                    runCatching { AdminStore(context).save(address) }
+                }
             }
         }
     }
