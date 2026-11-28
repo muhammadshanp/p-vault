@@ -25,7 +25,9 @@ begin
     return jsonb_build_object('status', 'bad_key');
   end if;
 
-  select coalesce(jsonb_agg(row order by row->>'created_at' desc nulls last), '[]'::jsonb)
+  -- `entry` rather than `row`: ROW is a keyword, and an alias that reads like one is a
+  -- needless argument with the parser.
+  select coalesce(jsonb_agg(entry order by entry->>'created_at' desc nulls last), '[]'::jsonb)
     into v_rows
     from (
       select jsonb_build_object(
@@ -36,7 +38,7 @@ begin
         'features',   coalesce(to_jsonb(g.features), '[]'::jsonb),
         'verified',   coalesce(g.verified, false),
         'partner',    coalesce(g.partner, false)
-      ) as row
+      ) as entry
         from public.usernames u
         left join public.username_grants g on g.username = u.username
     ) rows;
@@ -88,14 +90,3 @@ begin
 end $f$;
 
 grant execute on function public.pre_re_admin_user(text, text) to anon, authenticated;
-
--- 3. A count, for the panel's heading ------------------------------------------------
-create or replace function public.pre_re_public_count()
-returns jsonb language sql stable security definer set search_path = public as $f$
-  select jsonb_build_object(
-    'users', (select count(*) from public.usernames),
-    'with_email', (select count(*) from public.usernames where email is not null)
-  );
-$f$;
-
-grant execute on function public.pre_re_public_count() to anon, authenticated;
