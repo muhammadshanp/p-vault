@@ -2087,9 +2087,6 @@ fun VaultApp(
             if (profileOpen) {
                 key(profileSheetKey) {
                 ProfileSheet(
-                    // The key above rebuilds the sheet whenever the profile changes, so what is
-                    // on screen is always what is saved rather than a leftover draft.
-                    name = profile.name,
                     avatar = profile.avatar,
                     drive = drive,
                     backupAllowed = !grantsActive || access.has(AccessFeature.BACKUP),
@@ -2101,14 +2098,7 @@ fun VaultApp(
                     },
                     onConnectDrive = { connectDrive() },
                     onDisconnectDrive = { disconnectDrive() },
-                    onBackupNow = { name ->
-                        val clean = name.trim()
-                        if (clean.isNotBlank() && clean != profile.name) {
-                            profileStore.setName(clean)
-                            profile = profileStore.load()
-                        }
-                        backupNow()
-                    },
+                    onBackupNow = { backupNow() },
                     onRestoreFile = {
                         onExternal()
                         restorePicker.launch(
@@ -2167,18 +2157,6 @@ fun VaultApp(
                         // The server name moved: pick the new one up for the header and the
                         // settings rows without waiting for a restart.
                         scope.launch { access = AccessStore(context).refreshGrant() }
-                    },
-                    onSave = { name ->
-                        val changed = name != profile.name
-                        profileStore.setName(name)
-                        profile = profileStore.load()
-                        profileOpen = false
-                        // A rebuilt sheet, so no half-filled field survives into the next look.
-                        profileSheetKey += 1
-                        if (changed) {
-                            autoBackupTick += 1
-                            driveStore.markPending()
-                        }
                     },
                     onDismiss = {
                         profileOpen = false
