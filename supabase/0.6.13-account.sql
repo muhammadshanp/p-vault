@@ -14,11 +14,11 @@
 
 -- 1. An admin is an admin by address ---------------------------------------------------
 -- The owner list already answers per address; this is the same question under the name
--- the app calls, and it also accepts addresses marked as admins.
+-- the app calls (the owner list is public.admin_owners).
 create or replace function public.pre_re_is_owner(p_email text)
 returns boolean language sql stable security definer set search_path = public as $f$
   select coalesce((
-    select true from public.admins a
+    select true from public.admin_owners a
      where lower(a.email) = lower(btrim(coalesce(p_email, '')))
      limit 1
   ), false);
@@ -98,12 +98,7 @@ begin
   begin
     update public.usernames set username = v_new where username = holder;
     update public.username_grants set username = v_new where username = holder;
-    -- The names held for other devices point at the same person: keep them together.
-    update public.pre_re_devices set username = v_new where username = holder;
-  exception when undefined_table then
-    -- Older installs have no device table; the two updates above are the whole job.
-    null;
-  when unique_violation then
+  exception when unique_violation then
     return jsonb_build_object('status', 'taken');
   end;
 
@@ -139,7 +134,7 @@ returns jsonb language sql stable security definer set search_path = public as $
        where g.username = (select w.username from who w) and coalesce(g.partner, false)
     ),
     'admin', exists (
-      select 1 from public.admins a
+      select 1 from public.admin_owners a
        where lower(a.email) = lower(btrim(coalesce(p_email, '')))
     )
   );
