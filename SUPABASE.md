@@ -38,3 +38,31 @@ The green tick and online messages to the owner are **not implemented**. Existin
 
 Run it in the Supabase SQL editor before installing 0.6.8-pro. It is safe to run twice and
 changes no existing signature, so an older phone keeps working.
+
+## The owner passphrase
+
+`pre_re_is_admin(p_key)` takes the **SHA-256** of what the owner typed and compares it with
+`public.admin_keys.key_hash` (row `id = 1`). The phrase itself is not stored anywhere in the
+app or in this repository; the row is the only copy, and it is a hash.
+
+To change the phrase, update that row — never the function:
+
+```sql
+insert into public.admin_keys (id, key_hash, updated_at)
+values (1, encode(extensions.digest('your-new-phrase', 'sha256'), 'hex'), now())
+on conflict (id) do update set key_hash = excluded.key_hash, updated_at = now();
+```
+
+`public.admin_owners` is who may open the admin panel. It starts empty, and an empty list
+means nobody is an owner — the panel is then unreachable, because the panel is the only
+screen that can add to the list. Seed it with the owner's Google address:
+
+```sql
+insert into public.admin_owners (email, note) values ('owner@example.com', 'owner')
+on conflict (email) do update set note = 'owner';
+```
+
+`supabase/0.6.21-owner-key.sql` does both in one file. Once the app knows an address is an
+owner, the Account page's **Make this account an owner** adds the signed-in address with the
+passphrase alone.
+
