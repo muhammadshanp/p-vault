@@ -25,6 +25,9 @@ language sql stable security definer set search_path = public as $f$
 $f$;
 
 -- 3. The owner flips it -------------------------------------------------------------
+-- NOTE: `pre_re_is_admin` is not defined here. On the live project it compares against the
+-- single row in public.admin_keys (see supabase/0.6.21-owner-key.sql), so the passphrase is
+-- changed by updating that row, not by rewriting the function.
 create or replace function public.pre_re_admin_set_rename(p_key text, p_allowed boolean)
 returns boolean language plpgsql security definer set search_path = public as $f$
 begin
