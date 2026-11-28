@@ -67,7 +67,10 @@ class MainActivity : FragmentActivity() {
         // A special look is only shown while this phone still has special access. A look
         // from the catalogue is rebuilt from the stored copy, never from a build-in theme.
         catalogThemes = ThemeCatalogue(this).cached()
-        theme = themeStore.load(catalogThemes).forAccess(AccessStore(this).access())
+        theme = themeStore.load(catalogThemes).forAccess(
+            AccessStore(this).access(),
+            AdminStore(this).isAdmin(),
+        )
         applyNightMode(theme.dark)
         val settings = settingsStore.load()
         // Advanced mode off means no advanced look, whatever was worn before.
@@ -228,7 +231,10 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         external = false
         // Special access can be taken away while the app is in the background.
-        val allowed = themeStore.load(catalogThemes).forAccess(AccessStore(this).access())
+        val allowed = themeStore.load(catalogThemes).forAccess(
+            AccessStore(this).access(),
+            AdminStore(this).isAdmin(),
+        )
         if (allowed != theme) {
             theme = allowed
             applyNightMode(allowed.dark)

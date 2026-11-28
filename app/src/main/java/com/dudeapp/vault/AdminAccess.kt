@@ -51,11 +51,16 @@ import kotlinx.coroutines.launch
  * two free looks: a name starts at "No access" and the owner decides.
  */
 @Composable
-internal fun AdminAccessCard() {
+internal fun AdminAccessCard(
+    /** A passphrase already accepted elsewhere in the panel, so it is not typed twice. */
+    initialPassphrase: String = "",
+    /** Hands the accepted passphrase back, for the pages that need the same key. */
+    onUnlocked: (String) -> Unit = {},
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var passphrase by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf(initialPassphrase) }
     var unlocked by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -89,6 +94,7 @@ internal fun AdminAccessCard() {
                 if (adminList != null && adminList.second) owners = adminList.first
                 renameAllowed = Supabase.canRename(context)
                 unlocked = true
+                onUnlocked(passphrase)
             }
         }
     }

@@ -234,7 +234,19 @@ fun AdminScreen(
     var body by remember { mutableStateOf("") }
     var confirmOpen by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(AdminPage.MESSAGE) }
-    val adminPages = listOf(AdminPage.MESSAGE, AdminPage.ACCESS, AdminPage.PEOPLE, AdminPage.ACCOUNT)
+    // Users comes second: it is what the owner opens the panel for. Names is listed too —
+    // the page existed but was unreachable from these tabs.
+    val adminPages = listOf(
+        AdminPage.MESSAGE,
+        AdminPage.USERS,
+        AdminPage.ACCESS,
+        AdminPage.PEOPLE,
+        AdminPage.NAMES,
+        AdminPage.ACCOUNT,
+    )
+    // Kept here so the Users page does not ask for the passphrase the Access page already
+    // took; it is a local variable, never written to disk.
+    var ownerKey by remember { mutableStateOf("") }
     // What to do with the Google pass once it arrives.
     var afterToken by remember { mutableStateOf<((String) -> Unit)?>(null) }
 
@@ -386,7 +398,37 @@ fun AdminScreen(
                     }
                 } else {
                     when (page) {
-                        AdminPage.ACCESS -> AdminAccessCard()
+                        AdminPage.ACCESS -> AdminAccessCard(
+                            onUnlocked = { key -> ownerKey = key },
+                            initialPassphrase = ownerKey,
+                        )
+                        AdminPage.USERS -> {
+                            // The list is behind the owner passphrase, the same as Access.
+                            // Saying where to get it beats an empty screen.
+                            if (ownerKey.isBlank()) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text("Users", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "The user list opens with the owner passphrase. Unlock " +
+                                            "it once on the Access page; this page then shows " +
+                                            "everyone who has claimed a name.",
+                                        color = TextSoft,
+                                        fontSize = 13.sp,
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { page = AdminPage.ACCESS },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Unlock on Access") }
+                                }
+                            } else {
+                                AdminUsersCard(
+                                    passphrase = ownerKey,
+                                    onOpenAccess = { page = AdminPage.ACCESS },
+                                )
+                            }
+                        }
                         AdminPage.PEOPLE -> {
                             SpecialAccessCard(
                                 busy = busy,
@@ -395,10 +437,12 @@ fun AdminScreen(
                                 onDone = { problem -> if (problem != null) fail(problem) else busy = false },
                             )
                         }
-                        AdminPage.NAMES -> ReservedNamesCard(
-                            busy = busy,
-                            withGoogle = { next -> withGoogle(listOf(SCOPE_DATASTORE), next) },
-                            onDone = { problem -> if (problem != null) fail(problem) else busy = false },
+                        // Names set aside live on the Access page now (Supabase), where the
+                        // passphrase already is. The old Firebase copy of this list was a
+                        // second editor for the same thing, and it disagreed with the first.
+                        AdminPage.NAMES -> AdminAccessCard(
+                            onUnlocked = { key -> ownerKey = key },
+                            initialPassphrase = ownerKey,
                         )
                         AdminPage.MESSAGE -> AdminMessageCard(
                             busy = busy,
@@ -412,7 +456,9 @@ fun AdminScreen(
                             email = email,
                             busy = busy,
                             onSignOut = {
-                                admin.clear()
+                                // The same sign-out as everywhere else: the chose account,
+                                // the panel flag and the grants go together.
+                                signOutOfAccount(context)
                                 signedIn = false
                                 email = null
                                 error = null
@@ -464,6 +510,7 @@ fun AdminScreen(
 /** The parts of the admin panel, each on its own page. */
 enum class AdminPage(val label: String) {
     MESSAGE("Message"),
+    USERS("Users"),
     ACCESS("Access"),
     PEOPLE("People"),
     NAMES("Names"),
