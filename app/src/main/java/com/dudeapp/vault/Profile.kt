@@ -30,13 +30,11 @@ import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -116,7 +114,6 @@ class ProfileStore(private val context: Context) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSheet(
-    name: String,
     avatar: File?,
     drive: DriveBackupState,
     /** False when this name has not been given Drive backup. */
@@ -137,10 +134,8 @@ fun ProfileSheet(
     onSignOut: () -> Unit,
     /** Called after the name this phone holds was replaced. */
     onNameChanged: () -> Unit = {},
-    onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var draft by remember(name) { mutableStateOf(name) }
     // Seeded from what is saved, and never reset by the sheet reopening, so a name that was
     // just typed is not pulled back to the old one by a redraw.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -258,28 +253,11 @@ fun ProfileSheet(
             ) {
                 SettingsSheet {
                     SettingsSheetRow(
-                        icon = Icons.Outlined.Badge,
-                        title = "Profile name",
-                        value = name.trim().ifBlank { "Not set" },
-                    )
-                    SettingsSheetDivider()
-                    SettingsSheetRow(
                         icon = Icons.Outlined.Email,
                         title = "Email",
                         value = email.ifBlank { "None" },
                     )
                 }
-                Column(Modifier.padding(horizontal = 4.dp, vertical = 10.dp)) {
-                    OutlinedTextField(
-                        value = draft,
-                        onValueChange = { draft = it.take(40) },
-                        label = { Text("Profile name") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
                 SheetGap()
                 PreReNameCard(onChanged = onNameChanged, accountName = username)
 
@@ -326,7 +304,9 @@ fun ProfileSheet(
                             drive = drive,
                             onConnect = onConnectDrive,
                             onDisconnect = onDisconnectDrive,
-                            onBackupNow = { onBackupNow(draft.trim()) },
+                            // The backup is named after the account name, which is the only
+                            // name this app has (the local "profile name" is gone).
+                            onBackupNow = { onBackupNow(username.orEmpty()) },
                             onRestoreFile = onRestoreFile,
                         )
                     } else {
@@ -334,21 +314,6 @@ fun ProfileSheet(
                     }
                 }
 
-                SheetGap()
-                Button(
-                    onClick = { onSave(draft.trim()) },
-                    enabled = draft.isNotBlank(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = accent.primary,
-                        contentColor = accent.onPrimary,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                ) {
-                    Text("Save profile", fontWeight = FontWeight.SemiBold)
-                }
             }
         }
     }
